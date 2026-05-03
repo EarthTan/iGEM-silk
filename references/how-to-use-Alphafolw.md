@@ -662,3 +662,290 @@ POST /run_pipeline
 
 
 
+这个担心非常真实，而且基本是所有从“科研脚本”转向“Docker工程化”的人都会遇到的第一道心理门槛：**感觉本地开发被“容器化”绑架了，调试变慢、反馈变重、失去灵活性。**
+
+但实际情况恰恰相反——如果设计得对，Docker 不但不会让你变慢，反而会让你**开发-调试-部署三者一致且更快收敛问题**。关键在于你现在对 Docker 的理解还停留在“全量重新构建运行”的模式，而不是“分层开发模式”。
+
+我给你拆清楚。
+
+------
+
+# 一、你现在的误解：把 Docker 当成“虚拟机”
+
+你现在的担心本质是：
+
+> 每次改代码 → rebuild image → restart container → 重新跑 GPU pipeline
+
+如果真的这么用，结论是：
+
+> ❌ 确实会慢，而且非常反人类
+
+但这是**错误用法**，不是 Docker 的设计方式。
+
+------
+
+# 二、正确理解 Docker 的开发模式：三层拆分
+
+Docker 在工程里通常分三层使用：
+
+```text
+① 基础镜像（CUDA / Python / system libs）
+② 依赖层（pip/uv install）
+③ 代码层（你写的 FastAPI / AlphaFlow wrapper）
+```
+
+关键点是：
+
+> **开发阶段只动第 3 层，不重建 1-2 层**
+
+------
+
+# 三、正确的本地开发方式：Volume Mount（核心机制）
+
+你真正应该用的是这种方式：
+
+```bash
+docker run \
+  --gpus all \
+  -v $(pwd):/app \
+  -w /app \
+  -p 8001:8001 \
+  alphaflow-image \
+  uvicorn service:app --reload
+```
+
+------
+
+## 🔥 这个模式的意义
+
+### ✔ 代码是“实时映射”的
+
+你改：
+
+```python
+service.py
+```
+
+容器里立刻生效，不需要 rebuild。
+
+------
+
+### ✔ Docker 只负责“环境”
+
+CUDA / torch / openfold：
+
+- 不变
+- 不重装
+- 不重新编译
+
+------
+
+### ✔ 你调试的是“运行态”，不是“构建态”
+
+这才是关键差异。
+
+------
+
+# 四、你担心的“慢”，其实来自这三种错误用法
+
+## ❌ 错误 1：每次 rebuild image
+
+```bash
+docker build .
+docker run ...
+```
+
+👉 这是生产部署方式，不是开发方式
+
+------
+
+## ❌ 错误 2：把代码 COPY 进镜像
+
+```dockerfile
+COPY . /app
+```
+
+👉 这会导致每次改代码都要 rebuild
+
+------
+
+## ❌ 错误 3：没有 volume mount
+
+没有：
+
+```bash
+-v $(pwd):/app
+```
+
+👉 就失去开发意义
+
+------
+
+# 五、正确的开发流（你应该这样用）
+
+## 🧠 标准 workflow（工业级）
+
+### Step 1：第一次构建（慢，但只做一次）
+
+```bash
+docker build -t alphaflow .
+```
+
+------
+
+### Step 2：开发阶段（快）
+
+```bash
+docker run \
+  --gpus all \
+  -v $(pwd):/app \
+  -w /app \
+  -p 8001:8001 \
+  alphaflow \
+  uvicorn service:app --reload
+```
+
+------
+
+### Step 3：你修改代码
+
+你只需要：
+
+- 保存 Python 文件
+- FastAPI 自动 reload
+
+👉 **无需重启 Docker**
+
+------
+
+# 六、性能对比（真实情况）
+
+| 操作     | conda本地 | Docker开发模式 |
+| -------- | --------- | -------------- |
+| 改代码   | 即时      | 即时           |
+| 改依赖   | 可能重装  | uv sync        |
+| CUDA环境 | 容易坏    | 稳定           |
+| 启动速度 | 快        | 1-3 秒差异     |
+| GPU运行  | 不稳定    | 稳定           |
+
+👉 结论：
+
+> Docker 慢的不是开发，是“错误使用方式”
+
+------
+
+# 七、一个关键认知转变（很重要）
+
+你现在的思维是：
+
+> “我要在本地调试 Python”
+
+但 Docker 带来的正确思维是：
+
+> **“我在调试一个和生产环境完全一致的系统”**
+
+这会带来一个很重要的收益：
+
+------
+
+## ✔ 你不会再遇到：
+
+- 本地能跑，服务器炸
+- CUDA mismatch
+- torch ABI crash
+- openfold 编译问题
+
+------
+
+# 八、那 uv + Docker 怎么配合才最舒服？
+
+你的理想组合其实是：
+
+```text
+Docker = 环境 + GPU + system libs
+uv     = Python dependency manager
+```
+
+开发流变成：
+
+```bash
+# 改 Python 依赖
+uv add fastapi
+
+# 改代码
+vim service.py
+
+# 不用 rebuild container
+```
+
+------
+
+# 九、什么时候才需要 rebuild Docker？
+
+只有三种情况：
+
+## 1️⃣ CUDA / system dependency 变了
+
+```bash
+apt-get install xxx
+```
+
+------
+
+## 2️⃣ torch / openfold 编译层变化
+
+------
+
+## 3️⃣ 你升级基础镜像
+
+```dockerfile
+FROM nvidia/cuda:12.x
+```
+
+------
+
+👉 其他情况都不需要 rebuild
+
+------
+
+# 十、给你的结论（非常明确）
+
+你最担心的点可以直接一句话总结：
+
+> ❗ Docker 慢不慢，取决于你是不是把它当“构建工具”，而不是“运行环境”
+
+------
+
+# 十一、如果你想进一步优化（很适合你这个项目）
+
+你这个 AlphaFlow + peptide screening 系统，其实可以再升级一步：
+
+## 🚀 推荐你下一步做：
+
+- docker + hot reload
+- GPU worker 容器化
+- Redis task queue
+- 多容器并行 inference
+
+最后会变成：
+
+> **一个类似 “AlphaFold-as-a-Service” 的本地云计算系统**
+
+------
+
+如果你愿意，我可以下一步帮你直接设计：
+
+### 👉 “最适合你项目的 Docker + uv + GPU + FastAPI 完整开发模板”
+
+包括：
+
+- Dockerfile（CUDA optimized）
+- docker-compose（含 Redis + worker）
+- uv integration best practice
+- GPU 单 worker 控制方案
+- 本地 debug / 生产一致架构
+
+这个做完，你就基本进入“可以对外提供计算服务”的级别了。
+
+
+
