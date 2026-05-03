@@ -1,11 +1,35 @@
 [project]
 name = "algpred2-risk-prediction"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.4"
+description = "AlgPred2 过敏原性风险预测微服务"
 requires-python = ">=3.11"
 dependencies = [
     "algpred2>=1.4",
     "joblib>=1.5.3",
     "numpy==1.26.4",
     "scikit-learn==1.2.2",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+ml = [
+    "algpred2>=1.4",
+    "joblib>=1.5.3",
+    "numpy==1.26.4",
+    "scikit-learn==1.2.2",
+]
+service = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+]
+all = [
+    "algpred2>=1.4",
+    "joblib>=1.5.3",
+    "numpy==1.26.4",
+    "scikit-learn==1.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.27.0",
 ]
