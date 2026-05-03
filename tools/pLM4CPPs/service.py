@@ -41,6 +41,7 @@ class pLM4CPPsService(BioToolService):
     pLM4CPPs 细胞穿膜肽预测服务。
 
     使用 ESM2 蛋白质语言模型嵌入 + 1D-CNN 分类器预测肽的穿膜能力。
+    模型: ESM2-320 embeddings + CNN (from Kumar et al., J. Chem. Inf. Model. 2025)
     """
 
     tool_name = "plm4cpps"
@@ -48,11 +49,16 @@ class pLM4CPPsService(BioToolService):
     description = "细胞穿膜肽预测工具（pLM4CPPs）- ESM2 + 1D-CNN"
     recommended_batch_size = 20  # ESM2 模型较大，限制并发
 
+    # 优化后的阈值 (MCC-optimized on KELM external dataset)
+    THRESHOLD = 0.15
+
     async def load_model(self):
         """
         加载 pLM4CPPs 的 ESM2 模型和 CNN 分类器。
         """
-        from predict import load_cpp_model, load_esm2_model
+        from predict import load_cpp_model, load_esm2_model, generate_esm2_embeddings
+        from sklearn.preprocessing import MinMaxScaler
+        import pandas as pd
 
         # 加载 ESM2 模型
         self.esm_model, self.alphabet = load_esm2_model("esm2_t6_8M_UR50D")
@@ -61,7 +67,18 @@ class pLM4CPPsService(BioToolService):
         model_path = Path(__file__).parent / "pLM4CPPs-main" / "models" / "ESM2-320" / "best_model_320.h5"
         self.cnn_model = load_cpp_model(model_path)
 
-        print(f"[{self.tool_name}] ESM2 + CNN model loaded, ready to predict")
+        # 加载训练数据的嵌入并拟合 MinMaxScaler
+        # 注意：必须使用训练数据的嵌入来 fit scaler，以确保与模型训练时一致
+        emb_path = Path(__file__).parent / "pLM4CPPs-main" / "embedded_data" / "whole_sample_dataset_esm2_t6_8M_UR50D_unified_320_dimension.csv"
+        emb_df = pd.read_csv(emb_path, header=0, index_col=0)
+
+        self._scaler = MinMaxScaler()
+        self._scaler.fit(emb_df.values)
+
+        # 保存 generate_esm2_embeddings 供 predict_impl 使用
+        self._generate_embeddings = generate_esm2_embeddings
+
+        print(f"[{self.tool_name}] ESM2 + CNN model loaded, scaler fitted on training data")
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """
@@ -73,8 +90,6 @@ class pLM4CPPsService(BioToolService):
         Returns:
             ToolResult: 包含 score（0-1 CPP 概率）和 label（CPP/non-CPP）
         """
-        from predict import generate_esm2_embeddings, predict_cpp
-
         # 限制最小长度
         if len(sequence) < 5:
             return ToolResult(
@@ -87,22 +102,22 @@ class pLM4CPPsService(BioToolService):
             )
 
         # 生成 ESM2 嵌入
-        embeddings = generate_esm2_embeddings(
+        embeddings = self._generate_embeddings(
             [("temp", sequence)],
             model=self.esm_model,
             alphabet=self.alphabet
         )
 
-        # 使用 CNN 模型预测
-        result = predict_cpp(
-            [("temp", sequence)],
-            model=self.cnn_model,
-            embeddings=embeddings
-        )
+        # 使用训练时拟合的 MinMaxScaler 标准化
+        X = self._scaler.transform(embeddings.values)
 
-        row = result.iloc[0]
-        cpp_prob = float(row['CPP_Probability'])
-        label = row['Prediction_Label']
+        # 重塑为 1D-CNN 输入 (batch, 320, 1)
+        X = X.reshape(X.shape[0], X.shape[1], 1)
+
+        # 使用 CNN 模型预测
+        probs = self.cnn_model.predict(X, verbose=0).flatten()
+        cpp_prob = float(probs[0])
+        label = "CPP" if cpp_prob >= self.THRESHOLD else "non-CPP"
 
         return ToolResult(
             score=cpp_prob,
@@ -110,7 +125,8 @@ class pLM4CPPsService(BioToolService):
             details={
                 "length": len(sequence),
                 "prediction": label,
-                "threshold": 0.5
+                "threshold": self.THRESHOLD,
+                "model_type": "ESM2-320_CNN"
             }
         )
 
