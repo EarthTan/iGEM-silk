@@ -1,93 +1,68 @@
 """
-MLCPP Cell Penetrating Peptide Prediction Service
-Port: 8010
+service.py
+==========
+MLCPP 微服务入口。
+
+将现有的 MLCPP 细胞穿透肽预测工具封装为标准的微服务接口。
+
+使用方式：
+    cd tools/MLCPP
+    source .venv/bin/activate
+    python service.py
+
+API 端点：
+    GET  /           → 服务信息
+    GET  /health     → 健康检查
+    GET  /info       → 工具信息
+    POST /predict    → 单序列预测
+    POST /predict/batch → 批量预测
 """
 
+from __future__ import annotations
+
+import sys
+import os
 import random
-import numpy as np
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from pathlib import Path
 
-# Mock prediction result structure
-class PredictionResult:
-    """Simulated prediction result matching the MLCPP Integration output format"""
-    def __init__(self, sequence: str, peptide_id: str, probability: float, confidence: float):
-        self.sequence = sequence
-        self.peptide_id = peptide_id
-        self.cell_penetrating_probability = probability
-        self.predicted_class = 'CPP' if probability > 0.5 else 'Non-CPP'
-        self.confidence = confidence
-        self.is_cpp = probability > 0.5
-        self.prediction = self.predicted_class
+# 将项目根目录添加到路径
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-class MLCPPService:
-    """MLCPP Cell Penetrating Peptide prediction service"""
+# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
+from services.template.tool_service import BioToolService, create_app, ToolResult
 
-    def __init__(self):
-        self.name = "MLCPP"
-        self.version = "2.0"
-        self.description = "Machine Learning-based Cell Penetrating Peptide Predictor"
-        self.mode = "offline"  # Using mock mode since we don't have actual model
 
-        # Model parameters (simulated)
-        self.threshold = 0.5
-        self.features_dim = 21  # amino acid properties
+class MLCPPService(BioToolService):
+    """
+    MLCPP 细胞穿透肽预测服务。
 
-    async def initialize(self) -> bool:
-        """Initialize the MLCPP predictor"""
-        try:
-            # Simulate model loading
-            print("MLCPP predictor initialized (offline mode)")
-            return True
-        except Exception as e:
-            print(f"Failed to initialize MLCPP: {e}")
-            return False
+    基于机器学习模型预测肽序列的细胞穿透能力。
+    """
 
-    def _extract_features(self, sequence: str) -> np.ndarray:
-        """Extract physicochemical features from peptide sequence"""
-        # Amino acid property indices
-        aa_properties = {
+    tool_name = "mlcpp"
+    version = "2.0"
+    description = "细胞穿透肽预测工具（MLCPP）- 机器学习模型"
+    recommended_batch_size = 50
+
+    async def load_model(self):
+        """
+        加载 MLCPP 模型。
+        由于没有实际的模型文件，使用基于规则的模拟预测。
+        """
+        import numpy as np
+
+        self.np = np
+        self.aa_properties = {
             'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4,
             'Q': 5, 'E': 6, 'G': 7, 'H': 8, 'I': 9,
             'L': 10, 'K': 11, 'M': 12, 'F': 13, 'P': 14,
             'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19, 'X': 20
         }
+        self.threshold = 0.5
 
-        # Calculate features
-        length = len(sequence)
-        charge = 0
-        hydrophobic = 0
-        aromatic = 0
-
-        for aa in sequence.upper():
-            if aa in aa_properties:
-                idx = aa_properties[aa]
-                # Simulate feature values based on amino acid type
-                if aa in 'RK': charge += 1
-                if aa in 'AILMFVPG': hydrophobic += 1
-                if aa in 'FWY': aromatic += 1
-
-        # Normalize features
-        features = np.zeros(self.features_dim)
-        features[0] = length / 50.0  # normalized length
-        features[1] = charge / 10.0  # normalized charge
-        features[2] = hydrophobic / length if length > 0 else 0  # hydrophobic ratio
-        features[3] = aromatic / length if length > 0 else 0  # aromatic ratio
-        features[4] = 1.0 if 'R' in sequence or 'K' in sequence else 0  # has basic AA
-
-        # Add some noise to make predictions varied
-        noise = np.random.randn(self.features_dim) * 0.1
-        features = features + noise
-
-        return features
-
-    def _calculate_cpp_probability(self, sequence: str) -> tuple[float, float]:
-        """
-        Calculate CPP probability based on sequence features.
-        Uses known CPP patterns for simulation.
-        """
         # Strong CPP patterns (based on literature)
-        strong_cpp_patterns = [
+        self.strong_cpp_patterns = [
             'RKKRRQRRR',  # TAT
             'RQIKIWFQNRRMKWKK',  # Penetratin
             'RRRRRRRR',  # Poly-arginine
@@ -95,9 +70,38 @@ class MLCPPService:
             'KETWWETWWTEWSQPKKKRKV',  # MPG
         ]
 
+        print(f"[{self.tool_name}] MLCPP model initialized (rule-based simulation)")
+
+    def _extract_features(self, sequence: str):
+        """Extract physicochemical features from peptide sequence"""
+        length = len(sequence)
+        charge = 0
+        hydrophobic = 0
+        aromatic = 0
+
+        for aa in sequence.upper():
+            if aa in self.aa_properties:
+                if aa in 'RK': charge += 1
+                if aa in 'AILMFVPG': hydrophobic += 1
+                if aa in 'FWY': aromatic += 1
+
+        # Normalize features
+        features = self.np.zeros(21)
+        features[0] = length / 50.0
+        features[1] = charge / 10.0
+        features[2] = hydrophobic / length if length > 0 else 0
+        features[3] = aromatic / length if length > 0 else 0
+        features[4] = 1.0 if 'R' in sequence or 'K' in sequence else 0
+
+        noise = self.np.random.randn(21) * 0.1
+        return features + noise
+
+    def _calculate_cpp_probability(self, sequence: str):
+        """Calculate CPP probability based on sequence features"""
         # Check for known CPP patterns
-        for pattern in strong_cpp_patterns:
-            if pattern in sequence.upper() or sequence.upper() in pattern:
+        seq_upper = sequence.upper()
+        for pattern in self.strong_cpp_patterns:
+            if pattern in seq_upper or seq_upper in pattern:
                 return random.uniform(0.85, 0.98), random.uniform(0.85, 0.95)
 
         # Calculate based on features
@@ -105,9 +109,6 @@ class MLCPPService:
         charge = sequence.count('R') + sequence.count('K')
         hydrophobic_ratio = sum(1 for aa in sequence if aa in 'AILMFVPG') / length if length > 0 else 0
 
-        # Basic CPP scoring model
-        # Positive charge is important for CPP
-        #适度长度也重要
         base_prob = 0.3
 
         # Length factor (optimal: 8-30)
@@ -118,7 +119,7 @@ class MLCPPService:
         else:
             base_prob += 0.15
 
-        # Charge factor (important)
+        # Charge factor
         if charge >= 5:
             base_prob += 0.25
         elif charge >= 3:
@@ -126,14 +127,12 @@ class MLCPPService:
         elif charge >= 1:
             base_prob += 0.05
 
-        # Hydrophobic factor (helps membrane interaction)
+        # Hydrophobic factor
         if 0.2 <= hydrophobic_ratio <= 0.5:
             base_prob += 0.15
 
-        # Add some randomness
         probability = min(0.95, max(0.05, base_prob + random.uniform(-0.1, 0.1)))
 
-        # Confidence based on how decisive the prediction is
         if probability > 0.7 or probability < 0.3:
             confidence = random.uniform(0.8, 0.95)
         else:
@@ -141,73 +140,40 @@ class MLCPPService:
 
         return probability, confidence
 
-    async def predict_single(self, sequence: str, peptide_id: Optional[str] = None) -> Dict[str, Any]:
-        """Predict CPP for a single peptide sequence"""
-        if peptide_id is None:
-            peptide_id = f"peptide_{random.randint(1000, 9999)}"
+    async def predict_impl(self, sequence: str) -> ToolResult:
+        """
+        预测单条序列的细胞穿透能力。
 
+        Args:
+            sequence: 氨基酸序列（如 "RKKRRQRRR"）
+
+        Returns:
+            ToolResult: 包含 score（0-1 CPP 分数）和 label（CPP/Non-CPP）
+        """
         probability, confidence = self._calculate_cpp_probability(sequence)
-        predicted_class = 'CPP' if probability > self.threshold else 'Non-CPP'
+        prediction = "CPP" if probability >= self.threshold else "Non-CPP"
 
-        features = self._extract_features(sequence)
-
-        result = {
-            'peptide_id': peptide_id,
-            'sequence': sequence,
-            'cell_penetrating_probability': round(probability, 4),
-            'predicted_class': predicted_class,
-            'confidence': round(confidence, 4),
-            'is_cpp': probability > self.threshold,
-            'features': features.tolist()[:10],  # first 10 features
-            'model_type': 'RandomForest_CPP',
-            'prediction_time': round(random.uniform(0.1, 0.5), 3),
-            'timestamp': datetime.now().isoformat()
-        }
-
-        return result
-
-    async def predict_batch(self, sequences: List[Dict[str, str]], threshold: float = 0.5) -> List[Dict[str, Any]]:
-        """Predict CPP for multiple peptide sequences"""
-        self.threshold = threshold
-        results = []
-
-        for item in sequences:
-            peptide_id = item.get('id', f"peptide_{random.randint(1000, 9999)}")
-            sequence = item.get('sequence', '')
-
-            result = await self.predict_single(sequence, peptide_id)
-            result['threshold'] = threshold
-            results.append(result)
-
-        return results
-
-    async def health_check(self) -> Dict[str, Any]:
-        """Check service health status"""
-        return {
-            'status': 'healthy',
-            'service': self.name,
-            'version': self.version,
-            'mode': self.mode,
-            'timestamp': datetime.now().isoformat()
-        }
-
-    async def get_info(self) -> Dict[str, Any]:
-        """Get service information"""
-        return {
-            'name': self.name,
-            'version': self.version,
-            'description': self.description,
-            'mode': self.mode,
-            'capabilities': [
-                'Single peptide CPP prediction',
-                'Batch peptide CPP prediction',
-                'Physicochemical feature extraction',
-                'Probability scoring (0-1)',
-                'Threshold-based classification'
-            ],
-            'model_info': {
-                'type': 'RandomForest',
-                'threshold': self.threshold,
-                'features': self.features_dim
+        return ToolResult(
+            score=float(probability),
+            label=prediction,
+            details={
+                "length": len(sequence),
+                "prediction": prediction,
+                "confidence": round(confidence, 4),
+                "threshold": self.threshold,
+                "model_type": "MLCPP_RuleBased"
             }
-        }
+        )
+
+
+# 创建 FastAPI 应用
+app = create_app(MLCPPService)
+
+
+# 本地启动入口
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8010"))
+    print(f"Starting MLCPP service on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)
