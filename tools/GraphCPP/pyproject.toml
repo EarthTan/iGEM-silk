@@ -1,47 +1,48 @@
 [project]
-name = "graphcpp"
+name = "graphcpp-service"
 version = "1.0.0"
-description = "GraphCPP: A state-of-the-art graph neural network for the prediction of cell-penetrating peptides"
-readme = "README.md"
-requires-python = ">=3.9"
+description = "GraphCPP 微服务 - 图神经网络细胞穿膜肽预测"
+requires-python = ">=3.10"
 dependencies = [
+    "numpy",
+    "pandas",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+ml = [
     "torch>=1.13.1",
     "torch-geometric>=2.3.0",
     "rdkit>=2022.09.5",
     "deepchem>=2.7.1",
     "lightning>=2.0.1",
-    "streamlit>=1.21.0",
     "torchvision>=0.14.1",
     "torch-scatter",
     "torch-sparse",
     "pytorch-lightning",
     "torchmetrics",
     "scikit-learn",
-    "pandas",
-    "numpy",
-    "tqdm",
     "pyyaml",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "black",
-    "ruff",
+service = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
 ]
-
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["graphcpp*"]
-
-[tool.black]
-line-length = 100
-target-version = ["py39", "py310", "py311"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py39"
+all = [
+    "torch>=1.13.1",
+    "torch-geometric>=2.3.0",
+    "rdkit>=2022.09.5",
+    "deepchem>=2.7.1",
+    "lightning>=2.0.1",
+    "torchvision>=0.14.1",
+    "torch-scatter",
+    "torch-sparse",
+    "pytorch-lightning",
+    "torchmetrics",
+    "scikit-learn",
+    "pyyaml",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+]
