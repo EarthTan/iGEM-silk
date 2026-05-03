@@ -1,0 +1,15 @@
+Running job kyxq0
+
+Requirement already satisfied: pandas in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (2.2.3)
+Requirement already satisfied: numpy>=1.22.4 in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (from pandas) (1.26.4)
+Requirement already satisfied: python-dateutil>=2.8.2 in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (from pandas) (2.9.0)
+Requirement already satisfied: pytz>=2020.1 in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (from pandas) (2025.2)
+Requirement already satisfied: tzdata>=2022.7 in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (from pandas) (2025.2)
+Requirement already satisfied: six>=1.5 in /root/miniforge3/envs/esmfold/lib/python3.9/site-packages (from python-dateutil>=2.8.2->pandas) (1.16.0)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+/home/ubuntu/tamarind-utils/run_scripts/run_esmfold.py:117: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model = torch.load(args.model)
+Loading model...
+Running inference...
+PTM: 0.174 pLDDT: 26.416
+Results saved in directory: out
