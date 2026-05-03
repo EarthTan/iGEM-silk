@@ -1,0 +1,11 @@
+[project]
+name = "toxinpred3"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy<2",
+    "pandas",
+    "scikit-learn==1.2.2",
+    "joblib",
+]

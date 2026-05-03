@@ -1,0 +1,102 @@
+"""
+service.py
+==========
+AnOxPePred 微服务入口。
+
+将现有的 AnOxPePred 抗氧化肽预测工具封装为标准的微服务接口。
+
+使用方式：
+    cd tools/AnOxPePred
+    source .venv/bin/activate
+    python service.py
+
+API 端点：
+    GET  /           → 服务信息
+    GET  /health     → 健康检查
+    GET  /info       → 工具信息
+    POST /predict    → 单序列预测
+    POST /predict/batch → 批量预测
+"""
+
+from __future__ import annotations
+
+import sys
+import os
+from pathlib import Path
+
+# 将项目根目录添加到路径
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+# 将 tools/ 目录添加到路径，以便导入 anoxpepred_integration
+TOOLS_DIR = Path(__file__).parent / "tools"
+sys.path.insert(0, str(TOOLS_DIR))
+
+# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
+from services.template.tool_service import BioToolService, create_app, ToolResult
+
+
+class AnOxPePredService(BioToolService):
+    """
+    AnOxPePred 抗氧化肽预测服务。
+
+    基于深度学习模型预测肽序列的抗氧化活性，
+    支持两种机制：自由基清除（FRS）和金属螯合（Chel）。
+    """
+
+    tool_name = "anoxpepred"
+    version = "1.1.0"
+    description = "抗氧化肽预测工具（AnOxPePred）- 基于 CNN 深度学习模型"
+    recommended_batch_size = 50
+
+    async def load_model(self):
+        """
+        加载 AnOxPePred 模型。
+
+        初始化 anoxpepred_integration.py 中的预测器。
+        模型在服务运行期间保持加载状态，不重复加载。
+        """
+        from tools.anoxpepred_integration import AnOxPePredIntegration
+
+        self.model = AnOxPePredIntegration(verbose=True)
+        print(f"[{self.tool_name}] Model loaded, ready to predict")
+
+    async def predict_impl(self, sequence: str) -> ToolResult:
+        """
+        预测单条序列的抗氧化活性。
+
+        Args:
+            sequence: 氨基酸序列（如 "YVPLPNVPQG"）
+
+        Returns:
+            ToolResult: 包含 score（0-1）和 label（antioxidant/non-antioxidant）
+        """
+        # 调用原有的预测逻辑
+        result = self.model.predict_single(sequence)
+
+        # 转换为标准化的 ToolResult
+        # score: 综合抗氧化分数（0-1），越大抗氧化能力越强
+        # label: 分类标签（Antioxidant / Non-antioxidant）
+        return ToolResult(
+            score=result.overall_score,
+            label=result.overall_class,
+            details={
+                "frs_score": round(result.frs_score, 4),      # 自由基清除分数
+                "chel_score": round(result.chel_score, 4),    # 金属螯合分数
+                "confidence": result.confidence,              # 置信度
+                "is_antioxidant": result.is_antioxidant       # 是否判定为抗氧化
+            }
+        )
+
+
+# 创建 FastAPI 应用
+app = create_app(AnOxPePredService)
+
+
+# 本地启动入口
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8001"))
+    print(f"Starting AnOxPePred service on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)

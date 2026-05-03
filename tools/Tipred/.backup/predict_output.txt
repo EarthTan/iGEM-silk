@@ -1,0 +1,4 @@
+feature_dim=547
+train_size=160
+test_size=40
+probs=[0.9765453602011356, 0.02346567505812171]

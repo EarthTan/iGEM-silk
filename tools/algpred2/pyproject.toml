@@ -1,0 +1,11 @@
+[project]
+name = "algpred2-risk-prediction"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "algpred2>=1.4",
+    "joblib>=1.5.3",
+    "numpy==1.26.4",
+    "scikit-learn==1.2.2",
+]

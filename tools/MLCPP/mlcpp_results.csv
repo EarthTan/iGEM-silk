@@ -1,0 +1,2 @@
+peptide_id,sequence,cell_penetrating_probability,predicted_class,confidence
+single_peptide,RKKRRQRRR,0.46800020673523857,Non-CPP,0.8010963447831586
