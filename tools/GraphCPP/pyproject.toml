@@ -11,17 +11,9 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-    "torch>=1.13.1",
+    "torch>=2.0.0",
     "torch-geometric>=2.3.0",
     "rdkit>=2022.09.5",
-    "deepchem>=2.7.1",
-    "lightning>=2.0.1",
-    "torchvision>=0.14.1",
-    "torch-scatter",
-    "torch-sparse",
-    "pytorch-lightning",
-    "torchmetrics",
-    "scikit-learn",
     "pyyaml",
 ]
 service = [
@@ -30,17 +22,8 @@ service = [
     "pydantic>=2.0.0",
 ]
 all = [
-    "torch>=1.13.1",
-    "torch-geometric>=2.3.0",
+    "torch>=2.0.0",
     "rdkit>=2022.09.5",
-    "deepchem>=2.7.1",
-    "lightning>=2.0.1",
-    "torchvision>=0.14.1",
-    "torch-scatter",
-    "torch-sparse",
-    "pytorch-lightning",
-    "torchmetrics",
-    "scikit-learn",
     "pyyaml",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
