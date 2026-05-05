@@ -10,5 +10,4 @@
 
 # Agent 行为守则
 
-1. Never use subagent
-2. 
+1. Never use subagent, do it yourself, step by step.
