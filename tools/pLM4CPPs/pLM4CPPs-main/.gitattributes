@@ -1,2 +1,0 @@
-models/ESM2-320/*.h5 filter=lfs diff=lfs merge=lfs -text
-models/ESM2-480/*.h5 filter=lfs diff=lfs merge=lfs -text
