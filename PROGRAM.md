@@ -37,15 +37,15 @@
     
 
 - TemStaPro → 比较不同设计的热稳定性
-- <u>（已经实现微服务）</u>**AlgPred2** 是 CLI-first 过敏原性风险预测工具，通过机器学习模型评估肽/蛋白序列的过敏原性概率。
-- <u>（已经实现微服务）</u> AnOxPePred (Antioxidant Peptide Predictor) 是一个基于深度学习的抗氧化肽预测工具。它使用预训练的卷积神经网络模型来评估肽序列的抗氧化潜力，支持多种抗氧化机制
-- <u>（已经实现微服务）</u> BepiPred-3.0 是基于 ESM-2 蛋白质语言模型的线性 B 细胞表位预测工具。它预测蛋白质/肽序列中哪些氨基酸残基可能被抗体识别（即构成 B 细胞表位）。
-- <u>（已经实现微服务）</u> GraphCPP 是一个基于图神经网络(GNN)的细胞穿透肽(Cell-Penetrating Peptide, CPP)预测工具。使用 GraphSAGE 卷积层将肽序列转换为分子图表示，实现 SOTA 级别的 CPP 预测性能(MCC 0.5787, AUC 0.8459)。
-- <u>（已经实现微服务）</u> **HemoPI2** 是由 IIITD Raghava 团队开发的**肽溶血性预测工具**，
-- <u>（已经实现微服务）</u> MHCflurry 是一个基于深度学习的MHC I类肽结合亲和力预测工具。它使用预训练的神经网络模型来预测肽与主要组织相容性复合体（MHC）分子的结合强度，为疫苗设计和免疫原性评估提供关键信息。
-- <u>（已经实现微服务）</u> MLCPP 2.0 (Machine Learning-based Cell Penetrating Peptide Predictor) 是一个基于机器学习的细胞穿透肽预测工具。它使用预训练的机器学习模型来评估肽的细胞穿透潜力，为药物递送系统和治疗性肽设计提供关键信息。
-- <u>（已经实现微服务）</u> 预测**酪氨酸酶抑制肽（Tyrosinase Inhibitory Peptides, TIPs）**活性的计算工具，加速美白/抗黑色素生成肽的筛选。
-- <u>（已经实现微服务）</u> **ToxinPred 3.0** 是由印度 IIITD Prof. G. P. S. Raghava 团队开发的肽毒性预测工具，在融合引擎中承担**粗筛过滤**角色，用于在全排列组合之前剔除明显有毒的肽段。
+- <u>（已经转化微服务）</u>**AlgPred2** 是 CLI-first 过敏原性风险预测工具，通过机器学习模型评估肽/蛋白序列的过敏原性概率。
+- <u>（已经转化微服务）</u> AnOxPePred (Antioxidant Peptide Predictor) 是一个基于深度学习的抗氧化肽预测工具。它使用预训练的卷积神经网络模型来评估肽序列的抗氧化潜力，支持多种抗氧化机制
+- <u>（已经转化微服务）</u> BepiPred-3.0 是基于 ESM-2 蛋白质语言模型的线性 B 细胞表位预测工具。它预测蛋白质/肽序列中哪些氨基酸残基可能被抗体识别（即构成 B 细胞表位）。
+- <u>（已经转化微服务）</u> GraphCPP 是一个基于图神经网络(GNN)的细胞穿透肽(Cell-Penetrating Peptide, CPP)预测工具。使用 GraphSAGE 卷积层将肽序列转换为分子图表示，实现 SOTA 级别的 CPP 预测性能(MCC 0.5787, AUC 0.8459)。
+- <u>（已经转化微服务）</u> **HemoPI2** 是由 IIITD Raghava 团队开发的**肽溶血性预测工具**，
+- <u>（已经转化微服务）</u> MHCflurry 是一个基于深度学习的MHC I类肽结合亲和力预测工具。它使用预训练的神经网络模型来预测肽与主要组织相容性复合体（MHC）分子的结合强度，为疫苗设计和免疫原性评估提供关键信息。
+- <u>（已经转化微服务）</u> MLCPP 2.0 (Machine Learning-based Cell Penetrating Peptide Predictor) 是一个基于机器学习的细胞穿透肽预测工具。它使用预训练的机器学习模型来评估肽的细胞穿透潜力，为药物递送系统和治疗性肽设计提供关键信息。
+- <u>（已经转化微服务）</u> 预测**酪氨酸酶抑制肽（Tyrosinase Inhibitory Peptides, TIPs）**活性的计算工具，加速美白/抗黑色素生成肽的筛选。
+- <u>（已经转化微服务）</u> **ToxinPred 3.0** 是由印度 IIITD Prof. G. P. S. Raghava 团队开发的肽毒性预测工具，在融合引擎中承担**粗筛过滤**角色，用于在全排列组合之前剔除明显有毒的肽段。
 
 ##### 2. 基于PDB的评估
 

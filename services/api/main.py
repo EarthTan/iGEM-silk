@@ -7,7 +7,6 @@
 from .app import app
 
 # 导入所有模块以注册路由
-from . import lifecycle  # noqa: F401
 from .prediction import routes as _pred_routes  # noqa: F401
 from .tools import routes as _tools_routes  # noqa: F401
 from .status import routes as _status_routes  # noqa: F401
