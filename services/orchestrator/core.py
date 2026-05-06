@@ -119,8 +119,8 @@ from .registry import TOOL_REGISTRY, get_p0_tools, ToolConfig
 # 第一部分：数据模型（Dataclass）
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【什么是 dataclass？】
-#--------------------
+# 【什么是 dataclass？】
+# --------------------
 # dataclass 是 Python 的一种"数据容器"。
 # 它适合存放"一组相关的数据"，比如一个预测请求包含：序列、ID、工具列表。
 #
@@ -129,11 +129,12 @@ from .registry import TOOL_REGISTRY, get_p0_tools, ToolConfig
 #   2. 自动生成 __repr__：打印对象时可以看到所有字段
 #   3. 类型提示清晰：每个字段是什么类型一目了然
 #
-#【为什么需要这些数据结构？】
-#---------------------------
+# 【为什么需要这些数据结构？】
+# ---------------------------
 # 在复杂的系统里，"数据"和"逻辑"是分开的。
 # 数据结构只负责"存放数据"，不负责"处理数据"。
 # 这样代码更清晰，也更容易测试。
+
 
 @dataclass
 class PredictionRequest:
@@ -338,8 +339,8 @@ class FusionResult:
 # 第二部分：Orchestrator 主类
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【Orchestrator 是做什么的？】
-#----------------------------
+# 【Orchestrator 是做什么的？】
+# ----------------------------
 # Orchestrator（调度器）是整个系统的大脑。它的职责包括：
 #
 #   1. 管理 HTTP 客户端的生命周期
@@ -357,6 +358,7 @@ class FusionResult:
 #   4. 聚合结果并传递给 Scoring Engine
 #      - 把所有工具的结果汇总
 #      - 交给 scoring.py 计算融合分数
+
 
 class Orchestrator:
     """
@@ -401,10 +403,7 @@ class Orchestrator:
     """
 
     def __init__(
-        self,
-        timeout: float = 30.0,
-        max_retries: int = 3,
-        concurrency: int = 5
+        self, timeout: float = 30.0, max_retries: int = 3, concurrency: int = 5
     ):
         """
         初始化 Orchestrator。
@@ -425,14 +424,14 @@ class Orchestrator:
 
     # ── 生命周期管理 ─────────────────────────────────────────────────────────
     #
-    #【为什么要延迟创建客户端？】
-    #----------------------------
+    # 【为什么要延迟创建客户端？】
+    # ----------------------------
     # Orchestrator 创建的时候，不一定马上要发请求。
     # 如果提前创建 HTTP 客户端，但一直没用到，会浪费资源。
     # 所以采用"延迟创建"策略：第一次真正需要发请求的时候，才创建客户端。
     #
-    #【什么是"上下文管理器"（async with）？】
-    #---------------------------------------
+    # 【什么是"上下文管理器"（async with）？】
+    # ---------------------------------------
     # async with 是一种"自动管理资源"的方式。
     # 就像 try-finally 一样，不管代码是否抛出异常，退出时都会执行清理代码。
     # 使用 async with 的好处：
@@ -457,7 +456,7 @@ class Orchestrator:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self.default_timeout),
-                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
             )
         return self._client
 
@@ -494,8 +493,8 @@ class Orchestrator:
 
     # ── 核心调用逻辑 ─────────────────────────────────────────────────────────
     #
-    #【call_tool 是做什么的？】
-    #-------------------------
+    # 【call_tool 是做什么的？】
+    # -------------------------
     # call_tool 负责"调用单个工具服务"。
     #
     # 内部流程：
@@ -506,8 +505,8 @@ class Orchestrator:
     #   5. 如果失败，自动重试（最多 max_retries 次）
     #   6. 返回标准化的 ToolResult
     #
-    #【什么是"信号量"（Semaphore）？】
-    #--------------------------------
+    # 【什么是"信号量"（Semaphore）？】
+    # --------------------------------
     # 想象一下：餐厅有 5 个服务员，同时最多只能服务 5 位客人。
     # 第 6 位客人来了，只能等其中一位空出来。
     #
@@ -517,10 +516,7 @@ class Orchestrator:
     #   - 这样可以防止系统过载
 
     async def call_tool(
-        self,
-        tool: ToolConfig,
-        sequence: str,
-        peptide_id: str | None = None
+        self, tool: ToolConfig, sequence: str, peptide_id: str | None = None
     ) -> ToolResult:
         """
         调用单个工具服务。
@@ -596,7 +592,9 @@ class Orchestrator:
             last_error: str | None = None
 
             # 获取重试次数（优先使用 tool 的配置，否则使用默认值）
-            retries = tool.max_retries if hasattr(tool, 'max_retries') else self.max_retries
+            retries = (
+                tool.max_retries if hasattr(tool, "max_retries") else self.max_retries
+            )
 
             # ── 重试循环 ──────────────────────────────────────────────────
             # 最多重试 retries 次。每次失败后等一段时间再试。
@@ -611,7 +609,7 @@ class Orchestrator:
                     response = await client.post(
                         url,
                         json=payload,
-                        timeout=tool.timeout  # 使用工具指定的超时时间
+                        timeout=tool.timeout,  # 使用工具指定的超时时间
                     )
 
                     # 计算这次调用花了多少毫秒
@@ -632,7 +630,7 @@ class Orchestrator:
                                 score=result_data.get("score"),
                                 label=result_data.get("label"),
                                 details=result_data.get("details", {}),
-                                latency_ms=latency_ms
+                                latency_ms=latency_ms,
                             )
                         else:
                             # HTTP 200，但业务逻辑失败（比如模型加载失败）
@@ -660,7 +658,9 @@ class Orchestrator:
                 # 如果还有重试机会，等一段时间再试
                 if attempt < retries - 1:
                     # 获取重试间隔（优先使用 tool 的配置）
-                    retry_delay = tool.retry_delay if hasattr(tool, 'retry_delay') else 1.0
+                    retry_delay = (
+                        tool.retry_delay if hasattr(tool, "retry_delay") else 1.0
+                    )
                     # 指数退避：第1次等1秒，第2次等2秒，第3次等3秒
                     await asyncio.sleep(retry_delay * (attempt + 1))
 
@@ -672,13 +672,13 @@ class Orchestrator:
                 tool_name=tool.name,
                 peptide_id=peptide_id or "unknown",
                 sequence=sequence,
-                error=last_error
+                error=last_error,
             )
 
     # ── 预测入口 ───────────────────────────────────────────────────────────
     #
-    #【predict_single 是做什么的？】
-    #------------------------------
+    # 【predict_single 是做什么的？】
+    # ------------------------------
     # predict_single 处理"单条序列"的预测请求。
     #
     # 内部流程：
@@ -688,10 +688,7 @@ class Orchestrator:
     #   4. 计算融合分数（调用 scoring.py）
     #   5. 返回 FusionResult
 
-    async def predict_single(
-        self,
-        request: PredictionRequest
-    ) -> FusionResult:
+    async def predict_single(self, request: PredictionRequest) -> FusionResult:
         """
         对单条序列执行多工具预测。
 
@@ -754,9 +751,7 @@ class Orchestrator:
         if request.tools:
             # 如果请求指定了工具列表，过滤出存在的工具
             tools_to_call = [
-                TOOL_REGISTRY[name]
-                for name in request.tools
-                if name in TOOL_REGISTRY
+                TOOL_REGISTRY[name] for name in request.tools if name in TOOL_REGISTRY
             ]
             # 如果指定的工具都不存在，回退到 P0
             if not tools_to_call:
@@ -786,13 +781,17 @@ class Orchestrator:
             peptide_id=request.peptide_id or "unknown",
             sequence=request.sequence,
             tool_results=list(tool_results),
-            total_latency_ms=total_latency_ms
+            total_latency_ms=total_latency_ms,
         )
 
         # Step 4: 计算融合分数（调用 Scoring Engine）
         # 使用延迟导入避免循环依赖（scoring.py 导入了 core.py 的 ToolResult）
-        scoring_module = __import__('services.orchestrator.scoring', fromlist=['compute_fused_score'])
-        fused_score, fused_label, scoring_details = scoring_module.compute_fused_score(tool_results)
+        scoring_module = __import__(
+            "services.orchestrator.scoring", fromlist=["compute_fused_score"]
+        )
+        fused_score, fused_label, scoring_details = scoring_module.compute_fused_score(
+            tool_results
+        )
 
         # 将计算结果填充到 FusionResult
         fusion_result.fused_score = fused_score
@@ -802,9 +801,7 @@ class Orchestrator:
         return fusion_result
 
     async def predict_batch(
-        self,
-        requests: list[PredictionRequest],
-        tools: list[str] | None = None
+        self, requests: list[PredictionRequest], tools: list[str] | None = None
     ) -> list[FusionResult]:
         """
         批量预测多条序列。
@@ -874,7 +871,7 @@ class Orchestrator:
                 # 如果提供了 tools 参数，覆盖 request 中的 tools
                 if tools is not None:
                     req.tools = tools
-                return await self.predict_single(req)
+                return await self.predict_single(req)  # <<<<<<调用单条预测逻辑>>>>>
 
         # 为每条序列创建预测任务
         tasks = [bounded_predict(req) for req in requests]
@@ -887,8 +884,8 @@ class Orchestrator:
 # 第三部分：CLI 入口（用于快速测试）
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【这段代码什么时候用？】
-#----------------------
+# 【这段代码什么时候用？】
+# ----------------------
 # 当你想直接运行这个文件来测试 Orchestrator 时，这段代码会生效。
 # 比如：`python services/orchestrator/core.py`
 #
@@ -897,6 +894,7 @@ class Orchestrator:
 #   2. 发送一条测试序列 "YVPLPNVPQG"
 #   3. 打印所有工具的预测结果
 #   4. 打印融合分数
+
 
 async def main():
     """
@@ -918,10 +916,7 @@ async def main():
     """
     async with Orchestrator() as orchestrator:
         result = await orchestrator.predict_single(
-            PredictionRequest(
-                sequence="YVPLPNVPQG",
-                peptide_id="test_pep_001"
-            )
+            PredictionRequest(sequence="YVPLPNVPQG", peptide_id="test_pep_001")
         )
 
         print(f"肽: {result.sequence}")
@@ -931,9 +926,12 @@ async def main():
         print("\n各工具结果:")
         for tr in result.tool_results:
             status = "✅" if tr.error is None else "❌"
-            print(f"  {status} {tr.tool_name}: score={tr.score}, label={tr.label}, latency={tr.latency_ms:.0f}ms, error={tr.error}")
+            print(
+                f"  {status} {tr.tool_name}: score={tr.score}, label={tr.label}, latency={tr.latency_ms:.0f}ms, error={tr.error}"
+            )
 
 
 if __name__ == "__main__":
     # 运行 main() 函数
     asyncio.run(main())
+
