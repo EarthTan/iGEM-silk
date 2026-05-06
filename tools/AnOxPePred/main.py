@@ -10,6 +10,8 @@ Port 端口分配（参考 services/orchestrator/registry.py）：
 """
 
 import os
+import sys
+from pathlib import Path
 import uvicorn
 
 
@@ -26,16 +28,12 @@ def main():
 ╚══════════════════════════════════════════════════════╝
     """)
 
-    # 导入 app 对象（不是字符串），这样可以正常工作
+    # 导入 app 对象
     from service import app
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        reload=False
-    )
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":
     main()
+

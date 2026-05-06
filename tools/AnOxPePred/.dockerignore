@@ -1,0 +1,30 @@
+# tools/AnOxPePred/.dockerignore
+
+# Python 缓存
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+.dist-info
+.cache
+
+# Git
+.git
+.gitignore
+
+# IDE
+.DS_Store
+.vscode
+.idea
+*.md
+
+# 日志
+*.log
+
+# lock 文件
+*.lock
+

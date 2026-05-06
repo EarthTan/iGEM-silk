@@ -24,16 +24,11 @@ import sys
 import os
 from pathlib import Path
 
-# 将项目根目录添加到路径
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+# 向上跳 2 级目录，作为根路径
+root_path = Path(__file__).parents[2]
+sys.path.insert(0, str(root_path))
 
-# 将 tools/ 目录添加到路径，以便导入 anoxpepred_integration
-TOOLS_DIR = Path(__file__).parent / "tools"
-sys.path.insert(0, str(TOOLS_DIR))
-
-# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.tool_service import BioToolService, create_app, ToolResult
 
 
 class AnOxPePredService(BioToolService):
@@ -81,11 +76,11 @@ class AnOxPePredService(BioToolService):
             score=result.overall_score,
             label=result.overall_class,
             details={
-                "frs_score": round(result.frs_score, 4),      # 自由基清除分数
-                "chel_score": round(result.chel_score, 4),    # 金属螯合分数
-                "confidence": result.confidence,              # 置信度
-                "is_antioxidant": result.is_antioxidant       # 是否判定为抗氧化
-            }
+                "frs_score": round(result.frs_score, 4),  # 自由基清除分数
+                "chel_score": round(result.chel_score, 4),  # 金属螯合分数
+                "confidence": result.confidence,  # 置信度
+                "is_antioxidant": result.is_antioxidant,  # 是否判定为抗氧化
+            },
         )
 
 
