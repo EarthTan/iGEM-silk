@@ -45,8 +45,8 @@ from pydantic import BaseModel, Field
 # 第一部分：请求和响应模型
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【什么是"请求"和"响应"？】
-#-------------------------
+# 【什么是"请求"和"响应"？】
+# -------------------------
 # 简单来说：
 #   - 请求（Request）= 用户发给服务的东西（比如：要预测的氨基酸序列）
 #   - 响应（Response）= 服务返回给用户的东西（比如：预测分数 0.85）
@@ -54,13 +54,14 @@ from pydantic import BaseModel, Field
 # 在代码里，"请求"和"响应"都是 Python 的"类"，用来描述数据的结构。
 # 这样每个字段是什么意思就一目了然了。
 #
-#【为什么用 Pydantic？】
-#----------------------
+# 【为什么用 Pydantic？】
+# ----------------------
 # Pydantic 是一个数据验证库。我们用它来定义"请求"和"响应"的结构。
 # 好处是：用户发来数据时，Pydantic 会自动检查数据格式对不对。
 #   - 比如要求 score 必须是 0-1 之间的数字，如果用户传了 "hello"，会自动报错
 #   - 比如要求 sequence 不能为空，如果用户传了 ""，会自动报错
 # 这样可以避免很多奇怪的错误。
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PredictRequest：单序列预测请求
@@ -82,6 +83,7 @@ class PredictRequest(BaseModel):
         "peptide_id": "pep_001"
     }
     """
+
     sequence: str = Field(..., min_length=1, max_length=5000, description="氨基酸序列")
     peptide_id: str | None = Field(None, description="肽 ID（可选）")
 
@@ -108,6 +110,7 @@ class BatchPredictRequest(BaseModel):
         ]
     }
     """
+
     sequences: list[PredictRequest] = Field(..., min_length=1, max_length=1000)
 
 
@@ -140,6 +143,7 @@ class ToolResult(BaseModel):
         "details": {"confidence": 0.95, "method": "LSTM"}
     }
     """
+
     peptide_id: str = "unknown"
     sequence: str = ""
     score: float = Field(..., ge=0.0, le=1.0, description="预测分数 0-1")
@@ -173,6 +177,7 @@ class PredictResponse(BaseModel):
         "error": None
     }
     """
+
     success: bool
     peptide_id: str | None = None
     sequence: str | None = None
@@ -204,6 +209,7 @@ class BatchPredictResponse(BaseModel):
         "error": None
     }
     """
+
     success: bool
     results: list[ToolResult]
     total: int
@@ -227,6 +233,7 @@ class HealthResponse(BaseModel):
     - version: 工具的版本
     - model_loaded: 模型是否已加载（True/False）
     """
+
     status: str
     tool_name: str
     version: str
@@ -252,6 +259,7 @@ class InfoResponse(BaseModel):
     - output_format: 输出格式的说明
     - recommended_batch_size: 推荐每次批量预测的最大数量
     """
+
     tool_name: str
     version: str
     description: str
@@ -265,24 +273,25 @@ class InfoResponse(BaseModel):
 # 第二部分：BioToolService 基类
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【什么是"基类"？】
-#----------------
+# 【什么是"基类"？】
+# ----------------
 # 基类就像是一张"蓝图"，定义了所有工具服务"必须有什么"。
 # 如果你想创建一个新的工具服务，只需要：
 #   1. 继承 BioToolService（相当于说"我要基于这个蓝图来创建"）
 #   2. 填入你自己特有的内容（比如：怎么加载模型？怎么预测？）
 #
-#【什么是"抽象方法"？】
-#--------------------
+# 【什么是"抽象方法"？】
+# --------------------
 # 方法名后面有 "raise NotImplementedError" 的，就是"抽象方法"。
 # 抽象方法的意思是："子类必须实现这个方法，否则会报错"。
 # 就像是一份合同："我允许你继承，但你必须实现这些方法"。
 #
-#【什么是"异步"（async/await）？】
-#-------------------------------
+# 【什么是"异步"（async/await）？】
+# -------------------------------
 # async/await 是 Python 处理"并发"的方式。
 # 简单理解：可以不排队，同时做很多事情。
 # 比如：同时调用 10 个工具服务，而不是一个一个排队。
+
 
 class BioToolService:
     """
@@ -324,7 +333,7 @@ class BioToolService:
     # 子类必须设置这些属性，否则会使用默认值（但不推荐）
 
     tool_name: ClassVar[str] = "template"  # 工具的唯一名字
-    version: ClassVar[str] = "1.0.0"       # 版本号
+    version: ClassVar[str] = "1.0.0"  # 版本号
     description: ClassVar[str] = "Template bio tool service"  # 描述
     recommended_batch_size: ClassVar[int] = 50  # 推荐批量大小
 
@@ -348,7 +357,7 @@ class BioToolService:
         只有第一次需要加载，之后的请求直接用就行。
         """
         self._lock = asyncio.Lock()  # 并发控制锁
-        self._loaded = False          # 模型是否已加载的标记
+        self._loaded = False  # 模型是否已加载的标记
 
     async def load_model(self) -> None:
         """
@@ -400,7 +409,9 @@ class BioToolService:
                 label="antioxidant" if score > 0.5 else "non-antioxidant"
             )
         """
-        raise NotImplementedError(f"{self.tool_name}: predict_impl() must be implemented")
+        raise NotImplementedError(
+            f"{self.tool_name}: predict_impl() must be implemented"
+        )
 
     # ── 公开 API（一般不需要覆盖）──────────────────────────
     # 下面这些方法是"公开"的，可以被外部调用。
@@ -441,7 +452,7 @@ class BioToolService:
                 peptide_id=result.peptide_id,
                 sequence=request.sequence,
                 result=result,
-                error=None
+                error=None,
             )
         except Exception as e:
             # 预测出错了，返回错误信息
@@ -450,7 +461,7 @@ class BioToolService:
                 peptide_id=request.peptide_id,
                 sequence=request.sequence,
                 result=None,
-                error=str(e)
+                error=str(e),
             )
 
     async def predict_batch(self, request: BatchPredictRequest) -> BatchPredictResponse:
@@ -511,7 +522,9 @@ class BioToolService:
             success=True,
             results=valid_results,
             total=len(valid_results),
-            error=None if len(valid_results) == len(request.sequences) else f"{len(valid_results)}/{len(request.sequences)} succeeded"
+            error=None
+            if len(valid_results) == len(request.sequences)
+            else f"{len(valid_results)}/{len(request.sequences)} succeeded",
         )
 
 
@@ -519,8 +532,8 @@ class BioToolService:
 # 第三部分：FastAPI 应用工厂
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【什么是"工厂函数"？】
-#--------------------
+# 【什么是"工厂函数"？】
+# --------------------
 # 工厂函数就像是一个"模板机"：
 # 输入一个"工具类"，输出一个"完整的 FastAPI 应用"。
 # 你不需要知道 FastAPI 怎么用，只需要：
@@ -528,11 +541,12 @@ class BioToolService:
 #   2. 调用 create_app(你的工具类)
 #   3. 得到一个完整的 Web 服务！
 #
-#【什么是 FastAPI？】
-#------------------
+# 【什么是 FastAPI？】
+# ------------------
 # FastAPI 是一个 Python 的 Web 框架，用来构建 HTTP 服务。
 # 你只需要定义"请求格式"和"响应格式"，FastAPI 会自动处理 HTTP 细节。
 # 它还自动生成文档（/docs 页面），非常方便调试。
+
 
 def create_app(ToolClass: type[BioToolService]) -> FastAPI:
     """
@@ -591,7 +605,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
             # 不退出，允许服务启动但标记为未就绪
         yield
         # 关闭时：清理资源
-        if hasattr(tool_instance.model, 'clear_session'):
+        if hasattr(tool_instance.model, "clear_session"):
             tool_instance.model.clear_session()
         print(f"[{ToolClass.tool_name}] Shutdown")
 
@@ -600,7 +614,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
         title=ToolClass.tool_name,
         description=ToolClass.description,
         version=ToolClass.version,
-        lifespan=lifespan
+        lifespan=lifespan,
     )
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -624,7 +638,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
         return {
             "service": ToolClass.tool_name,
             "version": ToolClass.version,
-            "docs": "/docs"  # 文档地址
+            "docs": "/docs",  # 文档地址
         }
 
     @app.post("/predict", response_model=PredictResponse)
@@ -666,7 +680,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
         健康检查接口：GET /health
 
         【什么时候用？】
-        Orchestrator 会定期调用这个接口，检查服务是否正常。
+         会定期调用这个接口，检查服务是否正常。
 
         【响应格式】
         {"status": "healthy", "tool_name": "anoxpepred", "version": "1.1.0", "model_loaded": true}
@@ -675,7 +689,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
             status="healthy" if tool_instance._loaded else "loading",
             tool_name=ToolClass.tool_name,
             version=ToolClass.version,
-            model_loaded=tool_instance._loaded
+            model_loaded=tool_instance._loaded,
         )
 
     @app.get("/info", response_model=InfoResponse)
@@ -704,7 +718,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
             capabilities=["predict", "predict/batch"],
             input_format={"sequence": "string (amino acid sequence)"},
             output_format={"score": "float 0-1", "label": "string"},
-            recommended_batch_size=ToolClass.recommended_batch_size
+            recommended_batch_size=ToolClass.recommended_batch_size,
         )
 
     return app
@@ -714,8 +728,8 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
 # 第四部分：启动入口（用于直接运行模板）
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#【这段代码什么时候用？】
-#----------------------
+# 【这段代码什么时候用？】
+# ----------------------
 # 当你想"直接运行这个文件"来启动服务时，这段代码会生效。
 # 一般不推荐这样做，而是通过命令行指定 TOOL_CLASS 环境变量。
 
@@ -723,9 +737,9 @@ if __name__ == "__main__":
     import uvicorn
 
     # 从环境变量读取配置（或者使用默认值）
-    PORT = int(os.environ.get("TOOL_PORT", "8001"))       # 默认端口 8001
-    HOST = os.environ.get("TOOL_HOST", "0.0.0.0")          # 默认监听所有网卡
-    TOOL_CLASS = os.environ.get("TOOL_CLASS", "")           # 必须指定工具类
+    PORT = int(os.environ.get("TOOL_PORT", "8001"))  # 默认端口 8001
+    HOST = os.environ.get("TOOL_HOST", "0.0.0.0")  # 默认监听所有网卡
+    TOOL_CLASS = os.environ.get("TOOL_CLASS", "")  # 必须指定工具类
 
     if not TOOL_CLASS:
         print("ERROR: TOOL_CLASS environment variable must be set")
@@ -742,3 +756,4 @@ if __name__ == "__main__":
     # 创建应用并启动
     app = create_app(ToolClass)
     uvicorn.run(app, host=HOST, port=PORT)
+
