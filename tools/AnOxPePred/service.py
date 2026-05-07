@@ -51,7 +51,9 @@ class AnOxPePredService(FastaToolService):
         初始化 anoxpepred_integration.py 中的预测器。
         模型在服务运行期间保持加载状态，不重复加载。
         """
-        from tools.anoxpepred_integration import AnOxPePredIntegration
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent / "tools"))
+        from anoxpepred_integration import AnOxPePredIntegration
 
         self.model = AnOxPePredIntegration(verbose=True)
         print(f"[{self.tool_name}] Model loaded, ready to predict")
