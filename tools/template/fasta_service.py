@@ -7,7 +7,7 @@
 # 想象一下：你要创建一个"抗氧化预测工具"的服务。
 # 如果从零开始写，要处理很多复杂的事情：HTTP 接口、并发控制、错误处理...
 # 但是用这个模板，只需要：
-#   1. 继承 BioToolService 类
+#   1. 继承 FastaToolService 类
 #   2. 实现 load_model() 方法（告诉我怎么加载模型）
 #   3. 实现 predict_impl() 方法（告诉我怎么预测）
 # 然后这个模板会自动帮你处理所有其他的事情！
@@ -15,7 +15,7 @@
 # 【类比】
 # -------
 # 把这个模板想象成一张"烘焙食谱模板"：
-#   - 甜品师（BioToolService）只需要决定：用什么原料？烤多久？
+#   - 甜品师（FastaToolService）只需要决定：用什么原料？烤多久？
 #   - 食谱模板（create_app）自动处理：用什么温度？烤箱怎么预热？
 #
 # 【如何启动这个服务】
@@ -270,14 +270,14 @@ class InfoResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 第二部分：BioToolService 基类
+# 第二部分：FastaToolService 基类
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # 【什么是"基类"？】
 # ----------------
 # 基类就像是一张"蓝图"，定义了所有工具服务"必须有什么"。
 # 如果你想创建一个新的工具服务，只需要：
-#   1. 继承 BioToolService（相当于说"我要基于这个蓝图来创建"）
+#   1. 继承 FastaToolService（相当于说"我要基于这个蓝图来创建"）
 #   2. 填入你自己特有的内容（比如：怎么加载模型？怎么预测？）
 #
 # 【什么是"抽象方法"？】
@@ -293,20 +293,20 @@ class InfoResponse(BaseModel):
 # 比如：同时调用 10 个工具服务，而不是一个一个排队。
 
 
-class BioToolService:
+class FastaToolService:
     """
     所有工具服务的"基类"（蓝图）。
 
     【如果要用这个基类创建新工具，步骤是：】
     -------------------------------------------------
-    1. 创建一个新类，继承 BioToolService
+    1. 创建一个新类，继承 FastaToolService
     2. 设置类属性：tool_name（工具名字）、version（版本）、description（描述）
     3. 实现 load_model() 方法：告诉我怎么加载你的模型
     4. 实现 predict_impl() 方法：告诉我怎么对一条序列做预测
 
     【例子】
     --------
-    class AnOxPePredService(BioToolService):
+    class AnOxPePredService(FastaToolService):
         tool_name = "anoxpepred"           # 工具名字
         version = "1.1.0"                  # 版本号
         description = "抗氧化肽预测工具"   # 描述
@@ -537,7 +537,7 @@ class BioToolService:
 # 工厂函数就像是一个"模板机"：
 # 输入一个"工具类"，输出一个"完整的 FastAPI 应用"。
 # 你不需要知道 FastAPI 怎么用，只需要：
-#   1. 定义你的工具类（继承 BioToolService）
+#   1. 定义你的工具类（继承 FastaToolService）
 #   2. 调用 create_app(你的工具类)
 #   3. 得到一个完整的 Web 服务！
 #
@@ -548,21 +548,21 @@ class BioToolService:
 # 它还自动生成文档（/docs 页面），非常方便调试。
 
 
-def create_app(ToolClass: type[BioToolService]) -> FastAPI:
+def create_app(ToolClass: type[FastaToolService]) -> FastAPI:
     """
     工厂函数：基于工具类创建完整的 FastAPI 应用。
 
     【参数】
-    - ToolClass: 一个继承自 BioToolService 的类
+    - ToolClass: 一个继承自 FastaToolService 的类
 
     【返回值】
     - 一个配置好的 FastAPI 应用
 
     【使用例子】
     -----------
-    from tools.template.fasta_service import create_app, BioToolService, ToolResult
+    from tools.template.fasta_service import create_app, FastaToolService, ToolResult
 
-    class MyToolService(BioToolService):
+    class MyToolService(FastaToolService):
         tool_name = "mytool"
         version = "1.0.0"
         description = "我的自定义工具"

@@ -10,10 +10,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 TOOLS_DIR = Path(__file__).parent
 sys.path.insert(0, str(TOOLS_DIR))
 
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class TIPredService(BioToolService):
+class TIPredService(FastaToolService):
     """酪氨酸酶抑制肽预测服务"""
 
     tool_name = "tipred"

@@ -2,7 +2,7 @@
 # 工具服务模板包
 
 from .fasta_service import (
-    BioToolService,
+    FastaToolService,
     create_app,
     ToolResult,
     PredictRequest,
@@ -14,7 +14,7 @@ from .fasta_service import (
 )
 
 __all__ = [
-    "BioToolService",
+    "FastaToolService",
     "create_app",
     "ToolResult",
     "PredictRequest",

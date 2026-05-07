@@ -29,11 +29,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class MLCPPService(BioToolService):
+class MLCPPService(FastaToolService):
     """
     MLCPP 细胞穿透肽预测服务。
 
@@ -199,4 +198,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8010"))
     print(f"Starting MLCPP service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
-

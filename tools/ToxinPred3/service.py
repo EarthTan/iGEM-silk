@@ -33,10 +33,10 @@ TOOLS_DIR = Path(__file__).parent
 sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class ToxinPred3Service(BioToolService):
+class ToxinPred3Service(FastaToolService):
     """
     ToxinPred3 肽毒性预测服务。
 

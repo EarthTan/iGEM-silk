@@ -33,10 +33,10 @@ TOOLS_DIR = Path(__file__).parent
 sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class pLM4CPPsService(BioToolService):
+class pLM4CPPsService(FastaToolService):
     """
     pLM4CPPs 细胞穿膜肽预测服务。
 

@@ -19,10 +19,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class AlgPred2Service(BioToolService):
+class AlgPred2Service(FastaToolService):
     """AlgPred2 过敏原性风险预测服务"""
 
     tool_name = "algpred2"  # 必须与 registry.py 中的 name 一致

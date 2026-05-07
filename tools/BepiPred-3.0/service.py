@@ -22,10 +22,10 @@ from pathlib import Path
 root_path = Path(__file__).parents[2]
 sys.path.insert(0, str(root_path))
 
-from tools.template.fasta_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 
 
-class BepiPred3Service(BioToolService):
+class BepiPred3Service(FastaToolService):
     """BepiPred-3.0 B 细胞表位预测服务"""
 
     tool_name = "bepipred3"  # 必须与 registry.py 中的 name 一致
@@ -166,4 +166,3 @@ if __name__ == "__main__":
     print(f"Starting BepiPred-3.0 service on port {port}...")
     print(f"Note: First run will download ESM-2 model (~2.5GB)")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
