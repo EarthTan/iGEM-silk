@@ -1,0 +1,20 @@
+>Flex_GGGGSx1 | 最短柔性，低扰动
+GGGGS
+>Flex_GGGGSx2 | 经典柔性 linker，提供中等自由度
+GGGGSGGGGS
+>Flex_GGGGSx3 | 长柔性，用于末端融合或需要高暴露度场景
+GGGGSGGGGSGGGGS
+>Rigid_EAAAKx1 | 刚性α螺旋，可将功能肽顶出表面
+EAAAK
+>Rigid_EAAAKx2 | 长刚性，进一步隔离功能域
+EAAAKEAAAK
+>Helix_AEAAAKEAAAKA | 带电荷的螺旋 linker，兼顾刚性与亲水
+AEAAAKEAAAKA
+>Gly_rich_GPG | 仿丝素弹性区 GPGXX，天然兼容性好
+GPGGSGPGGS
+>Pro_rich_PPP | 富含脯氨酸的刚性转角，强制分隔
+PPPPGPPPP
+>PAS_linker | 亲水非结构化，抗非特异性吸附
+ASPAAAPASPAAAPASPAAA
+>Silk_like_GS | 丝素 GAGAGS 衍生，与骨架亲和且亲水
+GSGAGAGS

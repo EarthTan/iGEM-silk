@@ -14,7 +14,8 @@ wheels/
 # Virtual environments
 .venv
 
-# System Rubbish
-.DS_Store
 
 # Files
+output/
+.DS_Store
+.claude
