@@ -18,24 +18,20 @@ import os
 import tempfile
 from pathlib import Path
 
-# 将项目根目录添加到路径（用于导入 services.template）
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+# 向上跳 2 级目录，作为根路径
+root_path = Path(__file__).parents[2]
+sys.path.insert(0, str(root_path))
 
-# 将 repo 目录添加到路径（用于导入 bp3）
-REPO_DIR = Path(__file__).parent / "repo"
-sys.path.insert(0, str(REPO_DIR))
-
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class BepiPred3Service(BioToolService):
     """BepiPred-3.0 B 细胞表位预测服务"""
 
-    tool_name = "bepipred3"           # 必须与 registry.py 中的 name 一致
-    version = "0.0.12.7"              # 版本号
+    tool_name = "bepipred3"  # 必须与 registry.py 中的 name 一致
+    version = "0.0.12.7"  # 版本号
     description = "B 细胞表位预测工具 - 基于 ESM-2 蛋白质语言模型的线性表位预测"
-    recommended_batch_size = 10       # ESM-2 编码较慢，批量较小
+    recommended_batch_size = 10  # ESM-2 编码较慢，批量较小
 
     def __init__(self):
         super().__init__()
@@ -72,7 +68,7 @@ class BepiPred3Service(BioToolService):
             await self.load_model()
 
         # 创建临时 FASTA 文件
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fasta", delete=False) as f:
             f.write(f">PEP\n{sequence}\n")
             fasta_path = Path(f.name)
 
@@ -85,14 +81,12 @@ class BepiPred3Service(BioToolService):
                 antigens = self.antigens_class(
                     fasta_file=fasta_path,
                     esm_encoding_dir=self.esm_dir,
-                    add_seq_len=False
+                    add_seq_len=False,
                 )
 
                 # 预测
                 predictor = self.predictor_class(
-                    antigens,
-                    rolling_window_size=7,
-                    top_pred_pct=0.2
+                    antigens, rolling_window_size=7, top_pred_pct=0.2
                 )
                 predictor.run_bp3_ensemble()
 
@@ -124,7 +118,11 @@ class BepiPred3Service(BioToolService):
 
                 # 计算最大表位分数
                 max_score = float(max(all_probs))
-                max_rolling_score = float(max(rolling_scores)) if rolling_scores and len(rolling_scores) > 0 else max_score
+                max_rolling_score = (
+                    float(max(rolling_scores))
+                    if rolling_scores and len(rolling_scores) > 0
+                    else max_score
+                )
 
                 return ToolResult(
                     score=float(epitope_score),
@@ -136,8 +134,8 @@ class BepiPred3Service(BioToolService):
                         "max_linear_epitope_score": round(float(max_rolling_score), 4),
                         "threshold": float(threshold),
                         "num_residues_predicted": int(len(all_probs)),
-                        "model": str("ESM-2 + DenseNet Ensemble")
-                    }
+                        "model": str("ESM-2 + DenseNet Ensemble"),
+                    },
                 )
 
             finally:
@@ -148,10 +146,11 @@ class BepiPred3Service(BioToolService):
     def _compute_rolling_mean(self, values, window=7):
         """计算滚动平均"""
         import numpy as np
+
         values_list = list(values)
         if len(values_list) < window:
             return values_list
-        result = np.convolve(values_list, np.ones(window), 'same') / window
+        result = np.convolve(values_list, np.ones(window), "same") / window
         return result.tolist()
 
 
@@ -167,3 +166,4 @@ if __name__ == "__main__":
     print(f"Starting BepiPred-3.0 service on port {port}...")
     print(f"Note: First run will download ESM-2 model (~2.5GB)")
     uvicorn.run(app, host="0.0.0.0", port=port)
+

@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class MHCflurryService(BioToolService):
@@ -54,11 +54,13 @@ class MHCflurryService(BioToolService):
         # Python 3.13+ 兼容性补丁
         if sys.version_info >= (3, 13):
             import shlex
+
             class FakePipes:
                 @staticmethod
                 def quote(s):
                     return shlex.quote(s)
-            sys.modules['pipes'] = FakePipes()
+
+            sys.modules["pipes"] = FakePipes()
 
         from mhcflurry import Class1AffinityPredictor
 
@@ -77,8 +79,7 @@ class MHCflurryService(BioToolService):
         """
         # 预测亲和力（使用默认等位基因）
         affinity = self.predictor.predict(
-            peptides=[sequence],
-            alleles=[self.DEFAULT_ALLELE]
+            peptides=[sequence], alleles=[self.DEFAULT_ALLELE]
         )[0]
 
         # 转换亲和力为分数（0-1，越低越强）
@@ -99,8 +100,8 @@ class MHCflurryService(BioToolService):
             details={
                 "affinity_nM": round(float(affinity), 2),
                 "allele": self.DEFAULT_ALLELE,
-                "peptide_length": len(sequence)
-            }
+                "peptide_length": len(sequence),
+            },
         )
 
 
@@ -115,3 +116,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8005"))
     print(f"Starting MHCflurry service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
+

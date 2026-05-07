@@ -33,7 +33,7 @@ TOOLS_DIR = Path(__file__).parent
 sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class ToxinPred3Service(BioToolService):
@@ -57,7 +57,7 @@ class ToxinPred3Service(BioToolService):
 
         # 获取 toxinpred3 包路径
         tp3_path = list(toxinpred3.__path__)[0]
-        model_path = os.path.join(tp3_path, 'model', 'toxinpred3.0_model.pkl')
+        model_path = os.path.join(tp3_path, "model", "toxinpred3.0_model.pkl")
 
         # 直接加载 ExtraTreesClassifier
         self.model = joblib.load(model_path)
@@ -100,8 +100,8 @@ class ToxinPred3Service(BioToolService):
             details={
                 "length": len(sequence),
                 "prediction": prediction,
-                "threshold": 0.38
-            }
+                "threshold": 0.38,
+            },
         )
 
 
@@ -116,3 +116,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8003"))
     print(f"Starting ToxinPred3 service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
+

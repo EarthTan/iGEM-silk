@@ -33,7 +33,7 @@ TOOLS_DIR = Path(__file__).parent
 sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class pLM4CPPsService(BioToolService):
@@ -64,12 +64,23 @@ class pLM4CPPsService(BioToolService):
         self.esm_model, self.alphabet = load_esm2_model("esm2_t6_8M_UR50D")
 
         # 加载 CNN 分类器
-        model_path = Path(__file__).parent / "pLM4CPPs-main" / "models" / "ESM2-320" / "best_model_320.h5"
+        model_path = (
+            Path(__file__).parent
+            / "pLM4CPPs-main"
+            / "models"
+            / "ESM2-320"
+            / "best_model_320.h5"
+        )
         self.cnn_model = load_cpp_model(model_path)
 
         # 加载训练数据的嵌入并拟合 MinMaxScaler
         # 注意：必须使用训练数据的嵌入来 fit scaler，以确保与模型训练时一致
-        emb_path = Path(__file__).parent / "pLM4CPPs-main" / "embedded_data" / "whole_sample_dataset_esm2_t6_8M_UR50D_unified_320_dimension.csv"
+        emb_path = (
+            Path(__file__).parent
+            / "pLM4CPPs-main"
+            / "embedded_data"
+            / "whole_sample_dataset_esm2_t6_8M_UR50D_unified_320_dimension.csv"
+        )
         emb_df = pd.read_csv(emb_path, header=0, index_col=0)
 
         self._scaler = MinMaxScaler()
@@ -78,7 +89,9 @@ class pLM4CPPsService(BioToolService):
         # 保存 generate_esm2_embeddings 供 predict_impl 使用
         self._generate_embeddings = generate_esm2_embeddings
 
-        print(f"[{self.tool_name}] ESM2 + CNN model loaded, scaler fitted on training data")
+        print(
+            f"[{self.tool_name}] ESM2 + CNN model loaded, scaler fitted on training data"
+        )
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """
@@ -97,15 +110,13 @@ class pLM4CPPsService(BioToolService):
                 label="non-CPP",
                 details={
                     "warning": "Sequence too short (< 5 amino acids)",
-                    "length": len(sequence)
-                }
+                    "length": len(sequence),
+                },
             )
 
         # 生成 ESM2 嵌入
         embeddings = self._generate_embeddings(
-            [("temp", sequence)],
-            model=self.esm_model,
-            alphabet=self.alphabet
+            [("temp", sequence)], model=self.esm_model, alphabet=self.alphabet
         )
 
         # 使用训练时拟合的 MinMaxScaler 标准化
@@ -126,8 +137,8 @@ class pLM4CPPsService(BioToolService):
                 "length": len(sequence),
                 "prediction": label,
                 "threshold": self.THRESHOLD,
-                "model_type": "ESM2-320_CNN"
-            }
+                "model_type": "ESM2-320_CNN",
+            },
         )
 
 

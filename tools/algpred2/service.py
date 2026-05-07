@@ -19,16 +19,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class AlgPred2Service(BioToolService):
     """AlgPred2 过敏原性风险预测服务"""
 
-    tool_name = "algpred2"           # 必须与 registry.py 中的 name 一致
-    version = "1.4"                  # 版本号
+    tool_name = "algpred2"  # 必须与 registry.py 中的 name 一致
+    version = "1.4"  # 版本号
     description = "过敏原性风险预测工具 - 基于随机森林模型的蛋白过敏原性预测"
-    recommended_batch_size = 50      # 推荐批量大小
+    recommended_batch_size = 50  # 推荐批量大小
 
     def __init__(self):
         super().__init__()
@@ -86,6 +86,7 @@ class AlgPred2Service(BioToolService):
 
         # 转换为 2D numpy 数组 (sklearn 需要)
         import numpy as np
+
         X_test = np.array(aac_values).reshape(1, -1)
 
         # 预测
@@ -102,8 +103,8 @@ class AlgPred2Service(BioToolService):
             details={
                 "sequence_length": len(sequence),
                 "model": "Random Forest",
-                "threshold": threshold
-            }
+                "threshold": threshold,
+            },
         )
 
 
@@ -118,3 +119,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8008"))
     print(f"Starting AlgPred2 service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
+

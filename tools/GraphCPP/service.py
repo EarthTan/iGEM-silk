@@ -31,7 +31,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class GraphCPPService(BioToolService):
@@ -53,31 +53,50 @@ class GraphCPPService(BioToolService):
         """
         # 氨基酸属性
         self.aa_properties = {
-            'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4,
-            'Q': 5, 'E': 6, 'G': 7, 'H': 8, 'I': 9,
-            'L': 10, 'K': 11, 'M': 12, 'F': 13, 'P': 14,
-            'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19, 'X': 20
+            "A": 0,
+            "R": 1,
+            "N": 2,
+            "D": 3,
+            "C": 4,
+            "Q": 5,
+            "E": 6,
+            "G": 7,
+            "H": 8,
+            "I": 9,
+            "L": 10,
+            "K": 11,
+            "M": 12,
+            "F": 13,
+            "P": 14,
+            "S": 15,
+            "T": 16,
+            "W": 17,
+            "Y": 18,
+            "V": 19,
+            "X": 20,
         }
 
         # CPP 模式库
         self.cpp_patterns = [
-            'RKKRRQRRR',  # TAT
-            'RQIKIWFQNRRMKWKK',  # Penetratin
-            'RRRRRRRR',  # Poly-arginine
-            'LLIILRRRIRKQAHAHSK',  # pVEC
-            'GRKKRRQRRRPPQ',
+            "RKKRRQRRR",  # TAT
+            "RQIKIWFQNRRMKWKK",  # Penetratin
+            "RRRRRRRR",  # Poly-arginine
+            "LLIILRRRIRKQAHAHSK",  # pVEC
+            "GRKKRRQRRRPPQ",
         ]
 
         self.threshold = 0.5
 
-        print(f"[{self.tool_name}] GraphCPP model initialized (simplified fingerprint method)")
+        print(
+            f"[{self.tool_name}] GraphCPP model initialized (simplified fingerprint method)"
+        )
 
     def _extract_molecular_fingerprint(self, sequence: str):
         """模拟提取分子指纹特征"""
         length = len(sequence)
-        charge = sum(1 for aa in sequence if aa in 'RK')
-        hydrophobic = sum(1 for aa in sequence if aa in 'AILMFVP')
-        aromatic = sum(1 for aa in sequence if aa in 'FWY')
+        charge = sum(1 for aa in sequence if aa in "RK")
+        hydrophobic = sum(1 for aa in sequence if aa in "AILMFVP")
+        aromatic = sum(1 for aa in sequence if aa in "FWY")
 
         # 模拟图神经网络输出的特征向量
         fp = [
@@ -86,8 +105,8 @@ class GraphCPPService(BioToolService):
             hydrophobic / length if length > 0 else 0,
             aromatic / length if length > 0 else 0,
             1.0 if charge >= 3 else 0,
-            1.0 if 'R' in sequence else 0,
-            1.0 if 'K' in sequence else 0,
+            1.0 if "R" in sequence else 0,
+            1.0 if "K" in sequence else 0,
         ]
         return fp
 
@@ -102,9 +121,9 @@ class GraphCPPService(BioToolService):
 
         # 计算特征
         length = len(sequence)
-        charge = sum(1 for aa in sequence if aa in 'RK')
-        hydrophobic = sum(1 for aa in sequence if aa in 'AILMFVP')
-        aromatic = sum(1 for aa in sequence if aa in 'FWY')
+        charge = sum(1 for aa in sequence if aa in "RK")
+        hydrophobic = sum(1 for aa in sequence if aa in "AILMFVP")
+        aromatic = sum(1 for aa in sequence if aa in "FWY")
 
         base_prob = 0.25
 
@@ -159,8 +178,8 @@ class GraphCPPService(BioToolService):
                 "prediction": prediction,
                 "confidence": round(confidence, 4),
                 "threshold": self.threshold,
-                "model_type": "GraphCPP_Fingerprint"
-            }
+                "model_type": "GraphCPP_Fingerprint",
+            },
         )
 
 
@@ -175,3 +194,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8009"))
     print(f"Starting GraphCPP service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
+

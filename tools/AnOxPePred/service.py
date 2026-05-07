@@ -28,7 +28,7 @@ from pathlib import Path
 root_path = Path(__file__).parents[2]
 sys.path.insert(0, str(root_path))
 
-from tools.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class AnOxPePredService(BioToolService):

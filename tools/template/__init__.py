@@ -1,7 +1,7 @@
 # tools/template/__init__.py
 # 工具服务模板包
 
-from .tool_service import (
+from .fasta_service import (
     BioToolService,
     create_app,
     ToolResult,

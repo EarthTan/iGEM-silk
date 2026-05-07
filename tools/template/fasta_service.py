@@ -22,7 +22,7 @@
 # ------------------
 # 方式一：直接启动模板（不推荐，需要设置环境变量）
 #   TOOL_CLASS=tools.anoxpepred.service:AnOxPePredService
-#   uvicorn tools.template.tool_service:app --port 8001 --host 0.0.0.0
+#   uvicorn tools.template.fasta_service:app --port 8001 --host 0.0.0.0
 #
 # 方式二：创建自己的服务（推荐）
 #   假设你创建了一个 MyToolService 类
@@ -560,7 +560,7 @@ def create_app(ToolClass: type[BioToolService]) -> FastAPI:
 
     【使用例子】
     -----------
-    from tools.template.tool_service import create_app, BioToolService, ToolResult
+    from tools.template.fasta_service import create_app, BioToolService, ToolResult
 
     class MyToolService(BioToolService):
         tool_name = "mytool"

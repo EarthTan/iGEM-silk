@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from services.template.tool_service import BioToolService, create_app, ToolResult
+from tools.template.fasta_service import BioToolService, create_app, ToolResult
 
 
 class MLCPPService(BioToolService):
@@ -54,20 +54,37 @@ class MLCPPService(BioToolService):
 
         self.np = np
         self.aa_properties = {
-            'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4,
-            'Q': 5, 'E': 6, 'G': 7, 'H': 8, 'I': 9,
-            'L': 10, 'K': 11, 'M': 12, 'F': 13, 'P': 14,
-            'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19, 'X': 20
+            "A": 0,
+            "R": 1,
+            "N": 2,
+            "D": 3,
+            "C": 4,
+            "Q": 5,
+            "E": 6,
+            "G": 7,
+            "H": 8,
+            "I": 9,
+            "L": 10,
+            "K": 11,
+            "M": 12,
+            "F": 13,
+            "P": 14,
+            "S": 15,
+            "T": 16,
+            "W": 17,
+            "Y": 18,
+            "V": 19,
+            "X": 20,
         }
         self.threshold = 0.5
 
         # Strong CPP patterns (based on literature)
         self.strong_cpp_patterns = [
-            'RKKRRQRRR',  # TAT
-            'RQIKIWFQNRRMKWKK',  # Penetratin
-            'RRRRRRRR',  # Poly-arginine
-            'LLIILRRRIRKQAHAHSK',  # pVEC
-            'KETWWETWWTEWSQPKKKRKV',  # MPG
+            "RKKRRQRRR",  # TAT
+            "RQIKIWFQNRRMKWKK",  # Penetratin
+            "RRRRRRRR",  # Poly-arginine
+            "LLIILRRRIRKQAHAHSK",  # pVEC
+            "KETWWETWWTEWSQPKKKRKV",  # MPG
         ]
 
         print(f"[{self.tool_name}] MLCPP model initialized (rule-based simulation)")
@@ -81,9 +98,12 @@ class MLCPPService(BioToolService):
 
         for aa in sequence.upper():
             if aa in self.aa_properties:
-                if aa in 'RK': charge += 1
-                if aa in 'AILMFVPG': hydrophobic += 1
-                if aa in 'FWY': aromatic += 1
+                if aa in "RK":
+                    charge += 1
+                if aa in "AILMFVPG":
+                    hydrophobic += 1
+                if aa in "FWY":
+                    aromatic += 1
 
         # Normalize features
         features = self.np.zeros(21)
@@ -91,7 +111,7 @@ class MLCPPService(BioToolService):
         features[1] = charge / 10.0
         features[2] = hydrophobic / length if length > 0 else 0
         features[3] = aromatic / length if length > 0 else 0
-        features[4] = 1.0 if 'R' in sequence or 'K' in sequence else 0
+        features[4] = 1.0 if "R" in sequence or "K" in sequence else 0
 
         noise = self.np.random.randn(21) * 0.1
         return features + noise
@@ -106,8 +126,10 @@ class MLCPPService(BioToolService):
 
         # Calculate based on features
         length = len(sequence)
-        charge = sequence.count('R') + sequence.count('K')
-        hydrophobic_ratio = sum(1 for aa in sequence if aa in 'AILMFVPG') / length if length > 0 else 0
+        charge = sequence.count("R") + sequence.count("K")
+        hydrophobic_ratio = (
+            sum(1 for aa in sequence if aa in "AILMFVPG") / length if length > 0 else 0
+        )
 
         base_prob = 0.3
 
@@ -161,8 +183,8 @@ class MLCPPService(BioToolService):
                 "prediction": prediction,
                 "confidence": round(confidence, 4),
                 "threshold": self.threshold,
-                "model_type": "MLCPP_RuleBased"
-            }
+                "model_type": "MLCPP_RuleBased",
+            },
         )
 
 
@@ -177,3 +199,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8010"))
     print(f"Starting MLCPP service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
