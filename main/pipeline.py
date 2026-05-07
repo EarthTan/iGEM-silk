@@ -55,7 +55,10 @@ Step 7 — 综合评分 & 排名   : 加权求和排序，输出 Top 20
 from __future__ import annotations
 
 import asyncio
+import json
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 from main.config import (
     SERVICES,
@@ -396,65 +399,145 @@ async def run() -> None:
     # 评分结果通过 peptide_id 映射回每条 construct。
     #
     # 流程：
+    #   0. 检测缓存 — 如果上次运行已保存评分，询问用户是否复用
     #   1. 健康检查 — 确定哪些服务在线
     #   2. 对在线服务，各发送全部肽的批量请求（并发执行）
     #   3. 聚合每个服务的响应，按 peptide_id 建立评分字典
     #   4. 将评分映射到每条 construct（同一肽的所有 construct 共享分数）
+    #   5. 写入缓存 — 保存本次评分结果供下次复用
 
-    print("\n[Step 5/7] 调用微服务评分 …")
-    client = ServiceClient()
+    CACHE_PATH = Path(OUTPUT_DIR) / "cache_peptide_scores.json"
+    eval_result = None  # 将在下面被赋值（来自缓存或微服务调用）
 
-    try:
-        service_names = list(SERVICES.keys())
-        print("  健康检查中 …")
-        health = await client.check_health(service_names)
-        available = [n for n, s in health.items() if s["available"]]
-        unavailable = [n for n, s in health.items() if not s["available"]]
+    # ── 0. 检测缓存 ──────────────────────────────────────────
+    current_sequences = sorted(set(p["sequence"] for p in passed_peptides))
 
-        # 打印各服务状态
-        for name, status in health.items():
-            icon = "✓" if status["available"] else "✗"
-            print(f"    [{icon}] {name}: {status['status']}")
+    if CACHE_PATH.exists():
+        try:
+            with open(CACHE_PATH, encoding="utf-8") as f:
+                cache = json.load(f)
+            cache_time = cache.get("cached_at", "未知时间")
+            cache_sequences = sorted(cache.get("peptide_sequences", []))
 
-        # 如果没有可用服务，优雅降级
-        if not available:
-            print("  ⚠️  没有可用微服务，跳过评分步骤。")
-            print(f"  已生成的 construct 列表见 output/step04_passed_constructs.csv")
+            if cache_sequences == current_sequences:
+                print(f"\n[Step 5/7] 发现缓存评分结果")
+                print(f"  缓存时间: {cache_time}")
+                print(f"  缓存肽数: {len(cache_sequences)} 条")
+                print(f"  缓存服务: {', '.join(cache.get('services_used', []))}")
+                answer = input("  是否使用缓存? [Y/n]: ").strip().lower()
+                if answer in ("", "y", "yes"):
+                    eval_result = {
+                        "peptide_scores": cache["peptide_scores"],
+                        "service_status": {
+                            "available": cache.get("services_used", []),
+                            "unavailable": [],
+                        },
+                        "errors": [],
+                    }
+                    print("  ✓ 已加载缓存评分，跳过微服务调用。")
+                else:
+                    print("  用户选择重新评分。")
+            else:
+                cache_seqs_set = set(cache_sequences)
+                current_seqs_set = set(current_sequences)
+                new_count = len(current_seqs_set - cache_seqs_set)
+                removed_count = len(cache_seqs_set - current_seqs_set)
+                print(f"\n[Step 5/7] 缓存肽列表与当前不一致")
+                print(f"  缓存: {len(cache_sequences)} 条 (时间: {cache_time})")
+                print(f"  当前: {len(current_sequences)} 条")
+                if new_count > 0:
+                    print(f"  新增 {new_count} 条肽，需重新评分")
+                if removed_count > 0:
+                    print(f"  移除 {removed_count} 条肽")
+        except Exception as e:
+            print(f"  ⚠ 读取缓存失败 ({e})，将重新评分。")
+
+    # ── 1–4. 调用微服务（如果缓存未命中） ─────────────────────
+    if eval_result is None:
+        print("\n[Step 5/7] 调用微服务评分 …")
+        client = ServiceClient()
+
+        try:
+            service_names = list(SERVICES.keys())
+            print("  健康检查中 …")
+            health = await client.check_health(service_names)
+            available = [n for n, s in health.items() if s["available"]]
+            unavailable = [n for n, s in health.items() if not s["available"]]
+
+            # 打印各服务状态
+            for name, status in health.items():
+                icon = "✓" if status["available"] else "✗"
+                print(f"    [{icon}] {name}: {status['status']}")
+
+            # 如果没有可用服务，优雅降级
+            if not available:
+                print("  ⚠️  没有可用微服务，跳过评分步骤。")
+                print(f"  已生成的 construct 列表见 output/step04_passed_constructs.csv")
+                await client.close()
+
+                # 即使没有可用服务，也尝试使用缓存
+                if CACHE_PATH.exists():
+                    try:
+                        with open(CACHE_PATH, encoding="utf-8") as f:
+                            cache = json.load(f)
+                        eval_result = {
+                            "peptide_scores": cache["peptide_scores"],
+                            "service_status": {
+                                "available": cache.get("services_used", []),
+                                "unavailable": [],
+                            },
+                            "errors": [],
+                        }
+                        print(f"  ✓ 回退使用缓存 (时间: {cache.get('cached_at', '未知')})")
+                    except Exception:
+                        pass
+
+                if eval_result is None:
+                    return
+
+            else:
+                # 并发调用各微服务
+                print(f"\n  对 {len(passed_peptides)} 条肽调用 {len(available)} 个微服务 …")
+                eval_result = await client.evaluate_peptides(
+                    passed_peptides, available, health
+                )
+
+                # 打印各服务的错误（如有）
+                if eval_result["errors"]:
+                    for err in eval_result["errors"]:
+                        print(f"    ⚠ {err['service']}: {err['error']}")
+
+                # ── 5. 写入缓存 ──────────────────────────────
+                cache_data = {
+                    "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "peptide_count": len(passed_peptides),
+                    "peptide_sequences": current_sequences,
+                    "services_used": available,
+                    "peptide_scores": eval_result["peptide_scores"],
+                }
+                save_step(cache_data, "cache_peptide_scores.json")
+                print(f"  ✓ 评分结果已缓存 ({len(passed_peptides)} 条肽, {len(available)} 个服务)")
+        finally:
             await client.close()
-            return
 
-        # 并发调用各微服务
-        print(f"\n  对 {len(passed_peptides)} 条肽调用 {len(available)} 个微服务 …")
-        eval_result = await client.evaluate_peptides(
-            passed_peptides, available, health
-        )
+    # ── 将肽评分映射到 construct ─────────────────────────────
+    scored = ServiceClient.map_scores_to_constructs(
+        passed_constructs, eval_result["peptide_scores"]
+    )
 
-        # 打印各服务的错误（如有）
-        if eval_result["errors"]:
-            for err in eval_result["errors"]:
-                print(f"    ⚠ {err['service']}: {err['error']}")
-
-        # 将肽评分映射到 construct
-        scored = ServiceClient.map_scores_to_constructs(
-            passed_constructs, eval_result["peptide_scores"]
-        )
-
-        # 输出 Step 5 结果
-        step05_summary = {
-            "step": "05_service_scores",
-            "service_status": eval_result["service_status"],
-            "errors": eval_result["errors"],
-            "peptide_count": len(passed_peptides),
-            "scored_construct_count": len(scored),
-        }
-        save_step(step05_summary, "step05_service_scores_summary.json")
-        save_step(eval_result["peptide_scores"], "step05_peptide_scores.json")
-        write_constructs_csv(scored, "step05_scored_constructs.csv",
-                             extra_cols=["service_scores"])
-        print(f"  完成 {len(scored)} 条 construct 的评分映射")
-    finally:
-        # 无论如何确保 HTTP 客户端关闭
-        await client.close()
+    # 输出 Step 5 结果
+    step05_summary = {
+        "step": "05_service_scores",
+        "service_status": eval_result["service_status"],
+        "errors": eval_result["errors"],
+        "peptide_count": len(passed_peptides),
+        "scored_construct_count": len(scored),
+    }
+    save_step(step05_summary, "step05_service_scores_summary.json")
+    save_step(eval_result["peptide_scores"], "step05_peptide_scores.json")
+    write_constructs_csv(scored, "step05_scored_constructs.csv",
+                         extra_cols=["service_scores"])
+    print(f"  完成 {len(scored)} 条 construct 的评分映射")
 
     # ═══════════════════════════════════════════════════════════════
     # Step 6: 硬过滤 — 安全底线
