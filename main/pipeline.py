@@ -236,19 +236,23 @@ def score_and_filter_peptides(
                 triggered = True
 
             if triggered:
-                failed_by.append({
-                    "service": svc_name,
-                    "score": score,
-                    "threshold": threshold,
-                    "reason": svc_config["reason"],
-                })
+                failed_by.append(
+                    {
+                        "service": svc_name,
+                        "score": score,
+                        "threshold": threshold,
+                        "reason": svc_config["reason"],
+                    }
+                )
 
         if failed_by:
-            failed.append({
-                **pep,
-                "hard_filter_status": "failed",
-                "hard_filter_reasons": failed_by,
-            })
+            failed.append(
+                {
+                    **pep,
+                    "hard_filter_status": "failed",
+                    "hard_filter_reasons": failed_by,
+                }
+            )
             continue
 
         # ── 加权评分 ──
@@ -286,19 +290,25 @@ def score_and_filter_peptides(
             final_score = 0.0
             score_breakdown = {}
 
-        scored_peptides.append({
-            **pep,
-            "final_score": final_score,
-            "score_breakdown": score_breakdown,
-            "service_scores": scores,
-            "hard_filter_status": "passed",
-        })
+        scored_peptides.append(
+            {
+                **pep,
+                "final_score": final_score,
+                "score_breakdown": score_breakdown,
+                "service_scores": scores,
+                "hard_filter_status": "passed",
+            }
+        )
 
     # ── 排序 + Top-N ──
     # 无评分数据时 top_n 不生效（全部分数相同，截断无意义）
     effective_top_n = top_n if has_scores else None
     scored_peptides.sort(key=lambda x: x["final_score"], reverse=True)
-    passed = scored_peptides[:effective_top_n] if effective_top_n is not None else scored_peptides
+    passed = (
+        scored_peptides[:effective_top_n]
+        if effective_top_n is not None
+        else scored_peptides
+    )
 
     summary = {
         "step": "04_peptide_selection",
@@ -459,6 +469,7 @@ async def run() -> None:
 
     # 筛选抗氧化肽（当前项目的核心功能方向）
     choosen_peptides = peptides_df[peptides_df["is_antioxidant"] == 1]
+    # TODO: 功能肽选择扩展
 
     print(f"  Scaffold: {scaffold['id']} ({len(scaffold['sequence'])} aa)")
     print(f"  Linkers: {len(linkers)} 条")
@@ -618,7 +629,10 @@ async def run() -> None:
                     print("  → 无评分数据，将以全量肽继续枚举。")
                     eval_result = {
                         "peptide_scores": {},
-                        "service_status": {"available": [], "unavailable": service_names},
+                        "service_status": {
+                            "available": [],
+                            "unavailable": service_names,
+                        },
                         "errors": [],
                     }
 
@@ -683,13 +697,19 @@ async def run() -> None:
     save_step(step04, "step04_peptide_selection.json")
     if failed_peptides:
         save_step(
-            {"step": "04_failed_peptides", "count": len(failed_peptides), "results": failed_peptides},
+            {
+                "step": "04_failed_peptides",
+                "count": len(failed_peptides),
+                "results": failed_peptides,
+            },
             "step04_failed_peptides.json",
         )
     print(f"  硬过滤淘汰: {len(failed_peptides)} 条")
     print(f"  评分通过: {len(top_peptides)} 条（将进入枚举）")
     if top_peptides:
-        print(f"  评分范围: {step04['final_score_range']['max']:.4f} ~ {step04['final_score_range']['min']:.4f}")
+        print(
+            f"  评分范围: {step04['final_score_range']['max']:.4f} ~ {step04['final_score_range']['min']:.4f}"
+        )
 
     if not top_peptides:
         print("  ⚠️  没有肽通过评分筛选，流水线终止。")

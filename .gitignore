@@ -16,6 +16,5 @@ wheels/
 
 
 # Files
-output/
 .DS_Store
 .claude

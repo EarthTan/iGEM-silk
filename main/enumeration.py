@@ -241,8 +241,17 @@ def filter_peptides(df: pd.DataFrame) -> dict:
         if not pd.isna(pi) and PI_CAUTION_RANGE[0] <= pi <= PI_CAUTION_RANGE[1]:
             warnings.append(f"pI {pi:.1f} 在 6-8 范围，复性时需注意偏离 pH")
 
+        # peptide_id 不能是 NaN，否则后续 JSON 序列化爆炸
+        pid = row.get("source_name", "")
+        if pd.isna(pid) or str(pid).strip() == "":
+            pid = row.get("database_id", "")
+        if pd.isna(pid) or str(pid).strip() == "":
+            pid = seq
+        else:
+            pid = str(pid)
+
         entry = {
-            "peptide_id": row.get("source_name", row.get("database_id", "")),
+            "peptide_id": pid,
             "sequence": seq,
             "length": length,
             "gravy": round(gravy, 4),
