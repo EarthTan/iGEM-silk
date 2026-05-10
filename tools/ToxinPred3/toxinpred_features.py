@@ -192,17 +192,20 @@ def predict_toxicity(
     sequences: Union[List[str], str],
     names: List[str] = None,
     threshold: float = 0.38,
-    model: int = 2,
+    model: int = 1,
     return_raw: bool = False
 ) -> pd.DataFrame:
     """
     预测肽序列的毒性。
 
+    注意: 默认使用 model=1 (AAC+DPC)。model=2 (Hybrid+MERCI) 需要 perl 运行时，
+    且在实际测试中对已知毒素 (如 KWKLFKKIGAVLKVL) 产生假阴性。
+
     Args:
         sequences: 肽序列列表或单个序列，或 FASTA 文件路径
         names: 可选的序列名称列表
         threshold: 毒性阈值 (0-1)，默认0.38
-        model: 模型选择，1=AAC+DPC, 2=Hybrid，默认2
+        model: 模型选择，1=AAC+DPC (推荐), 2=Hybrid+MERCI (需 perl)
         return_raw: 是否返回完整结果（含 MERCI 分数）
 
     Returns:

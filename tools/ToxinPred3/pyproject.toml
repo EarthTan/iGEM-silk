@@ -9,23 +9,17 @@ dependencies = [
     "scikit-learn==1.2.2",
     "joblib",
     "httpx>=0.27.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
-# ML 模式：完整功能
+# 核心模型依赖
 ml = [
     "toxinpred3",
 ]
-# 微服务模式：HTTP 接口支持
-service = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.0.0",
-]
-# 全部依赖
+# 全部依赖（模型 + 服务）
 all = [
     "toxinpred3",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.0.0",
 ]

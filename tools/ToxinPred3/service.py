@@ -1,9 +1,13 @@
 """
 service.py
 ==========
-ToxinPred3 微服务入口。
+ToxinPred3 微服务入口 — 肽毒性预测。
 
-将现有的 ToxinPred3 毒性预测工具封装为标准的微服务接口。
+原仓库: https://github.com/raghavagps/toxinpred3
+论文: Rathore AS, et al. (2024) "ToxinPred3.0". *Computers in Biology and Medicine*.
+
+基于 Extra Trees 分类器 + AAC(20维)/DPC(400维) 特征。
+使用 Model 1 (ML only)，不依赖 MERCI/Perl 杂交路径。
 
 使用方式：
     cd tools/ToxinPred3
@@ -37,70 +41,69 @@ from tools.template.fasta_service import FastaToolService, create_app, ToolResul
 
 
 class ToxinPred3Service(FastaToolService):
-    """
-    ToxinPred3 肽毒性预测服务。
+    """ToxinPred3 肽毒性预测服务。
 
-    基于 Extra Trees 分类器预测肽序列的毒性。
-    直接加载模型，避免 toxinpred3 包的 CLI bug。
+    基于 Extra Trees 分类器 + AAC(20维)/DPC(400维) 特征。
+    使用 Model 1 (纯 ML)，不依赖 MERCI 杂交路径（该路径在已知毒素上产生假阴性）。
+
+    原仓库: https://github.com/raghavagps/toxinpred3
     """
 
-    tool_name = "toxipred3"
-    version = "1.0.0"
-    description = "肽毒性预测工具（ToxinPred3）- Extra Trees 分类器"
+    tool_name = "toxinpred3"
+    version = "2.0.0"
+    description = "肽毒性预测工具（ToxinPred3）- Extra Trees 分类器 + AAC/DPC 特征"
     recommended_batch_size = 50
 
     async def load_model(self):
-        """加载 ToxinPred3 模型"""
+        """加载 ToxinPred3 ExtraTrees 模型和特征提取器。
+
+        直接 joblib.load 加载 sklearn 模型（绕过 toxinpred3 CLI 的 pandas 兼容性 bug）。
+        特征提取使用本地 AAC + DPC 实现（与原始包对齐，420 维）。
+        """
         import toxinpred3
         import joblib
+        import sklearn
         import os
 
-        # 获取 toxinpred3 包路径
+        self._sklearn_ver = sklearn.__version__
+
         tp3_path = list(toxinpred3.__path__)[0]
         model_path = os.path.join(tp3_path, "model", "toxinpred3.0_model.pkl")
-
-        # 直接加载 ExtraTreesClassifier
         self.model = joblib.load(model_path)
 
-        # 导入特征提取函数
         from toxinpred_features import extract_features
-
-        # 保存特征提取函数
         self.extract_features = extract_features
 
-        print(f"[{self.tool_name}] Model loaded, ready to predict")
+        print(f"[{self.tool_name}] ExtraTreesClassifier loaded | sklearn={self._sklearn_ver} | path={model_path}")
 
     async def predict_impl(self, sequence: str) -> ToolResult:
-        """
-        预测单条序列的毒性。
+        """预测单条序列的毒性。
 
         Args:
             sequence: 氨基酸序列（如 "KWKLFKKIGAVLKVL"）
 
         Returns:
-            ToolResult: 包含 score（0-1 毒性分数）和 label（Toxin/Non-Toxin）
+            ToolResult: score=毒性概率(0-1), label="Toxin"/"Non-Toxin"
         """
-        import numpy as np
+        import warnings
 
-        # 提取 AAC + DPC 特征 (420维)
         features = self.extract_features([sequence])
 
-        # 转换为 numpy 数组
-        X = features.values
+        # 抑制 sklearn 特征名称警告（列名对齐已验证）
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="X does not have valid feature names")
+            score = float(self.model.predict_proba(features)[0][1])
 
-        # 预测毒性分数（概率）
-        score = self.model.predict_proba(X)[0][1]  # 取 class 1 (Toxin) 的概率
-
-        # 预测标签
         prediction = "Toxin" if score >= 0.38 else "Non-Toxin"
 
         return ToolResult(
-            score=float(score),
+            score=score,
             label=prediction,
             details={
                 "length": len(sequence),
-                "prediction": prediction,
                 "threshold": 0.38,
+                "model": "ExtraTreesClassifier (Model 1: AAC+DPC)",
+                "sklearn_version": self._sklearn_ver,
             },
         )
 

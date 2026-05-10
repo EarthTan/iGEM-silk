@@ -8,6 +8,9 @@ last_updated: 2026-04-25
 
 # ToxinPred 3.0 技能包
 
+> 原仓库: https://github.com/raghavagps/toxinpred3
+> 论文: Rathore AS, et al. (2024) "ToxinPred3.0: An improved method for the prediction of toxicity of peptides." *Computers in Biology and Medicine*.
+
 ## 工具定位
 
 **ToxinPred 3.0** 是由印度 IIITD Prof. G. P. S. Raghava 团队开发的肽毒性预测工具，在融合引擎中承担**粗筛过滤**角色，用于在全排列组合之前剔除明显有毒的肽段。
@@ -24,11 +27,14 @@ last_updated: 2026-04-25
 ### 技术原理
 
 ```
-毒性预测 = f(ML分数, MERCI Motif分数)
-- ML模型：基于 Extra Trees 分类器
+毒性预测 = ML 分数 (Extra Trees + AAC/DPC)
+- ML 模型：基于 Extra Trees 分类器
 - 特征：AAC(20维) + DPC(400维) = 420维
-- MERCI：已知毒素 motif 匹配
+- 服务使用 Model 1 (纯 ML)，不依赖 MERCI/Perl 杂交路径
 ```
+
+> **Model 1 vs Model 2**: 官方提供两种模式 — Model 1 (AAC+DPC) 和 Model 2 (Hybrid+MERCI motif)。
+> 实际测试发现 Model 2 在已知毒素上产生假阴性（MERCI 负向 motif 过度惩罚），服务选择 Model 1。
 
 ---
 
