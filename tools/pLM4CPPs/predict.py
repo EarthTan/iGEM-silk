@@ -142,9 +142,14 @@ def generate_esm2_embeddings(
     if model is None or alphabet is None:
         model, alphabet = load_esm2_model(model_name)
 
-    # Determine device
+    # Determine device: CUDA > MPS > CPU
     if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
     model = model.to(device)
     model.eval()
 
