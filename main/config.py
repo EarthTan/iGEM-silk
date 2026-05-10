@@ -10,7 +10,7 @@
 --------
 1. 所有魔法数字集中管理，不散落各个模块
 2. 每个参数都有注释说明其生物学/工程意义
-3. 按功能分为六个区块：微服务 · 硬过滤 · 评分 · 肽预筛 · 禁入区 · 输出
+3. 按功能分为七个区块：微服务 · 硬过滤 · 评分 · 肽预筛 · 禁入区 · 输出
 
 科学背景速览
 ------------
@@ -22,16 +22,22 @@
 
 from __future__ import annotations
 
+import os
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 一、微服务 URL 配置
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# 每个微服务是独立运行的 FastAPI 进程，监听在 127.0.0.1 的不同端口。
+# 每个微服务是独立运行的 FastAPI 进程，默认监听在 127.0.0.1 的不同端口。
 # group 字段决定该服务在流水线中的角色：
 #   - "score"  → 参与综合评分（加权累加）
 #   - "filter" → 参与硬过滤（一票否决：毒性/过敏原/溶血超标直接淘汰）
 #
 # 端口分配：8001–8010，与 tools/ 下各子目录一一对应。
+#
+# 远程服务：设置环境变量 {NAME}_HOST 可将某个服务的地址指向远程机器。
+#   例：export ANOXPEPRED_HOST=192.168.1.100   # GPU 服务器
+#       export ANOXPEPRED_PORT=8001            # 可选，默认用配置中的端口
 
 SERVICE_HOST = "127.0.0.1"
 
@@ -39,6 +45,7 @@ SERVICES: dict[str, dict] = {
     # ═══════ 评分型服务 ═══════
     "anoxpepred":   {"port": 8001, "group": "score"},
     # AnOxPePred：基于 CNN 的抗氧化肽预测（自由基清除 + 金属螯合双机制）
+    # 支持 CUDA GPU 加速，可部署在独立 GPU 服务器上
 
     "bepipred3":    {"port": 8002, "group": "score"},
     # BepiPred-3.0：基于 ESM-2 的 B 细胞表位预测
@@ -74,9 +81,16 @@ SERVICES: dict[str, dict] = {
 
 
 def service_url(name: str) -> str:
-    """根据服务名拼接完整 HTTP base URL，如 ``http://127.0.0.1:8001``。"""
-    port = SERVICES[name]["port"]
-    return f"http://{SERVICE_HOST}:{port}"
+    """根据服务名拼接完整 HTTP base URL。
+
+    优先级: 环境变量 {NAME}_HOST > SERVICES[name]["host"] > SERVICE_HOST。
+    例如 ``export ANOXPEPRED_HOST=192.168.1.100`` 可指向远程 GPU 服务器。
+    """
+    env_host = os.environ.get(f"{name.upper()}_HOST")
+    host = env_host or SERVICES[name].get("host", SERVICE_HOST)
+    env_port = os.environ.get(f"{name.upper()}_PORT")
+    port = int(env_port) if env_port else SERVICES[name]["port"]
+    return f"http://{host}:{port}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

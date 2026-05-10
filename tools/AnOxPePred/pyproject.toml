@@ -15,6 +15,13 @@ ml = [
     "tensorflow>=2.15.0",
     "biopython>=1.80",
 ]
+# 参考代码依赖（运行 AnOxPePred_funcs.py 需要）
+reference = [
+    "scikit-learn>=1.0",
+    "matplotlib>=3.5",
+    "seaborn>=0.12",
+    "statsmodels>=0.14",
+]
 # 微服务模式：HTTP 接口支持
 service = [
     "fastapi>=0.115.0",

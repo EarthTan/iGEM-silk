@@ -78,10 +78,13 @@ class AnOxPePredService(FastaToolService):
             score=result.overall_score,
             label=result.overall_class,
             details={
-                "frs_score": round(result.frs_score, 4),  # 自由基清除分数
-                "chel_score": round(result.chel_score, 4),  # 金属螯合分数
-                "confidence": result.confidence,  # 置信度
-                "is_antioxidant": result.is_antioxidant,  # 是否判定为抗氧化
+                "frs_score": round(result.frs_score, 4),
+                "chel_score": round(result.chel_score, 4),
+                "confidence": result.confidence,
+                "is_antioxidant": result.is_antioxidant,
+                "model_mode": self.model.model_mode,
+                "gpu_backend": self.model.gpu_info.get("backend", "unknown"),
+                "gpu_count": self.model.gpu_info.get("gpu_count", 0),
             },
         )
 

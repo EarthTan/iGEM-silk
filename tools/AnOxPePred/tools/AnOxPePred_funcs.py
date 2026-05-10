@@ -1,3 +1,14 @@
+"""
+AnOxPePred 原始论文代码 (参考实现)
+================================
+来源: https://github.com/TobiasHeOl/AnOxPePred
+用途: 保留作为算法参考，了解 CNN 模型定义、Focal Loss、数据预处理等原始实现细节。
+
+注意: 此文件不被微服务直接调用。实际预测逻辑见 anoxpepred_integration.py。
+     此文件导入依赖较复杂 (seaborn, matplotlib, Bio.pairwise2, statsmodels)，
+     如需运行需额外安装这些包。
+"""
+
 import numpy as np, pandas as pd, tensorflow as tf, seaborn as sns
 from Bio import pairwise2
 import os, time
