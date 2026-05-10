@@ -7,27 +7,19 @@ dependencies = [
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "httpx>=0.27.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
-# ML 模式：完整功能
 ml = [
     "modlamp>=4.3.2",
     "peptides>=0.5.0",
     "scikit-learn>=1.0.0",
 ]
-# 微服务模式：HTTP 接口支持
-service = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.0.0",
-]
-# 全部依赖
 all = [
     "modlamp>=4.3.2",
     "peptides>=0.5.0",
     "scikit-learn>=1.0.0",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.0.0",
 ]
