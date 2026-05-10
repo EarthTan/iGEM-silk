@@ -1,10 +1,16 @@
 """
 service.py
 ==========
-GraphCPP 微服务入口。
+GraphCPP 微服务入口 — 细胞穿膜肽 (CPP) 预测（图神经网络）。
 
-将现有的 GraphCPP 图神经网络细胞穿透肽预测工具封装为标准的微服务接口。
-由于 torch_scatter 等依赖安装复杂，使用简化的分子指纹方法进行模拟预测。
+原仓库: https://github.com/drkumarnandan/GraphCPP
+论文: GraphCPP: graph neural network for cell-penetrating peptide prediction.
+
+架构: 肽序列 → RDKit 分子图 → MolGraphConvFeaturizer (DeepChem)
+      → GraphSAGE 卷积 (2层) + Topological Fingerprint (2048维)
+      → Sigmoid 分类
+
+在流水线中作为 score 型服务，权重 0.05（轻量版，低于 pLM4CPPs 的 0.10）。
 
 使用方式：
     cd tools/GraphCPP
@@ -23,175 +29,192 @@ from __future__ import annotations
 
 import sys
 import os
-import random
+import warnings
 from pathlib import Path
 
-# 将项目根目录添加到路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
-from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.template.fasta_service import (
+    FastaToolService, create_app, ToolResult,
+    BatchPredictRequest, BatchPredictResponse,
+)
 
 
 class GraphCPPService(FastaToolService):
-    """
-    GraphCPP 图神经网络细胞穿透肽预测服务。
+    """GraphCPP 细胞穿膜肽预测服务（真实 GNN 模型）。
 
-    使用简化分子指纹方法模拟图神经网络预测结果。
+    使用 GraphSAGE + Topological Fingerprint 预测 CPP。
+    原仓库: https://github.com/drkumarnandan/GraphCPP
     """
 
     tool_name = "graphcpp"
-    version = "1.0.0"
-    description = "细胞穿透肽预测工具（GraphCPP）- 图神经网络（简化版）"
+    version = "2.0.0"
+    description = "细胞穿膜肽预测工具（GraphCPP）- GraphSAGE GNN + Morgan FP"
     recommended_batch_size = 20
 
     async def load_model(self):
-        """
-        加载 GraphCPP 模型（使用简化模拟）。
-        实际模型需要 torch_scatter 等复杂依赖。
-        """
-        # 氨基酸属性
-        self.aa_properties = {
-            "A": 0,
-            "R": 1,
-            "N": 2,
-            "D": 3,
-            "C": 4,
-            "Q": 5,
-            "E": 6,
-            "G": 7,
-            "H": 8,
-            "I": 9,
-            "L": 10,
-            "K": 11,
-            "M": 12,
-            "F": 13,
-            "P": 14,
-            "S": 15,
-            "T": 16,
-            "W": 17,
-            "Y": 18,
-            "V": 19,
-            "X": 20,
-        }
+        """加载 GraphCPP GNN 模型 (GraphSAGE + Topological Fingerprint)。
 
-        # CPP 模式库
-        self.cpp_patterns = [
-            "RKKRRQRRR",  # TAT
-            "RQIKIWFQNRRMKWKK",  # Penetratin
-            "RRRRRRRR",  # Poly-arginine
-            "LLIILRRRIRKQAHAHSK",  # pVEC
-            "GRKKRRQRRRPPQ",
-        ]
+        模型: GraphSAGE 2-layer + TopologicalTorsion FP (2048维) + MLP
+        Checkpoint: model/checkpoints/epoch=22-step=69.ckpt
+        """
+        import torch
+        from graphcpp.model import GCN
+        from config import BEST_PARAMETERS
+        from graphcpp.dataset import featurize_fasta
+        from graphcpp.fp_generators import fp_dict
+        from rdkit import Chem
+
+        self.torch = torch
+        self.Chem = Chem
+        self.featurize_fasta = featurize_fasta
+
+        params = BEST_PARAMETERS.copy()
+
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available()
+            else "mps" if torch.backends.mps.is_available()
+            else "cpu"
+        )
+
+        # 初始化 GCN 模型
+        self.model = GCN(
+            layers_pre_mp=params["layers_pre_mp"],
+            mp_layers=params["mp_layers"],
+            layers_post_mp=params["layers_post_mp"],
+            hidden_channels=params["hidden_channels"],
+            stage_type=params["stage_type"],
+            layer_type=params["layer_type"],
+            act=params["act"],
+            conv_aggr=params["conv_aggr"],
+            conv_dropout=params["conv_dropout"],
+            has_bn=params["has_bn"],
+            has_l2norm=params["has_l2norm"],
+            layer_fingerprints=params["layer_fingerprints"],
+            pooling=params["pooling"],
+        )
+
+        # 加载预训练权重
+        ckpt_path = Path(__file__).parent / "model" / "checkpoints" / "epoch=22-step=69.ckpt"
+        ckpt = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
+        state_dict = {k.removeprefix("model."): v for k, v in ckpt["state_dict"].items()}
+        self.model.load_state_dict(state_dict)
+        self.model.to(self.device)
+        self.model.eval()
+
+        # 指纹生成器 (topological torsion, 2048维)
+        self.fp_gen = fp_dict[params["fingerprint_type"]]
 
         self.threshold = 0.5
 
         print(
-            f"[{self.tool_name}] GraphCPP model initialized (simplified fingerprint method)"
+            f"[{self.tool_name}] GraphSAGE GNN loaded | "
+            f"device={self.device} | "
+            f"threshold={self.threshold} | "
+            f"fingerprint={params['fingerprint_type']}"
         )
 
-    def _extract_molecular_fingerprint(self, sequence: str):
-        """模拟提取分子指纹特征"""
-        length = len(sequence)
-        charge = sum(1 for aa in sequence if aa in "RK")
-        hydrophobic = sum(1 for aa in sequence if aa in "AILMFVP")
-        aromatic = sum(1 for aa in sequence if aa in "FWY")
-
-        # 模拟图神经网络输出的特征向量
-        fp = [
-            length / 50.0,
-            charge / 10.0,
-            hydrophobic / length if length > 0 else 0,
-            aromatic / length if length > 0 else 0,
-            1.0 if charge >= 3 else 0,
-            1.0 if "R" in sequence else 0,
-            1.0 if "K" in sequence else 0,
-        ]
-        return fp
-
-    def _calculate_cpp_score(self, sequence: str):
-        """基于分子指纹计算 CPP 概率"""
+    def _predict_score(self, sequence: str) -> float:
+        """对单条序列执行 GNN 推理，返回 CPP 概率。"""
         seq_upper = sequence.upper()
 
-        # 检查已知 CPP 模式
-        for pattern in self.cpp_patterns:
-            if pattern in seq_upper or seq_upper in pattern:
-                return random.uniform(0.88, 0.97), random.uniform(0.85, 0.93)
+        # RDKit FASTA → Mol → SMILES
+        mol = self.Chem.MolFromFASTA(seq_upper)
+        if mol is None:
+            return 0.0
 
-        # 计算特征
-        length = len(sequence)
-        charge = sum(1 for aa in sequence if aa in "RK")
-        hydrophobic = sum(1 for aa in sequence if aa in "AILMFVP")
-        aromatic = sum(1 for aa in sequence if aa in "FWY")
+        smiles = self.Chem.MolToSmiles(mol)
 
-        base_prob = 0.25
+        # 分子图 featurize
+        data = self.featurize_fasta(seq_upper)
 
-        # 长度因素
-        if 8 <= length <= 30:
-            base_prob += 0.25
-        elif length < 8:
-            base_prob += 0.1
-        else:
-            base_prob += 0.15
+        # 拓扑指纹 (2048维)
+        mol_from_smiles = self.Chem.MolFromSmiles(smiles)
+        data.fp = self.torch.tensor(
+            [self.fp_gen.GetFingerprint(mol_from_smiles)], dtype=self.torch.float32
+        )
 
-        # 电荷因素
-        if charge >= 6:
-            base_prob += 0.3
-        elif charge >= 4:
-            base_prob += 0.2
-        elif charge >= 2:
-            base_prob += 0.1
+        # 移动到设备
+        data = data.to(self.device)
 
-        # 疏水性因素
-        h_ratio = hydrophobic / length if length > 0 else 0
-        if 0.15 <= h_ratio <= 0.45:
-            base_prob += 0.15
+        with self.torch.no_grad():
+            pred, _, _ = self.model(data)
+            prob = self.torch.sigmoid(pred).item()
 
-        probability = min(0.96, max(0.04, base_prob + random.uniform(-0.08, 0.08)))
-
-        if probability > 0.7 or probability < 0.3:
-            confidence = random.uniform(0.82, 0.95)
-        else:
-            confidence = random.uniform(0.62, 0.78)
-
-        return probability, confidence
+        return float(prob)
 
     async def predict_impl(self, sequence: str) -> ToolResult:
-        """
-        预测单条序列的细胞穿透能力。
+        """预测单条序列的细胞穿透能力。
 
         Args:
             sequence: 氨基酸序列（如 "RKKRRQRRR"）
 
         Returns:
-            ToolResult: 包含 score（0-1 CPP 分数）和 label（CPP/non-CPP）
+            ToolResult: score=CPP概率(0-1), label="CPP"/"non-CPP"
         """
-        probability, confidence = self._calculate_cpp_score(sequence)
-        prediction = "CPP" if probability >= self.threshold else "non-CPP"
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            prob = self._predict_score(sequence)
+
+        label = "CPP" if prob >= self.threshold else "non-CPP"
 
         return ToolResult(
-            score=float(probability),
-            label=prediction,
+            score=prob,
+            label=label,
             details={
                 "length": len(sequence),
-                "prediction": prediction,
-                "confidence": round(confidence, 4),
+                "prediction": label,
                 "threshold": self.threshold,
-                "model_type": "GraphCPP_Fingerprint",
+                "model_type": "GraphSAGE-GNN",
+                "device": str(self.device),
             },
         )
 
+    async def predict_batch(self, request: BatchPredictRequest) -> BatchPredictResponse:
+        """批量预测。"""
+        if not self._loaded:
+            async with self._lock:
+                if not self._loaded:
+                    await self.load_model()
+                    self._loaded = True
 
-# 创建 FastAPI 应用
+        if not request.sequences:
+            return BatchPredictResponse(success=True, results=[], total=0, error=None)
+
+        results: list[ToolResult] = []
+        for item in request.sequences:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore")
+                prob = self._predict_score(item.sequence)
+
+            label = "CPP" if prob >= self.threshold else "non-CPP"
+            result = ToolResult(
+                score=prob,
+                label=label,
+                details={
+                    "length": len(item.sequence),
+                    "prediction": label,
+                    "threshold": self.threshold,
+                    "model_type": "GraphSAGE-GNN",
+                    "device": str(self.device),
+                },
+            )
+            result.peptide_id = item.peptide_id or "unknown"
+            result.sequence = item.sequence
+            results.append(result)
+
+        return BatchPredictResponse(
+            success=True, results=results, total=len(results), error=None
+        )
+
+
 app = create_app(GraphCPPService)
 
 
-# 本地启动入口
 if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8009"))
     print(f"Starting GraphCPP service on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
-

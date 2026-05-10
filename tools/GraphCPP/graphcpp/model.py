@@ -68,8 +68,6 @@ class MLP(torch.nn.Module):
         self.model = Sequential(*layers)
 
     def forward(self, batch):
-        print(self.model)
-
         if self.dim_in > 2000:
             if isinstance(batch, torch.Tensor):
                 batch = self.model(batch)
