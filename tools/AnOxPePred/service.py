@@ -29,6 +29,7 @@ root_path = Path(__file__).parents[2]
 sys.path.insert(0, str(root_path))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.utils import detect_gpu
 
 
 class AnOxPePredService(FastaToolService):
@@ -51,11 +52,12 @@ class AnOxPePredService(FastaToolService):
         初始化 anoxpepred_integration.py 中的预测器。
         模型在服务运行期间保持加载状态，不重复加载。
         """
+        gpu_info = detect_gpu()
         import sys
         sys.path.insert(0, str(Path(__file__).parent / "tools"))
         from anoxpepred_integration import AnOxPePredIntegration
 
-        self.model = AnOxPePredIntegration(verbose=True)
+        self.model = AnOxPePredIntegration(verbose=True, gpu_info=gpu_info)
         print(f"[{self.tool_name}] Model loaded, ready to predict")
 
     async def predict_impl(self, sequence: str) -> ToolResult:

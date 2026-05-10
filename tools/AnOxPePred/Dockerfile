@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir \
 
 # 复制项目骨架 — 保留 tools/template/ 相对路径结构
 WORKDIR /app
+COPY tools/utils.py ./tools/utils.py
 COPY tools/template/ ./tools/template/
 COPY tools/AnOxPePred/ ./tools/AnOxPePred/
 

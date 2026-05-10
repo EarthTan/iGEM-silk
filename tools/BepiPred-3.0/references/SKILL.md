@@ -8,11 +8,15 @@ last_updated: 2026-04-25
 
 # BepiPred-3.0 线性 B 细胞表位预测工具
 
+> 原仓库: https://github.com/UberClifford/BepiPred-3.0
+> PyPI: bp3==0.0.12.7
+> 论文: Clifford, J. N., et al. (2022). "BepiPred-3.0: Improved B-cell epitope prediction using protein language models." *Protein Science*, 31(12), e4497.
+
 ## What It Is
 
 BepiPred-3.0 是基于 ESM-2 蛋白质语言模型的线性 B 细胞表位预测工具。它预测蛋白质/肽序列中哪些氨基酸残基可能被抗体识别（即构成 B 细胞表位）。
 
-**核心价值**：为融合引擎提供"免疫原性风险信号"，帮助剔除高免疫原性候选肽。
+**核心价值**：在 iGEM-silk 流水线中作为"暴露度代理指标"——如果功能肽区域被预测为 B 细胞表位，说明该区域在折叠后暴露于蛋白表面（抗体可及），功能肽有效暴露的概率更高。
 
 ## When to Use
 

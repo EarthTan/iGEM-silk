@@ -39,53 +39,22 @@ WEIGHTS_FILE = DATA_DIR / "AnOxPePred_v1"
 AA_ORDER = "ARNDCQEGHILKMFPSTWYV"
 
 
-def detect_gpu() -> dict:
-    """自动检测系统 GPU / CUDA 环境，返回结构化诊断信息。
+try:
+    from tools.utils import detect_gpu
+except ImportError:
+    detect_gpu = None  # 独立运行时 sys.path 可能不含项目根，用 _fallback_gpu_detect
 
-    三层检测，由强到弱：
-    1. GPU 可用 → gpu 加速
-    2. TF 带 CUDA 但无 GPU → CPU 推理（驱动/容器问题）
-    3. TF 不带 CUDA → CPU 推理（pip 安装的 TF）
 
-    返回:
-        {
-            "cuda_available": bool,
-            "gpu_count": int,
-            "gpu_devices": [str, ...],
-            "backend": "gpu" | "cpu",
-            "message": str,
-        }
-    """
-    info: dict = {
-        "cuda_available": False,
-        "gpu_count": 0,
-        "gpu_devices": [],
-        "backend": "cpu",
-        "message": "",
-    }
-
-    if not TF_AVAILABLE:
-        info["message"] = "TensorFlow not installed"
-        return info
-
-    info["cuda_available"] = bool(tf.test.is_built_with_cuda())
-
-    try:
-        gpus = tf.config.list_physical_devices("GPU")
-    except Exception:
-        gpus = []
-
-    if gpus:
-        info["gpu_count"] = len(gpus)
-        info["gpu_devices"] = [g.name for g in gpus]
-        info["backend"] = "gpu"
-        info["message"] = f"CUDA GPU × {len(gpus)}: {', '.join(info['gpu_devices'])}"
-    elif info["cuda_available"]:
-        info["message"] = "TF built with CUDA but no GPU detected (check nvidia driver / container runtime)"
-    else:
-        info["message"] = "CPU-only TensorFlow (pip install, no CUDA support)"
-
-    return info
+def _fallback_gpu_detect() -> dict:
+    """最小 GPU 检测（独立运行时的降级方案）。"""
+    if TF_AVAILABLE and tf.test.is_built_with_cuda():
+        try:
+            gpus = tf.config.list_physical_devices("GPU")
+            if gpus:
+                return {"backend": "gpu", "gpu_count": len(gpus), "message": f"GPU × {len(gpus)}", "details": [str(g.name) for g in gpus]}
+        except Exception:
+            pass
+    return {"backend": "cpu", "gpu_count": 0, "message": "CPU only", "details": []}
 
 
 class PredictionResult:
@@ -275,17 +244,18 @@ class AnOxPePredIntegration:
         print(f"抗氧化概率: {result.overall_score:.3f}")
     """
 
-    def __init__(self, verbose: bool = True):
+    def __init__(self, verbose: bool = True, gpu_info: dict | None = None):
         self.verbose = verbose
         self.model = None
         self.model_mode = "unknown"  # "cnn" | "rule"
         self._load_error = None
-        self.gpu_info: dict = {}  # detect_gpu() 结果
+        self.gpu_info = gpu_info or {}  # 由外部传入或后续 detect_gpu 填充
         self._load_model()
 
     def _load_model(self):
         """加载深度学习模型。失败时降级为规则预测模式并记录原因。"""
-        self.gpu_info = detect_gpu()
+        if not self.gpu_info:
+            self.gpu_info = _fallback_gpu_detect()
 
         if not TF_AVAILABLE:
             self.model_mode = "rule"
