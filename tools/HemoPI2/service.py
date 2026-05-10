@@ -1,9 +1,14 @@
 """
 service.py
 ==========
-HemoPI2 微服务入口。
+HemoPI2 微服务入口 — 肽溶血性预测。
 
-将现有的 HemoPI2 溶血性预测工具封装为标准的微服务接口。
+原仓库: https://github.com/raghavagps/HemoPI2
+论文: Rathore et al. (2025) "HemoPI2". *Communications Biology*, 8, 176.
+PyPI:  https://pypi.org/project/hemopi2/
+
+使用 Model 3 (ESM-2 t6) — 基于 ESM-2 蛋白质语言模型的深度学习预测。
+Model 1/2 (RF/MERCI) 和 Model 4 (Hybrid2) 需要 perl 运行时，不在此服务中提供。
 
 使用方式：
     cd tools/HemoPI2
@@ -24,82 +29,87 @@ import sys
 import os
 from pathlib import Path
 
-# 将项目根目录添加到路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.utils import detect_gpu
 
 
 class HemoPI2Service(FastaToolService):
-    """
-    HemoPI2 肽溶血性预测服务。
+    """HemoPI2 肽溶血性预测服务。
 
-    使用 ESM-2 蛋白质语言模型预测肽序列的溶血活性。
+    使用 Model 3 (ESM-2 t6) — ESM-2 蛋白质语言模型 + 序列分类头。
+    原仓库: https://github.com/raghavagps/HemoPI2
     """
 
     tool_name = "hemopi2"
-    version = "1.3.0"
+    version = "2.0.0"
     description = "肽溶血性预测工具（HemoPI2）- ESM-2 蛋白质语言模型"
-    recommended_batch_size = 20  # ESM-2 模型较大，限制并发
+    recommended_batch_size = 20
 
     async def load_model(self):
-        """
-        加载 HemoPI2 的 ESM-2 模型。
+        """加载 HemoPI2 ESM-2 模型（Model 3: ESM-2 t6）。
+
+        hemopi2_classification 在 import 时触发模块级 ESM-2 加载（from_pretrained）。
+        之后移动模型到检测到的设备 (CUDA > MPS > CPU)。
         """
         import hemopi2
         import torch
 
-        # 获取 hemopi2 包路径
-        hp_path = list(hemopi2.__path__)[0]
-        model_dir = os.path.join(hp_path, "Model")
+        self.gpu_info = detect_gpu()
+        print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
-        # 导入 hemopi2_classification 中的模型和 tokenizer
+        hp_path = list(hemopi2.__path__)[0]
         sys.path.insert(0, os.path.join(hp_path, "python_scripts"))
         import hemopi2_classification as hc
 
-        # 加载 ESM-2 模型
         self.model = hc.model
         self.tokenizer = hc.tokenizer
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # 设备选择: CUDA > MPS > CPU
+        device_str = "cpu"
+        if torch.cuda.is_available():
+            device_str = "cuda"
+        elif torch.backends.mps.is_available():
+            device_str = "mps"
+        self.device = torch.device(device_str)
+
+        # 一次性移动模型到设备
+        self.model.to(self.device)
+        self.model.eval()
 
         print(
-            f"[{self.tool_name}] ESM-2 model loaded on {self.device}, ready to predict"
+            f"[{self.tool_name}] ESM-2 loaded | device={self.device} | "
+            f"backend={self.gpu_info['backend']}"
         )
 
     async def predict_impl(self, sequence: str) -> ToolResult:
-        """
-        预测单条序列的溶血活性。
+        """预测单条序列的溶血活性。
 
         Args:
             sequence: 氨基酸序列（如 "KWKLFKKIGAVLKVL"）
 
         Returns:
-            ToolResult: 包含 score（0-1 溶血分数）和 label（Hemolytic/Non-Hemolytic）
+            ToolResult: score=溶血概率(0-1), label="Hemolytic"/"Non-Hemolytic"
         """
         import torch
-        from transformers import AutoTokenizer
 
-        # 限制序列长度
+        # 截断长序列（ESM-2 输入限制）
         if len(sequence) > 40:
             sequence = sequence[:40]
 
-        # 使用 ESM-2 模型预测
-        device = self.device
         inputs = self.tokenizer(
             [sequence], padding=True, truncation=True, return_tensors="pt"
         )
-        inputs = {key: value.to(device) for key, value in inputs.items()}
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        self.model.to(device)
         with torch.no_grad():
             outputs = self.model(**inputs)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
+            probs = torch.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
 
         score = float(probs[0])
-        threshold = 0.55  # ESM 模型默认阈值
+        threshold = 0.55
         prediction = "Hemolytic" if score >= threshold else "Non-Hemolytic"
 
         return ToolResult(
@@ -107,9 +117,10 @@ class HemoPI2Service(FastaToolService):
             label=prediction,
             details={
                 "length": len(sequence),
-                "prediction": prediction,
                 "threshold": threshold,
-                "model_type": "ESM-2",
+                "model": "ESM-2 t6 (Model 3)",
+                "device": str(self.device),
+                "gpu_backend": self.gpu_info.get("backend", "unknown"),
             },
         )
 
