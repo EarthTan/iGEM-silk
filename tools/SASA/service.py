@@ -105,6 +105,30 @@ class SASAService(PdbScoringService):
             print(f"[{self.tool_name}] {self._ready_message}")
             raise RuntimeError(self._ready_message)
 
+    # ── 辅助: 在 PDB 残基列表中定位肽序列 ────────────────────
+
+    @staticmethod
+    def _locate_peptide_in_residues(
+        residues: list[dict[str, Any]], peptide_seq: str
+    ) -> tuple[list[int], str | None]:
+        """在残基列表中匹配肽序列，返回匹配的 residue_id 列表。
+
+        按序拼接 PDB 残基的单字母码，搜索 peptide_seq 的所有匹配位置。
+        取第一个匹配，返回其 residue_id 列表。
+        """
+        seq_parts = [r["residue_code"] for r in residues]
+        pdb_seq = "".join(seq_parts)
+
+        start = 0
+        while True:
+            pos = pdb_seq.find(peptide_seq, start)
+            if pos == -1:
+                break
+            # 提取匹配段的 residue_id
+            matched_ids = [residues[i]["residue_id"] for i in range(pos, pos + len(peptide_seq))]
+            return matched_ids, None
+        return [], f"Peptide '{peptide_seq}' not found in PDB chain sequence '{pdb_seq}'"
+
     # ── PDB 评分 ──────────────────────────────────────────────
 
     async def score_pdb(
@@ -113,22 +137,24 @@ class SASAService(PdbScoringService):
         sequence: str | None = None,
         chain_id: str | None = None,
     ) -> PdbScoreResult:
-        """对 PDB 结构计算 SASA 暴露度评分。
+        """对 PDB 结构计算 SASA，聚焦功能肽区域暴露度。
 
         Args:
             pdb_content: PDB 格式结构文本
-            sequence: 全长氨基酸序列 (单字母, 用于标注残基名)
+            sequence: 功能肽序列 (单字母, 如 "YWDHINNPEVYF")。
+                      服务在 PDB 残基中自动定位，只对肽区域做统计。
+                      不传则只返回逐残基原始数据，score=0。
             chain_id: 目标链 ID (默认 "A")
 
         Returns:
-            PdbScoreResult: score = 平均相对 SASA, details = 逐残基数据
+            PdbScoreResult: score = 功能肽区域平均相对 SASA,
+                            details = 全结构逐残基 + 肽区域汇总
         """
         import freesasa
         from Bio.PDB.PDBParser import PDBParser
 
         chain = chain_id or "A"
 
-        # 写入临时文件 (FreeSASA 需要文件路径)
         with tempfile.NamedTemporaryFile(
             suffix=".pdb", mode="w", delete=False
         ) as f:
@@ -140,7 +166,7 @@ class SASAService(PdbScoringService):
             fs_struct = freesasa.Structure(tmp_path)
             fs_result = freesasa.calc(fs_struct)
 
-            # 2. Biopython 解析残基编号
+            # 2. Biopython 解析残基
             parser = PDBParser(QUIET=True)
             structure = parser.get_structure("sasa", tmp_path)
             model = structure[0]
@@ -153,9 +179,6 @@ class SASAService(PdbScoringService):
 
             # 3. 逐残基 SASA 提取
             residues: list[dict[str, Any]] = []
-            total_sasa = 0.0
-            exposed_count = 0
-
             for res in chain_obj:
                 if res.id[0] != " ":  # 跳过 HETATM / 水
                     continue
@@ -163,19 +186,14 @@ class SASAService(PdbScoringService):
                 rid = res.id[1]
                 resname = res.resname.upper()
 
-                # FreeSASA selectArea 按残基提取
                 sel = freesasa.selectArea(
                     [("residue", f"resi {rid} and chain {chain}")],
                     fs_struct, fs_result,
                 )
                 sasa_val = sel.get("residue", 0.0)
-                total_sasa += sasa_val
 
                 max_ref = MAX_SASA.get(resname, 200.0)
                 rel_sasa = min(sasa_val / max_ref, 1.0) if max_ref > 0 else 0.0
-                is_exposed = rel_sasa > DEFAULT_EXPOSURE_THRESHOLD
-                if is_exposed:
-                    exposed_count += 1
 
                 residues.append({
                     "residue_id": rid,
@@ -183,30 +201,69 @@ class SASAService(PdbScoringService):
                     "residue_code": AA3_TO_1.get(resname, "X"),
                     "sasa": round(sasa_val, 3),
                     "relative_sasa": round(rel_sasa, 3),
-                    "is_exposed": is_exposed,
+                    "is_exposed": rel_sasa > DEFAULT_EXPOSURE_THRESHOLD,
                 })
 
-            # 4. 汇总统计
-            n = len(residues)
-            mean_rel = sum(r["relative_sasa"] for r in residues) / n if n else 0.0
-            exposure_ratio = exposed_count / n if n else 0.0
+            # 4. 定位功能肽
+            peptide_ids: list[int] = []
+            locate_error: str | None = None
+            if sequence:
+                peptide_ids, locate_error = self._locate_peptide_in_residues(
+                    residues, sequence
+                )
+                if locate_error:
+                    return PdbScoreResult(
+                        score=0.0,
+                        label="error",
+                        details={
+                            "error": locate_error,
+                            "chain": chain,
+                            "residues": residues,
+                        },
+                    )
 
-            # score = 平均相对 SASA (0-1)
-            score = round(mean_rel, 4)
+            # 5. 筛选肽区域残基
+            if peptide_ids:
+                peptide_set = set(peptide_ids)
+                peptide_residues = [r for r in residues if r["residue_id"] in peptide_set]
+                n_pep = len(peptide_residues)
+                pep_exposed = sum(1 for r in peptide_residues if r["is_exposed"])
+                pep_mean_rel = (
+                    sum(r["relative_sasa"] for r in peptide_residues) / n_pep
+                    if n_pep else 0.0
+                )
+                pep_total_sasa = sum(r["sasa"] for r in peptide_residues)
+                pep_exposure_ratio = pep_exposed / n_pep if n_pep else 0.0
 
-            details = {
-                "total_sasa": round(total_sasa, 3),
-                "mean_relative_sasa": round(mean_rel, 3),
-                "exposure_ratio": round(exposure_ratio, 3),
-                "num_residues": n,
-                "num_exposed": exposed_count,
+                score = round(pep_mean_rel, 4)
+                label = "exposed" if pep_exposure_ratio > 0.6 else ("partial" if pep_exposure_ratio > 0.3 else "buried")
+            else:
+                peptide_residues = []
+                n_pep = 0
+                pep_exposed = 0
+                pep_mean_rel = 0.0
+                pep_total_sasa = 0.0
+                pep_exposure_ratio = 0.0
+                score = 0.0
+                label = "no_target"
+
+            # 6. 组装响应
+            details: dict[str, Any] = {
                 "chain": chain,
                 "probe_radius": DEFAULT_PROBE_RADIUS,
                 "exposure_threshold": DEFAULT_EXPOSURE_THRESHOLD,
-                "residues": residues,
+                "peptide": {
+                    "sequence": sequence,
+                    "num_residues": n_pep,
+                    "num_exposed": pep_exposed,
+                    "total_sasa": round(pep_total_sasa, 3),
+                    "mean_relative_sasa": round(pep_mean_rel, 3),
+                    "exposure_ratio": round(pep_exposure_ratio, 3),
+                    "residue_ids": peptide_ids,
+                    "residues": peptide_residues,
+                },
+                "all_residues": residues,
             }
-
-            label = "exposed" if exposure_ratio > 0.6 else "buried"
 
             return PdbScoreResult(
                 score=score,
