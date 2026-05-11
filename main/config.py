@@ -30,8 +30,10 @@ import os
 #
 # 每个微服务是独立运行的 FastAPI 进程，默认监听在 127.0.0.1 的不同端口。
 # group 字段决定该服务在流水线中的角色：
-#   - "score"  → 参与综合评分（加权累加）
-#   - "filter" → 参与硬过滤（一票否决：毒性/过敏原/溶血超标直接淘汰）
+#   - "score"     → 参与肽序列综合评分（加权累加）
+#   - "filter"    → 参与肽序列硬过滤（一票否决：毒性/过敏原/溶血超标直接淘汰）
+#   - "structure" → 序列生成 3D 结构
+#   - "pdb_score" → PDB 结构评分
 #
 # 端口分配与 tools/ 下各子目录一一对应。
 #
@@ -77,9 +79,13 @@ SERVICES: dict[str, dict] = {
     # CPU 即可运行，无需 GPU
 
     # ═══════ PDB 评分服务 ═══════
-    "sasa":         {"port": 8101, "group": "score"},
+    "sasa":         {"port": 8101, "group": "pdb_score"},
     # SASA：溶剂可及表面积分析 (FreeSASA Lee-Richards 算法)
     # 输入 PDB 结构，输出逐残基暴露度评分。用于评估功能肽表面暴露程度
+
+    "aggrescan3d":  {"port": 8102, "group": "pdb_score"},
+    # Aggrescan3D：结构聚集倾向分析 (A3D score)
+    # 输入 PDB 结构，输出逐残基聚集热点与整体聚集风险。用于最终 construct 复性/可溶性风险评估
 
     # ═══════ 过滤型服务 ═══════
     "toxinpred3":   {"port": 8003, "group": "filter"},

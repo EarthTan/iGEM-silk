@@ -59,6 +59,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | 服务 | 范围 | 作用 | 环境 | 端口 |
 | ---- | ---- | ---- | ---- | ---- |
 | SASA | 蛋白质 / 肽 （无上限） | 溶剂可及表面积分析 — FreeSASA Lee-Richards 算法，逐残基暴露度量化 | CPU（Python 原生） | 8101 |
+| Aggrescan3D | 蛋白质 / 肽 PDB 结构 | 结构聚集倾向分析 — 原版 Aggrescan3D CLI，逐残基 A3D score 与聚集热点 | CPU（Docker 封装，需 `lcbio/a3d_server`） | 8102 |
 
 ##### Structure Service (8201+)
 | 服务 | 范围 | 作用 | 环境 | 端口 |

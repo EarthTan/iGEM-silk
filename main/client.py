@@ -191,6 +191,56 @@ class ServiceClient:
             return {"success": False, "error": str(e), "results": [], "total": 0}
 
     # ────────────────────────────────────────────────────────────────
+    # PDB 结构评分
+    # ────────────────────────────────────────────────────────────────
+
+    async def predict_pdb_single(
+        self,
+        service_name: str,
+        pdb_content: str,
+        peptide_id: str = "unknown",
+        sequence: str | None = None,
+        chain_id: str | None = None,
+    ) -> dict:
+        """
+        对单个 PDB 结构调用指定 PDB 评分服务的 /predict 端点。
+
+        适用于 sasa、aggrescan3d 等 pdb_service。注意它和序列评分服务不同：
+        payload 中传的是 pdb_content，而不是 sequence。
+        """
+        client = await self._get_client()
+        url = f"{service_url(service_name)}/predict"
+        payload = {
+            "pdb_content": pdb_content,
+            "peptide_id": peptide_id,
+            "sequence": sequence,
+            "chain_id": chain_id,
+        }
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            return {"success": False, "error": str(e), "peptide_id": peptide_id}
+
+    async def predict_pdb_batch(self, service_name: str, requests: list[dict]) -> dict:
+        """
+        对多个 PDB 结构调用指定 PDB 评分服务的 /predict/batch 端点。
+
+        requests 示例：
+            [{"pdb_content": "...", "peptide_id": "construct_001", "chain_id": "A"}]
+        """
+        client = await self._get_client()
+        url = f"{service_url(service_name)}/predict/batch"
+        payload = {"requests": requests}
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            return {"success": False, "error": str(e), "results": [], "total": 0}
+
+    # ────────────────────────────────────────────────────────────────
     # 全服务评估（流水线 Step 5 的核心调用）
     # ────────────────────────────────────────────────────────────────
 

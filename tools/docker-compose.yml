@@ -253,6 +253,27 @@ services:
       timeout: 10s
       retries: 3
 
+  aggrescan3d:
+    build:
+      context: ..
+      dockerfile: tools/Aggrescan3D/Dockerfile
+    image: igem-silk/aggrescan3d-api:latest
+    container_name: aggrescan3d
+    ports:
+      - "8102:8102"
+    environment:
+      - PORT=8102
+      - A3D_IMAGE=${A3D_IMAGE:-lcbio/a3d_server}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ===========================================================================
   # CPU 服务 (profile: cpu)
   # ===========================================================================
@@ -310,5 +331,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-
