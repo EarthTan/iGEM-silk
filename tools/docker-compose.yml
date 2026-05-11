@@ -2,7 +2,7 @@
 # iGEM-silk 微服务集群 — Docker Compose
 # =============================================================================
 #
-# 从 tools/ 目录启动全部 9 个微服务:
+# 从 tools/ 目录启动全部微服务:
 #   cd tools && docker compose up -d
 #
 # 仅 GPU 服务:
@@ -182,6 +182,36 @@ services:
       timeout: 30s
       retries: 5
       start_period: 30s
+
+  # ===========================================================================
+  # Structure Service (profile: gpu — needs Docker socket + host GPU)
+  # ===========================================================================
+
+  alphafold3:
+    build:
+      context: ..
+      dockerfile: AlphaFold3/Dockerfile
+    image: igem-silk/alphafold3-api:latest
+    container_name: alphafold3
+    ports:
+      - "8201:8201"
+    environment:
+      - PORT=8201
+      - AF3_IMAGE=${AF3_IMAGE:-alphafold3}
+      - AF3_MODEL_DIR=${AF3_MODEL_DIR:-/root/models}
+      - AF3_DATABASE_DIR=${AF3_DATABASE_DIR:-/root/public_databases}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${AF3_MODEL_DIR:-/tmp/af3_models}:/root/models
+      - ${AF3_DATABASE_DIR:-/tmp/af3_databases}:/root/public_databases
+    profiles: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8201/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # ===========================================================================
   # CPU 服务 (profile: cpu)

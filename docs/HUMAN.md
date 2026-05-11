@@ -11,3 +11,6 @@
 
 # TOOLS
 
+### 功能肽设计：
+
+- Binding ddG对功能肽关键残基做单点突变扫描（alanine scanning），找出活性关键位点，用于后期优化阶段

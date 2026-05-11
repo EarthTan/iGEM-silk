@@ -8,7 +8,7 @@
 #   ./tools/start_all.sh stop         # 停止所有服务
 #   ./tools/start_all.sh status       # 查看服务状态
 #
-# 服务列表 (端口 8001–8009):
+# 服务列表:
 #   AnOxPePred   8001  抗氧化肽预测 (CNN)
 #   BepiPred-3.0 8002  B细胞表位预测 (ESM-2)
 #   ToxinPred3   8003  肽毒性预测 (Extra Trees)
@@ -18,6 +18,7 @@
 #   Tipred       8007  酪氨酸酶抑制肽预测 (Stacked Ensemble)
 #   AlgPred2     8008  过敏原性预测 (Random Forest)
 #   GraphCPP     8009  细胞穿透肽预测 (GraphSAGE GNN)
+#   AlphaFold3   8201  3D结构预测 (Docker, GPU必需)
 #
 # 日志输出: tools/logs/<name>.log
 # PID 文件: tools/logs/<name>.pid
@@ -27,7 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGS_DIR="$SCRIPT_DIR/logs"
 
 # 所有服务名（迭代顺序）
-SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp"
+SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp alphafold3"
 
 # ── 根据服务名查目录名 ──
 dir_of() {
@@ -41,6 +42,7 @@ dir_of() {
         tipred)      echo "Tipred"       ;;
         algpred2)    echo "algpred2"     ;;
         graphcpp)    echo "GraphCPP"     ;;
+        alphafold3)  echo "AlphaFold3"   ;;
     esac
 }
 
@@ -56,6 +58,7 @@ port_of() {
         tipred)      echo "8007" ;;
         algpred2)    echo "8008" ;;
         graphcpp)    echo "8009" ;;
+        alphafold3)  echo "8201" ;;
     esac
 }
 

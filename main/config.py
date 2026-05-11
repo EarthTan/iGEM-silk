@@ -33,7 +33,7 @@ import os
 #   - "score"  → 参与综合评分（加权累加）
 #   - "filter" → 参与硬过滤（一票否决：毒性/过敏原/溶血超标直接淘汰）
 #
-# 端口分配：8001–8009，与 tools/ 下各子目录一一对应。
+# 端口分配与 tools/ 下各子目录一一对应。
 #
 # 远程服务：设置环境变量 {NAME}_HOST 可将某个服务的地址指向远程机器。
 #   例：export ANOXPEPRED_HOST=192.168.1.100   # GPU 服务器
@@ -64,6 +64,12 @@ SERVICES: dict[str, dict] = {
 
     "graphcpp":     {"port": 8009, "group": "score"},
     # GraphCPP：细胞穿透肽预测（GraphSAGE GNN，权重低于 pLM4CPPs）
+
+    # ═══════ 结构预测服务 ═══════
+    "alphafold3":   {"port": 8201, "group": "structure"},
+    # AlphaFold3：3D 蛋白质结构预测 (Google DeepMind, Docker 封装)
+    # 仅支持 Ubuntu + NVIDIA GPU，通过 Docker CLI 调用官方镜像
+    # 不参与肽级别的评分/过滤流水线，用于验证最终 construct 的三维结构
 
     # ═══════ 过滤型服务 ═══════
     "toxinpred3":   {"port": 8003, "group": "filter"},

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-iGEM-silk is a computational platform for designing silk fibroin fusion proteins with functional peptides. It enumerates all possible insertion positions of antioxidant/anti-melanogenic peptides into a silk scaffold, then scores and ranks the resulting constructs using 10 specialized microservices.
+iGEM-silk is a computational platform for designing silk fibroin fusion proteins with functional peptides. It enumerates all possible insertion positions of antioxidant/anti-melanogenic peptides into a silk scaffold, then scores and ranks the resulting constructs using specialized microservices.
 
 ## Commands
 
@@ -12,7 +12,7 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 # Run the full 7-step pipeline
 python -m main
 
-# Start all 10 microservices (each in its own tools/<name>/.venv)
+# Start all microservices (each in its own tools/<name>/.venv)
 ./tools/start_all.sh
 
 # Stop all microservices
@@ -20,6 +20,12 @@ python -m main
 
 # Check microservice status
 ./tools/start_all.sh status
+
+# Start microservices via Docker (GPU + CPU profiles)
+docker compose --profile gpu --profile cpu up -d
+
+# Install deps for a single microservice
+cd tools/<name> && uv sync
 
 # Run tests
 uv run pytest
@@ -34,9 +40,9 @@ uv run ruff check .
 
 The orchestration layer runs a 7-step pipeline defined in `main/pipeline.py`:
 
-1. **Load** — scaffold (`data/silk.fasta`), linkers (`data/linker.fasta`), function peptides (`data/function.csv`, ~25K entries)
+1. **Load** — scaffold (`data/silk.fasta`, ~346 aa), linkers (`data/linker.fasta`, 10 types), function peptides (`data/function.csv`, ~25K entries). Currently filters for `is_antioxidant == 1` only; other activity columns (anti-microbial, anti-glycation, collagen-stimulating, cell-penetrating) are available but unused.
 2. **Prefilter peptides** — physicochemical filters (length 5–15, GRAVY < 0, net charge ±3)
-3. **Microservice scoring** — concurrent HTTP calls to all available microservices, with cache at `output/cache_peptide_scores.json`
+3. **Microservice scoring** — concurrent HTTP calls to all available microservices, with cache at `output/cache_peptide_scores.json`. On re-runs with the same peptide set, the pipeline prompts to reuse cached scores (skipping expensive ML inference).
 4. **Peptide selection** — hard filters (toxicity/allergen/hemolytic) + weighted scoring + top-N cutoff
 5. **Super-enumeration** — `top_peptides × (scaffold_length+1 positions) × 11 linker options`, generating up to millions of constructs
 6. **Prefilter constructs** — remove constructs whose insertion position falls in forbidden zones (poly-Ala β-sheet regions, Cys clusters, hydrophobic cores)
@@ -44,8 +50,11 @@ The orchestration layer runs a 7-step pipeline defined in `main/pipeline.py`:
 
 Key files:
 - `main/config.py` — **single control panel** for all parameters: microservice URLs, filter thresholds, scoring weights, forbidden-zone rules. Edit only this file to tune the pipeline.
+- `main/data_loader.py` — FASTA and CSV parsing (scaffold, linkers, function peptides). Modify this when input formats change.
 - `main/client.py` — async HTTP client (`httpx`) for concurrent microservice calls
 - `main/enumeration.py` — peptide property calculation (GRAVY, pI, charge), forbidden-zone scanning, construct enumeration, CSV/JSON output
+
+The pipeline persists intermediate results to `output/` after each step (JSON summaries + large CSV files). A full run generates ~580 MB. The `output/.gitignore` contains `*` — outputs are never committed.
 
 ### Microservices (`tools/`)
 
@@ -59,9 +68,11 @@ POST /predict/batch → batch prediction (up to 1000 sequences)
 
 All FASTA-based services subclass `FastaToolService` from `tools/template/fasta_service.py`, implementing only `load_model()` and `predict_impl()`. The template handles HTTP, concurrency (internal semaphore of 10), error handling, and health checks.
 
-Two additional service templates exist but are not yet widely adopted:
-- `tools/template/structure_service.py` — sequence → 3D structure (PDB)
-- `tools/template/pdb_service.py` — PDB structure → scoring
+Two additional service templates exist as ready-to-use base classes but have no concrete implementations yet:
+- `tools/template/structure_service.py` — sequence → 3D structure (PDB). Subclass `StructureService`, implement `predict_structure()`. Concurrency limited to 3 (structure prediction is compute-heavy).
+- `tools/template/pdb_service.py` — PDB structure → scoring. Subclass `PdbScoringService`, implement `score_pdb()`. Concurrency limited to 10.
+
+Each service directory also contains a `Dockerfile` for containerized deployment, and a `pyproject.toml` with optional dependency groups (`ml`, `service`, `all`).
 
 | Service | Port | Type | Role |
 |---------|------|------|------|
@@ -74,6 +85,7 @@ Two additional service templates exist but are not yet widely adopted:
 | TIPred | 8007 | score | Tyrosinase inhibitory peptide (anti-melanin core function) |
 | AlgPred2 | 8008 | filter | Allergenicity prediction (veto if ≥ 0.3) |
 | GraphCPP | 8009 | score | CPP prediction (GraphSAGE GNN) |
+| AlphaFold3 | 8201 | structure | 3D structure prediction (Docker, Ubuntu+GPU only) |
 
 ### Key design decisions
 

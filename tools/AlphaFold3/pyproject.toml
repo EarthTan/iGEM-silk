@@ -1,0 +1,11 @@
+[project]
+name = "alphafold3-service"
+version = "1.0.0"
+description = "AlphaFold3 微服务 - 3D 蛋白质结构预测 (Docker 封装)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.27.0",
+]
