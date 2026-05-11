@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# 一键启动所有 10 个微服务
+# 一键启动所有 9 个微服务
 # ============================================================================
 #
 # 用法:
@@ -8,7 +8,7 @@
 #   ./tools/start_all.sh stop         # 停止所有服务
 #   ./tools/start_all.sh status       # 查看服务状态
 #
-# 服务列表 (端口 8001–8010):
+# 服务列表 (端口 8001–8009):
 #   AnOxPePred   8001  抗氧化肽预测 (CNN)
 #   BepiPred-3.0 8002  B细胞表位预测 (ESM-2)
 #   ToxinPred3   8003  肽毒性预测 (Extra Trees)
@@ -17,8 +17,7 @@
 #   pLM4CPPs     8006  细胞穿透肽预测 (ESM-2 + CNN)
 #   Tipred       8007  酪氨酸酶抑制肽预测 (Stacked Ensemble)
 #   AlgPred2     8008  过敏原性预测 (Random Forest)
-#   GraphCPP     8009  细胞穿透肽预测 (GNN)
-#   MLCPP        8010  细胞穿透肽预测 (规则版)
+#   GraphCPP     8009  细胞穿透肽预测 (GraphSAGE GNN)
 #
 # 日志输出: tools/logs/<name>.log
 # PID 文件: tools/logs/<name>.pid
@@ -28,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGS_DIR="$SCRIPT_DIR/logs"
 
 # 所有服务名（迭代顺序）
-SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp mlcpp"
+SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp"
 
 # ── 根据服务名查目录名 ──
 dir_of() {
@@ -42,7 +41,6 @@ dir_of() {
         tipred)      echo "Tipred"       ;;
         algpred2)    echo "algpred2"     ;;
         graphcpp)    echo "GraphCPP"     ;;
-        mlcpp)       echo "MLCPP"        ;;
     esac
 }
 
@@ -58,7 +56,6 @@ port_of() {
         tipred)      echo "8007" ;;
         algpred2)    echo "8008" ;;
         graphcpp)    echo "8009" ;;
-        mlcpp)       echo "8010" ;;
     esac
 }
 

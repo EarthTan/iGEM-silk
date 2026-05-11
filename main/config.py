@@ -33,7 +33,7 @@ import os
 #   - "score"  → 参与综合评分（加权累加）
 #   - "filter" → 参与硬过滤（一票否决：毒性/过敏原/溶血超标直接淘汰）
 #
-# 端口分配：8001–8010，与 tools/ 下各子目录一一对应。
+# 端口分配：8001–8009，与 tools/ 下各子目录一一对应。
 #
 # 远程服务：设置环境变量 {NAME}_HOST 可将某个服务的地址指向远程机器。
 #   例：export ANOXPEPRED_HOST=192.168.1.100   # GPU 服务器
@@ -63,10 +63,7 @@ SERVICES: dict[str, dict] = {
     # TIPred：酪氨酸酶抑制肽预测（抗黑色素沉积核心功能）
 
     "graphcpp":     {"port": 8009, "group": "score"},
-    # GraphCPP：细胞穿透肽预测（简化分子指纹版，权重低于 pLM4CPPs）
-
-    "mlcpp":        {"port": 8010, "group": "score"},
-    # MLCPP：细胞穿透肽预测（规则版，仅作参考，权重为 0）
+    # GraphCPP：细胞穿透肽预测（GraphSAGE GNN，权重低于 pLM4CPPs）
 
     # ═══════ 过滤型服务 ═══════
     "toxinpred3":   {"port": 8003, "group": "filter"},
@@ -142,7 +139,7 @@ HARD_FILTERS = {
 #   - B 细胞表位（bepipred3）是暴露度代理——如果暴露得好，功能肽才能发挥作用
 #   - 细胞穿透（plm4cpps）是辅助递送功能，次之
 #   - MHC 结合（mhcflurry）是反向指标（免疫原性风险），且只对部分肽有效，权重低
-#   - graphcpp 和 mlcpp 是 CPP 的简化/规则版，权重很低或不参与评分
+#   - graphcpp 是 CPP 的 GNN 简化版，权重低于 plm4cpps
 
 SCORE_WEIGHTS = {
     "anoxpepred":   0.35,   # 抗氧化 — 核心功能
@@ -151,7 +148,7 @@ SCORE_WEIGHTS = {
     "plm4cpps":      0.10,   # 细胞穿透 — 辅助递送功能
     "mhcflurry":     0.05,   # MHC结合 — 免疫原性参考（反向指标）
     "graphcpp":      0.05,   # 细胞穿透（简化版，权重低于 plm4cpps）
-    "mlcpp":         0.00,   # 细胞穿透（规则版，仅输出参考，不参与评分）
+
 }
 
 # 反向指标集合：这些服务的分数越高越不好（如免疫原性），评分时自动做 (1.0 - score) 转换。

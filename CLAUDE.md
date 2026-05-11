@@ -73,8 +73,7 @@ Two additional service templates exist but are not yet widely adopted:
 | pLM4CPPs | 8006 | score | Cell-penetrating peptide prediction (ESM-2 + CNN) |
 | TIPred | 8007 | score | Tyrosinase inhibitory peptide (anti-melanin core function) |
 | AlgPred2 | 8008 | filter | Allergenicity prediction (veto if ≥ 0.3) |
-| GraphCPP | 8009 | score | CPP prediction (GNN) |
-| MLCPP | 8010 | score | CPP prediction (rule-based, weight = 0) |
+| GraphCPP | 8009 | score | CPP prediction (GraphSAGE GNN) |
 
 ### Key design decisions
 

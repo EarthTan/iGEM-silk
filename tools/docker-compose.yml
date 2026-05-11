@@ -1,0 +1,244 @@
+# =============================================================================
+# iGEM-silk 微服务集群 — Docker Compose
+# =============================================================================
+#
+# 从 tools/ 目录启动全部 9 个微服务:
+#   cd tools && docker compose up -d
+#
+# 仅 GPU 服务:
+#   docker compose --profile gpu up -d
+#
+# 仅 CPU 服务:
+#   docker compose --profile cpu up -d
+#
+# 构建并启动:
+#   docker compose up -d --build
+#
+# 查看状态:
+#   docker compose ps
+#
+# 前提条件 (GPU 服务):
+#   - NVIDIA 驱动 >= 525
+#   - nvidia-container-toolkit
+# =============================================================================
+
+services:
+
+  # ===========================================================================
+  # GPU 加速服务 (profile: gpu)
+  # ===========================================================================
+
+  anoxpepred:
+    build:
+      context: ..
+      dockerfile: AnOxPePred/Dockerfile
+    image: igem-silk/anoxpepred:latest
+    container_name: anoxpepred
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  bepipred3:
+    build:
+      context: ..
+      dockerfile: BepiPred-3.0/Dockerfile
+    image: igem-silk/bepipred3:latest
+    container_name: bepipred3
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+
+  hemopi2:
+    build:
+      context: ..
+      dockerfile: HemoPI2/Dockerfile
+    image: igem-silk/hemopi2:latest
+    container_name: hemopi2
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+
+  mhcflurry:
+    build:
+      context: ..
+      dockerfile: MHCflurry/Dockerfile
+    image: igem-silk/mhcflurry:latest
+    container_name: mhcflurry
+    ports:
+      - "8005:8005"
+    environment:
+      - PORT=8005
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
+
+  plm4cpps:
+    build:
+      context: ..
+      dockerfile: pLM4CPPs/Dockerfile
+    image: igem-silk/plm4cpps:latest
+    container_name: plm4cpps
+    ports:
+      - "8006:8006"
+    environment:
+      - PORT=8006
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+
+  graphcpp:
+    build:
+      context: ..
+      dockerfile: GraphCPP/Dockerfile
+    image: igem-silk/graphcpp:latest
+    container_name: graphcpp
+    ports:
+      - "8009:8009"
+    environment:
+      - PORT=8009
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  # ===========================================================================
+  # CPU 服务 (profile: cpu)
+  # ===========================================================================
+
+  toxinpred3:
+    build:
+      context: ..
+      dockerfile: ToxinPred3/Dockerfile
+    image: igem-silk/toxinpred3:latest
+    container_name: toxinpred3
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tipred:
+    build:
+      context: ..
+      dockerfile: TIPred/Dockerfile
+    image: igem-silk/tipred:latest
+    container_name: tipred
+    ports:
+      - "8007:8007"
+    environment:
+      - PORT=8007
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  algpred2:
+    build:
+      context: ..
+      dockerfile: AlgPred2/Dockerfile
+    image: igem-silk/algpred2:latest
+    container_name: algpred2
+    ports:
+      - "8008:8008"
+    environment:
+      - PORT=8008
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+

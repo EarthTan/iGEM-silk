@@ -38,7 +38,7 @@ python main.py
 
 编辑 `config.py` 即可调整：
 
-- **微服务地址**：`SERVICE_HOST`（默认 127.0.0.1）和各服务端口（8001–8010）
+- **微服务地址**：`SERVICE_HOST`（默认 127.0.0.1）和各服务端口（8001+）
 - **肽预筛选**：`PEPTIDE_MIN_LENGTH` / `PEPTIDE_MAX_LENGTH`、`PEPTIDE_MAX_GRAVY`、电荷范围
 - **硬过滤阈值**：`HARD_FILTERS` 中每个服务的 threshold
 - **评分权重**：`SCORE_WEIGHTS`，`SCORE_INVERT` 标记反向指标（如 MHCflurry）
