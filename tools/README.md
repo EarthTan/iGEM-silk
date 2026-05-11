@@ -54,6 +54,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | TIPred | 短肽（≥3）/ 蛋白质（无上限） | 预测酪氨酸酶抑制肽(TIP)活性 | CPU |  | 8007 |
 | AlgPred2 | 中肽 ~ 蛋白质（针对较长序列优化） | 过敏原性风险预测工具 - 基于随机森林模型的蛋白过敏原性预测 | CPU |  | 8008 |
 | GraphCPP | 短肽（5~40 最优，>100 精度下降） | 基于图神经网络(GraphSAGE)的细胞穿透肽(CPP)预测工具 | GPU 加速（PyTorch，可选，已配置dockerfile） |  | 8009 |
+| TemStaPro | 短肽 ~ 蛋白质（全范围） | 蛋白质热稳定性预测 — ProtT5-XL 嵌入 + MLP 集成，预测 40–65°C 区间热稳定性 | GPU 加速（PyTorch，可选，已配置dockerfile） |  | 8010 |
 
 ##### PDB Service （8101+）
 | 服务 | 范围 | 作用 | 环境 | 端口 |
