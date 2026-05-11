@@ -71,6 +71,16 @@ SERVICES: dict[str, dict] = {
     # 仅支持 Ubuntu + NVIDIA GPU，通过 Docker CLI 调用官方镜像
     # 不参与肽级别的评分/过滤流水线，用于验证最终 construct 的三维结构
 
+    "pepfold4":     {"port": 8202, "group": "structure"},
+    # PEP-FOLD4：肽从头结构预测 (RPBS, Docker 封装)
+    # 专为短肽 (5–40 aa) 设计，sOPEP 力场 + 蒙特卡洛采样，支持 pH/离子强度
+    # CPU 即可运行，无需 GPU
+
+    # ═══════ PDB 评分服务 ═══════
+    "sasa":         {"port": 8101, "group": "score"},
+    # SASA：溶剂可及表面积分析 (FreeSASA Lee-Richards 算法)
+    # 输入 PDB 结构，输出逐残基暴露度评分。用于评估功能肽表面暴露程度
+
     # ═══════ 过滤型服务 ═══════
     "toxinpred3":   {"port": 8003, "group": "filter"},
     # ToxinPred3：肽毒性预测（Extra Trees），≥ 0.38 直接淘汰
