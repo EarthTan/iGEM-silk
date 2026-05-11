@@ -18,6 +18,7 @@
 #   Tipred       8007  酪氨酸酶抑制肽预测 (Stacked Ensemble)
 #   AlgPred2     8008  过敏原性预测 (Random Forest)
 #   GraphCPP     8009  细胞穿透肽预测 (GraphSAGE GNN)
+#   TemStaPro    8010  蛋白质热稳定性预测 (ProtT5-XL + MLP)
 #   AlphaFold3   8201  3D结构预测 (Docker, GPU必需)
 #   PEP-FOLD4    8202  肽从头结构预测 (Docker, CPU)
 #   SASA         8101  溶剂可及表面积分析 (FreeSASA)
@@ -30,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGS_DIR="$SCRIPT_DIR/logs"
 
 # 所有服务名（迭代顺序）
-SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp alphafold3 pepfold4 sasa"
+SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp temstapro alphafold3 pepfold4 sasa"
 
 # ── 根据服务名查目录名 ──
 dir_of() {
@@ -44,6 +45,7 @@ dir_of() {
         tipred)      echo "Tipred"       ;;
         algpred2)    echo "algpred2"     ;;
         graphcpp)    echo "GraphCPP"     ;;
+        temstapro)   echo "TemStaPro"    ;;
         alphafold3)  echo "AlphaFold3"   ;;
         pepfold4)    echo "PEP-FOLD4"    ;;
         sasa)        echo "SASA"         ;;
@@ -62,6 +64,7 @@ port_of() {
         tipred)      echo "8007" ;;
         algpred2)    echo "8008" ;;
         graphcpp)    echo "8009" ;;
+        temstapro)   echo "8010" ;;
         alphafold3)  echo "8201" ;;
         pepfold4)    echo "8202" ;;
         sasa)        echo "8101" ;;
