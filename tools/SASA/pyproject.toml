@@ -1,0 +1,14 @@
+[project]
+name = "sasa-service"
+version = "1.0.0"
+description = "SASA 微服务 - 溶剂可及表面积分析 (FreeSASA)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.27.0",
+    "freesasa>=2.1.0",
+    "biopython>=1.87",
+    "numpy>=1.24.0",
+]
