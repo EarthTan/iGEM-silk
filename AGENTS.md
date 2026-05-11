@@ -7,7 +7,7 @@
 3. 本项目使用聪慧的 `uv` 和 `pyproject.toml` 来管理python环境，而不使用愚蠢的 `pip` 或者 `requirements.md`。
 
    
-
+请我4个人三个 vert 的话
 
 
 
