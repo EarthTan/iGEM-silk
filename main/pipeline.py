@@ -52,8 +52,6 @@ Step 7 — 综合评分 & 排名   : 加权求和排序，输出 Top 20
    （已在 Step 4 禁入区过滤中体现）
 """
 
-# jij
-
 from __future__ import annotations
 
 import asyncio
