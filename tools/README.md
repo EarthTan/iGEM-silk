@@ -58,9 +58,10 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 ##### PDB Service （8101+）
 | 服务 | 范围 | 作用 | 环境 | 端口 |
 | ---- | ---- | ---- | ---- | ---- |
-| 暂无 | — | 模板已就绪，暂无具体实现 | — | — |
+| SASA | 蛋白质 / 肽 （无上限） | 溶剂可及表面积分析 — FreeSASA Lee-Richards 算法，逐残基暴露度量化 | CPU（Python 原生） | 8101 |
 
 ##### Structure Service (8201+)
 | 服务 | 范围 | 作用 | 环境 | 端口 |
 | ---- | ---- | ---- | ---- | ---- |
 | AlphaFold3 | 蛋白质（无上限）/ 肽 / DNA / RNA / 配体 | 3D 生物分子结构预测 (Google DeepMind) | GPU 必需（NVIDIA，Docker 封装，仅 Ubuntu） | 8201 |
+| PEP-FOLD4 | 短肽（5~40 aa） | 肽从头结构预测 — sOPEP 力场 + 蒙特卡洛采样 | CPU（只有Docker 封装） | 8202 |
