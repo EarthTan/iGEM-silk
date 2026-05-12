@@ -11,24 +11,21 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 ```bash
 # Run the full 7-step pipeline
 python -m main
+igem-silk                   # CLI command (same as above)
 
 # Start all microservices (each in its own tools/<name>/.venv)
 ./tools/start_all.sh
 
-# Stop all microservices
+# Stop / status
 ./tools/start_all.sh stop
-
-# Check microservice status
 ./tools/start_all.sh status
 
 # Start microservices via Docker (GPU + CPU profiles, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
 
-# Install deps for a single microservice
-cd tools/<name> && uv sync
-
-# Run tests
-uv run pytest
+# Install deps
+uv sync                      # root project
+cd tools/<name> && uv sync   # single microservice
 
 # Lint
 uv run ruff check .
@@ -52,7 +49,7 @@ Key files:
 - `main/pipeline.py` — **7-step pipeline orchestration** (`run()` function), step output management, caching logic
 - `main/config.py` — **single control panel** for all parameters: microservice URLs, filter thresholds, scoring weights, forbidden-zone rules. Edit only this file to tune the pipeline.
 - `main/data_loader.py` — FASTA and CSV parsing (scaffold, linkers, function peptides). Modify this when input formats change.
-- `main/client.py` — async HTTP client (`httpx`) for concurrent microservice calls
+- `main/client.py` — async HTTP client (`httpx`) for concurrent microservice calls. Handles both FASTA-based (`predict_single`, `predict_batch`) and PDB-based (`predict_pdb_single`, `predict_pdb_batch`) scoring.
 - `main/enumeration.py` — peptide property calculation (GRAVY, pI, charge), forbidden-zone scanning, construct enumeration, CSV/JSON output
 
 The pipeline persists intermediate results to `output/` after each step (JSON summaries + large CSV files). A full run generates ~580 MB. The `output/.gitignore` contains `*` — outputs are never committed.
@@ -69,9 +66,9 @@ POST /predict/batch → batch prediction (up to 1000 sequences)
 
 All FASTA-based services subclass `FastaToolService` from `tools/template/fasta_service.py`, implementing only `load_model()` and `predict_impl()`. The template handles HTTP, concurrency (internal semaphore of 10), error handling, and health checks.
 
-Two additional service templates exist as ready-to-use base classes but have no concrete implementations yet:
-- `tools/template/structure_service.py` — sequence → 3D structure (PDB). Subclass `StructureService`, implement `predict_structure()`. Concurrency limited to 3 (structure prediction is compute-heavy).
-- `tools/template/pdb_service.py` — PDB structure → scoring. Subclass `PdbScoringService`, implement `score_pdb()`. Concurrency limited to 10.
+Two additional service templates exist:
+- `tools/template/structure_service.py` — sequence → 3D structure (PDB). Subclass `StructureService`, implement `predict_structure()`. Concurrency limited to 3. Used by AlphaFold3 and PEP-FOLD4.
+- `tools/template/pdb_service.py` — PDB structure → scoring. Subclass `PdbScoringService`, implement `score_pdb()`. Concurrency limited to 10. Used by SASA and Aggrescan3D.
 
 Each service directory also contains a `Dockerfile` for containerized deployment, and a `pyproject.toml` with optional dependency groups (`ml`, `service`, `all`).
 
@@ -90,13 +87,46 @@ Each service directory also contains a `Dockerfile` for containerized deployment
 | SoDoPE | 8012 | score | Protein solubility prediction (SWI — solubility-weighted index, CPU) |
 | AlphaFold3 | 8201 | structure | 3D structure prediction (Docker, Ubuntu+GPU only) |
 | PEP-FOLD4 | 8202 | structure | De novo peptide structure prediction (Docker, 5–40 aa) |
-| SASA | 8101 | score | Solvent accessible surface area analysis (FreeSASA) |
+| SASA | 8101 | pdb_score | Solvent accessible surface area analysis (FreeSASA) |
+| Aggrescan3D | 8102 | pdb_score | Structural aggregation propensity (A3D score, Docker) |
 
 ### Key design decisions
 
 - **Peptide-level scoring, not construct-level**: The ML models were trained on short peptides (5–50 aa), not full fusion proteins (350+ aa). Constructs inherit their peptide's scores; differentiation comes from insertion position (forbidden-zone filtering).
 - **Hard filters are absolute**: toxic/allergenic/hemolytic peptides are eliminated before enumeration — no trade-offs allowed.
 - **Scoring is weighted-average**: `Σ(weight × adjusted_score) / Σ(weight)`. Inverse indicators (MHCflurry) get `adjusted = 1.0 - raw`.
+
+### Model file management
+
+All model files live under `tools/<name>/models/` (`.gitignore`d except small files). Four sourcing strategies:
+
+| Strategy | When | Notes |
+|----------|------|-------|
+| Git-tracked (< 5 MB) | Small files (CNN ckpt, GCN weights, scalers) | Checked into repo |
+| First-run download (> 10 MB) | Large files (ESM-2 ~2.5 GB, ProtT5-XL ~3 GB) | `load_model()` auto-downloads to `models/` |
+| pip package | Bundled with pip install | Models live in `.venv/` |
+| None needed | Pure algorithm or synthetic training (FreeSASA, TIPred) | No model file |
+
+**Shared model cache:** `tools/models/` is a cross-service cache for models used by multiple services. Currently `fair-esm/` (ESM-2 checkpoints via `torch.hub`) is shared — pLM4CPPs and BepiPred-3.0 both set `TORCH_HOME` to `tools/models/fair-esm/`. A migration script (`tools/migrate_models.sh`) moves existing per-service checkpoints into the shared directory.
+
+Docker deployments volume-mount `models/` — models are never baked into images.
+
+### Microservice design principles
+
+When adding a new microservice to `tools/`:
+1. **Original implementation first** — use the tool author's code, model, and approach verbatim. No shortcuts or AI-synthesized approximations.
+2. **Environment portability** — auto-detect GPU and use it when available, fall back to CPU otherwise. Services that require GPU (AlphaFold3) should error clearly on CPU. CUDA-capable services get a `Dockerfile` for GPU deployment.
+3. **Unified API** — subclass `FastaToolService`, `StructureService`, or `PdbScoringService` from `tools/template/`. Only implement `load_model()` and `predict_impl()`; the template handles HTTP, concurrency, and health checks.
+
+## Entry point
+
+`main/__init__.py` defines `main()` which calls `main.pipeline.run()` via `asyncio.run()`. `main/__main__.py` calls `main()` so `python -m main` works. Both are entry points into the single pipeline orchestration in `pipeline.py`.
+
+## Supporting documentation
+
+- `main/docs/PIPELINE.md` — deeper pipeline walkthrough
+- `main/docs/TOOLS.md` — microservice design reference
+- `tools/README.md` — microservice port table, model management, design principles
 
 ## Python environment
 

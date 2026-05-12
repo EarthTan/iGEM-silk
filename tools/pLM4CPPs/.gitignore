@@ -1,1 +1,2 @@
-models/
+# models/ — ESM-2 checkpoint 已迁至共享池 tools/models/fair-esm/
+# CNN 分类器在 pLM4CPPs-main/models/（Git 追踪，不在此目录）

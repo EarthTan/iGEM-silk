@@ -65,10 +65,10 @@ class BepiPred3Service(FastaToolService):
         self.antigens_class = bepipred3.Antigens
         self.predictor_class = bepipred3.BP3EnsemblePredict
 
-        # 模型缓存目录 (项目本地，gitignored)
-        self._model_dir = Path(__file__).parent / "models"
-        self._model_dir.mkdir(exist_ok=True)
-        os.environ["TORCH_HOME"] = str(self._model_dir / "torch")
+        # 将 ESM-2 模型缓存指向共享目录 (tools/models/fair-esm/)
+        os.environ["TORCH_HOME"] = str(
+            Path(__file__).parent.parent / "models" / "fair-esm"
+        )
 
         # 序列嵌入缓存
         self.esm_dir = Path(__file__).parent / "esm_cache"
@@ -77,10 +77,10 @@ class BepiPred3Service(FastaToolService):
         self.gpu_info = detect_gpu()
         self._system_info = detect_system()
 
-        # 预下载 + 验证 ESM-2
+        # 预下载 + 验证 ESM-2 (共享缓存目录)
         checkpoint_path = (
-            self._model_dir / "torch" / "hub" / "checkpoints"
-            / f"{self._ESM_MODEL_NAME}.pt"
+            Path(__file__).parent.parent / "models" / "fair-esm"
+            / "hub" / "checkpoints" / f"{self._ESM_MODEL_NAME}.pt"
         )
 
         if checkpoint_path.exists():
