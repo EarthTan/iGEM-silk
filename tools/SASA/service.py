@@ -43,6 +43,7 @@ from tools.template.pdb_service import (
     PdbScoreRequest,
     PdbBatchScoreRequest,
 )
+from tools.utils import detect_system
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 标准氨基酸最大 SASA 参考值 (Å²)
@@ -97,6 +98,12 @@ class SASAService(PdbScoringService):
         try:
             import freesasa  # noqa: F401
             self._ready_message = "FreeSASA ready"
+            self._system_info = detect_system()
+            self._model_status = {
+                "status": "ready",
+                "engine": "FreeSASA (Lee-Richards)",
+                "backend": "cpu",
+            }
             print(f"[{self.tool_name}] {self._ready_message}")
         except ImportError:
             self._ready_message = (

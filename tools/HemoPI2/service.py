@@ -33,7 +33,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
-from tools.utils import detect_gpu
+from tools.utils import detect_gpu, detect_system
 
 
 class HemoPI2Service(FastaToolService):
@@ -58,6 +58,7 @@ class HemoPI2Service(FastaToolService):
         import torch
 
         self.gpu_info = detect_gpu()
+        self._system_info = detect_system()
         print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
         hp_path = list(hemopi2.__path__)[0]
@@ -78,6 +79,14 @@ class HemoPI2Service(FastaToolService):
         # 一次性移动模型到设备
         self.model.to(self.device)
         self.model.eval()
+
+        self._model_status = {
+            "status": "ready",
+            "model": "ESM-2 t6 (Model 3)",
+            "model_source": "HuggingFace (facebook/esm2_t6_8M_UR50D)",
+            "device": str(self.device),
+            "backend": self.gpu_info["backend"],
+        }
 
         print(
             f"[{self.tool_name}] ESM-2 loaded | device={self.device} | "

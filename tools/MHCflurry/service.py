@@ -39,7 +39,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
-from tools.utils import detect_gpu
+from tools.utils import detect_gpu, detect_system
 
 
 class MHCflurryService(FastaToolService):
@@ -64,6 +64,7 @@ class MHCflurryService(FastaToolService):
         Python 3.13+ 兼容: pipes 模块已在 3.13 中移除，mhcflurry 间接引用它。
         """
         self.gpu_info = detect_gpu()
+        self._system_info = detect_system()
         print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
         # Python 3.13+ 兼容性补丁 — pipes 模块已在 Python 3.13 中移除
@@ -81,6 +82,13 @@ class MHCflurryService(FastaToolService):
 
         self.predictor = Class1AffinityPredictor.load()
         self._allele_count = len(self.predictor.supported_alleles)
+
+        self._model_status = {
+            "status": "ready",
+            "model": "MHCflurry Class1AffinityPredictor",
+            "alleles": self._allele_count,
+            "backend": self.gpu_info["backend"],
+        }
 
         print(
             f"[{self.tool_name}] MHCflurry loaded | "
