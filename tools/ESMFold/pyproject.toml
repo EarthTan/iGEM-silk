@@ -7,6 +7,9 @@ dependencies = [
     "fair-esm>=3.0.0",
     "torch>=2.0.0",
     "biotite>=0.39.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
