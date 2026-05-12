@@ -82,7 +82,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 
 | 来源 | 标签 | 位置 | 示例 |
 |------|------|------|------|
-| **Git 随仓库** | `[Git]` | `tools/<name>/` 下，直接 git 追踪（< 5 MB） | AnOxPePred CNN、GraphCPP GCN |
+| **Git 随仓库** | `[Git]` | `tools/<name>/` 下，直接 git 追踪（< 50 MB） | AnOxPePred CNN、GraphCPP GCN |
 | **首次启动下载** | `[下载]` | `tools/<name>/models/`，`load_model()` 自动下载并 gitignored | MHCflurry、TemStaPro |
 | **pip 包自带** | `[pip]` | `.venv/` 内，随 pip install 安装 | ToxinPred3、HemoPI2、AlgPred2 |
 | **无需模型** | `[—]` | 纯算法或启动时合成训练 | TIPred、SoDoPE、SASA |
