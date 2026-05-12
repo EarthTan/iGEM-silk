@@ -67,6 +67,11 @@ class MHCflurryService(FastaToolService):
         self._system_info = detect_system()
         print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
+        # 将 MHCflurry 模型下载重定向到项目目录
+        self._model_dir = Path(__file__).parent / "models"
+        self._model_dir.mkdir(exist_ok=True)
+        os.environ["MHCFLURRY_DOWNLOADS_DIR"] = str(self._model_dir)
+
         # Python 3.13+ 兼容性补丁 — pipes 模块已在 Python 3.13 中移除
         if sys.version_info >= (3, 13):
             import shlex
@@ -87,6 +92,7 @@ class MHCflurryService(FastaToolService):
             "status": "ready",
             "model": "MHCflurry Class1AffinityPredictor",
             "alleles": self._allele_count,
+            "models_dir": str(self._model_dir),
             "backend": self.gpu_info["backend"],
         }
 
