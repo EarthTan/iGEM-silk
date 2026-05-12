@@ -23,13 +23,12 @@ COPY tools/utils.py ./tools/utils.py
 COPY tools/template/ ./tools/template/
 
 # 复制 SoDoPE 自身代码
-COPY SoDoPE_paper_2020/ ./SoDoPE_paper_2020/
-WORKDIR /app/SoDoPE_paper_2020
+COPY tools/SoDoPE_paper_2020/ ./tools/SoDoPE_paper_2020/
+WORKDIR /app/tools/SoDoPE_paper_2020
 
 # 使用 uv 同步依赖
 RUN pip install --no-cache-dir uv && \
-    uv sync --no-dev --frozen && \
-    pip uninstall -y uv
+    uv sync --no-dev --frozen --extra service
 
 EXPOSE 8012
 

@@ -25,11 +25,16 @@ import sys
 import os
 from pathlib import Path
 
-root_path = Path(__file__).parents[1]
-sys.path.insert(0, str(root_path))
+SERVICE_DIR = Path(__file__).parent
+PROJECT_ROOT = SERVICE_DIR.parent.parent
+sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 from tools.utils import detect_gpu, detect_system
+
+sys.path.insert(0, str(Path(__file__).parent / "tools"))
+from sodope_integration import SoDoPEIntegration
 
 
 class SoDoPEService(FastaToolService):
@@ -62,9 +67,6 @@ class SoDoPEService(FastaToolService):
         gpu_info = detect_gpu()
         self._system_info = detect_system()
         print(f"[{self.tool_name}] {gpu_info['message']}")
-
-        sys.path.insert(0, str(Path(__file__).parent / "tools"))
-        from sodope_integration import SoDoPEIntegration
 
         self.model = SoDoPEIntegration(verbose=True)
 

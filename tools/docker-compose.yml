@@ -328,7 +328,7 @@ services:
   sodope:
     build:
       context: ..
-      dockerfile: SoDoPE_paper_2020/Dockerfile
+      dockerfile: tools/SoDoPE_paper_2020/Dockerfile
     image: igem-silk/sodope:latest
     container_name: sodope
     ports:
