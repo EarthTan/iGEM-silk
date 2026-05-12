@@ -39,6 +39,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.utils import detect_system
 
 
 class GraphCPPService(FastaToolService):
@@ -103,10 +104,19 @@ class GraphCPPService(FastaToolService):
         self.model.to(self.device)
         self.model.eval()
 
+        self._system_info = detect_system()
+
         # 指纹生成器 (topological torsion, 2048维)
         self.fp_gen = fp_dict[params["fingerprint_type"]]
 
         self.threshold = 0.5
+
+        self._model_status = {
+            "status": "ready",
+            "model": "GraphSAGE GCN + TopologicalTorsion FP (2048-dim)",
+            "checkpoint": str(ckpt_path),
+            "device": str(self.device),
+        }
 
         print(
             f"[{self.tool_name}] GraphSAGE GNN loaded | "
