@@ -62,14 +62,15 @@ sys.path.insert(0, str(SERVICE_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.fasta_service import (
-    FastaToolService,   # 基类：提供 FastAPI 路由、并发控制、健康检查
-    create_app,         # 工厂函数：把服务类 → FastAPI 应用
-    ToolResult,         # 统一预测结果格式 {score, label, details}
-    PredictResponse,    # 单次预测 HTTP 响应
-    BatchPredictResponse,  # 批量预测 HTTP 响应
-    PredictRequest,     # 单次预测 HTTP 请求
-    BatchPredictRequest,   # 批量预测 HTTP 请求
+    FastaToolService,
+    create_app,
+    ToolResult,
+    PredictResponse,
+    BatchPredictResponse,
+    PredictRequest,
+    BatchPredictRequest,
 )
+from tools.utils import detect_system
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 配置常量
@@ -155,60 +156,55 @@ class TemStaProService(FastaToolService):
     # 分为两步: (1) 加载 ProtT5-XL 编码器 (2) 加载 30 个 MLP 分类器
 
     async def load_model(self) -> None:
-        """加载全部模型到内存/显存。
-
-        加载内容:
-          1. ProtT5-XL (T5EncoderModel) ~ 3GB, 用于把序列变成 1024-dim 嵌入
-          2. 30 个 MLP_C2H2 分类器 (5 seeds × 6 thresholds)
-             每个 ~ 2MB, 合计 ~ 60MB
-
-        环境变量:
-          PROTTRANS_MODEL_DIR: ProtT5-XL 本地路径 (可选，默认从 HuggingFace Hub 下载)
-          TEMSTAPRO_MODELS_DIR: MLP 权重目录 (默认 ./models/)
-
-        注意: 基类会在 lifespan 中 try/except 包裹此方法，
-        加载失败不会导致进程退出，而是标记 _loaded=False。
-        """
+        """加载全部模型到内存/显存，同步更新 self._model_status。"""
         import torch
-        from prottrans import load_prottrans  # 封装了 T5 模型的加载逻辑
-        from mlp import MLP_C2H2              # 2 隐层 MLP，与论文一致
+        from prottrans import load_prottrans
+        from mlp import MLP_C2H2
 
-        # 自动检测 GPU — ProtT5-XL 在 GPU 上编码速度快 10–50 倍
+        def _set(component: str, data: dict) -> None:
+            if self._model_status is None:
+                self._model_status = {"status": "loading", "components": {}}
+            self._model_status["components"][component] = data
+            states = {c["status"] for c in self._model_status["components"].values()}
+            if "error" in states:
+                self._model_status["status"] = "error"
+            elif "downloading" in states:
+                self._model_status["status"] = "downloading"
+            else:
+                self._model_status["status"] = "ready"
+
         self._device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
+        self._system_info = detect_system()
         print(f"[{self.tool_name}] Device: {self._device}")
 
-        # ── 步骤 1: 加载 ProtT5-XL 编码器 ──────────────────────
-        # 这个模型大约 3GB，首次加载会从 HuggingFace Hub 下载
-        # 设置 PROTTRANS_MODEL_DIR 可以指向已下载的本地副本
-        model_dir = os.environ.get("PROTTRANS_MODEL_DIR") or None
+        # ── 步骤 1: ProtT5-XL ──────────────────────────────
         print(f"[{self.tool_name}] Loading ProtT5-XL …")
-        self._prottrans_model, self._tokenizer = load_prottrans(model_dir)
+        self._prottrans_model, self._tokenizer = load_prottrans(
+            os.environ.get("PROTTRANS_MODEL_DIR") or None,
+            on_status=lambda d: _set("prot_t5_xl", d),
+        )
         print(f"[{self.tool_name}] ProtT5-XL loaded on {self._device}")
 
-        # ── 步骤 2: 加载 30 个 MLP 分类器 ─────────────────────
-        # 文件命名规则: mean_major_imbal_{threshold}_s{seed}.pt
-        # 例如: mean_major_imbal_45_s3.pt = 45°C 阈值、种子 3 的 MLP 权重
+        # ── 步骤 2: MLP 分类器 ──────────────────────────────
         models_dir = os.environ.get(
             "TEMSTAPRO_MODELS_DIR",
             str(Path(__file__).parent / "models"),
         )
+        if not _classifiers_exist(models_dir):
+            _set("mlp_classifiers", {"status": "downloading", "detail": "从 GitHub 获取 30 个权重文件…"})
+            print(f"[{self.tool_name}] MLP 分类器缺失，自动下载到 {models_dir} …")
+            _download_classifiers(models_dir)
+
         print(f"[{self.tool_name}] Loading MLP classifiers from {models_dir} …")
 
         loaded = 0
-        for threshold in TEMPERATURE_THRESHOLDS:   # 6 个阈值
-            for seed in SEEDS:                      # 5 个种子
-                key = f"{threshold}_s{seed}"        # 字典键，如 "45_s3"
+        for threshold in TEMPERATURE_THRESHOLDS:
+            for seed in SEEDS:
+                key = f"{threshold}_s{seed}"
                 fname = f"mean_major_imbal-{threshold}_s{seed}.pt"
                 fpath = os.path.join(models_dir, fname)
-
-                # 权重文件缺失 → 直接抛错，由基类捕获并标记服务未就绪
-                if not os.path.exists(fpath):
-                    raise FileNotFoundError(
-                        f"Classifier checkpoint not found: {fpath}. "
-                        f"Download models from https://github.com/ievapudz/TemStaPro/tree/main/models"
-                    )
 
                 # 创建 MLP 实例，结构与论文一致: 1024→512→256→1
                 mlp = MLP_C2H2(MLP_INPUT_SIZE, MLP_HIDDEN_1, MLP_HIDDEN_2)
@@ -241,7 +237,9 @@ class TemStaProService(FastaToolService):
                 loaded += 1
 
         print(f"[{self.tool_name}] {loaded} MLP classifiers loaded")
-        # 此时 self._loaded 仍为 False，由基类的 lifespan 在 load_model 成功后设为 True
+        _set("mlp_classifiers", {
+            "status": "local", "path": models_dir, "count": loaded,
+        })
 
     # ── 嵌入生成 ──────────────────────────────────────────────────────
     # ProtT5-XL 编码是计算瓶颈 (~90% 耗时)，所以提供独立的单条/批量方法
@@ -618,6 +616,48 @@ class TemStaProService(FastaToolService):
                 error="Model not loaded — check /health for status",
             )
         return await super().predict_single(request)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MLP 分类器自动下载
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_TSP_BASE_URL = (
+    "https://github.com/ievapudz/TemStaPro/raw/main/models"
+)
+
+
+def _classifiers_exist(models_dir: str) -> bool:
+    """检查 30 个 MLP 分类器文件是否全部存在。"""
+    for threshold in TEMPERATURE_THRESHOLDS:
+        for seed in SEEDS:
+            fname = f"mean_major_imbal-{threshold}_s{seed}.pt"
+            if not os.path.isfile(os.path.join(models_dir, fname)):
+                return False
+    return True
+
+
+def _download_classifiers(models_dir: str) -> None:
+    """从 GitHub 下载 30 个 MLP 分类器权重到 models_dir。"""
+    import urllib.request
+
+    os.makedirs(models_dir, exist_ok=True)
+    for threshold in TEMPERATURE_THRESHOLDS:
+        for seed in SEEDS:
+            fname = f"mean_major_imbal-{threshold}_s{seed}.pt"
+            url = f"{_TSP_BASE_URL}/{fname}"
+            dest = os.path.join(models_dir, fname)
+            if os.path.exists(dest):
+                continue
+            print(f"  下载 {fname} …")
+            try:
+                urllib.request.urlretrieve(url, dest)
+            except Exception as e:
+                raise RuntimeError(
+                    f"下载失败: {url}\n{e}\n"
+                    f"请手动下载 30 个 .pt 文件到 {models_dir}，"
+                    f"来源: https://github.com/ievapudz/TemStaPro/tree/main/models"
+                ) from e
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

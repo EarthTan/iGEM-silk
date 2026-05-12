@@ -10,7 +10,11 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from pathlib import Path
 from typing import Any
+
+# ProtT5-XL 下载到服务目录下的 models/prot_t5_xl/，而非系统缓存
+_PROTT5_XL_MODEL_ID = "Rostlab/prot_t5_xl_half_uniref50-enc"
 
 
 def _preprocess_sequence(seq: str) -> str:
@@ -24,28 +28,81 @@ def _seq_hash(seq: str) -> str:
     return hashlib.sha256(seq.encode()).hexdigest()
 
 
-def load_prottrans(model_dir: str | None = None) -> tuple[Any, Any]:
-    """Load ProtT5-XL encoder and tokenizer.
+def _default_model_dir() -> Path:
+    """models/prot_t5_xl/ 相对于本文件所在目录 (tools/TemStaPro/)。"""
+    return Path(__file__).parent / "models" / "prot_t5_xl"
 
-    Args:
-        model_dir: Path to local ProtT5-XL model directory.
-                   If None, downloads from HuggingFace Hub.
 
-    Returns:
-        (model, tokenizer) tuple. Model is moved to GPU if available.
+def load_prottrans(
+    model_dir: str | None = None,
+    on_status: Any | None = None,
+) -> tuple[Any, Any]:
+    """加载 ProtT5-XL 编码器和分词器。
+
+    优先使用 model_dir 指定的路径（或环境变量 PROTTRANS_MODEL_DIR），
+    否则默认下载到 tools/TemStaPro/models/prot_t5_xl/。
+
+    若默认目录不存在，自动从 HuggingFace Hub 下载。
+    on_status 可选回调，接收 dict 报告当前状态。
     """
     import torch
     from transformers import T5EncoderModel, T5Tokenizer
 
-    model_path = model_dir or "Rostlab/prot_t5_xl_half_uniref50-enc"
-    tokenizer = T5Tokenizer.from_pretrained(model_path, do_lower_case=False)
-    model = T5EncoderModel.from_pretrained(model_path)
+    if model_dir is None:
+        model_dir = os.environ.get("PROTTRANS_MODEL_DIR", "")
+    if not model_dir:
+        model_dir = str(_default_model_dir())
+
+    target = Path(model_dir)
+
+    # 检查本地目录是否已有模型；没有则下载
+    if _model_files_exist(target):
+        _report(on_status, {"status": "local", "path": str(target), "size": _dir_size_str(target)})
+    else:
+        _report(on_status, {"status": "downloading", "detail": "从 HuggingFace Hub 获取…"})
+        _download_prott5xl(target)
+        _report(on_status, {"status": "local", "path": str(target), "size": _dir_size_str(target)})
+
+    tokenizer = T5Tokenizer.from_pretrained(model_dir, do_lower_case=False)
+    model = T5EncoderModel.from_pretrained(model_dir)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     model = model.eval()
 
     return model, tokenizer
+
+
+def _report(callback: Any | None, data: dict) -> None:
+    if callback:
+        callback(data)
+
+
+def _dir_size_str(path: Path) -> str:
+    """人类可读的目录大小。"""
+    total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+    if total >= 1 << 30:
+        return f"{total / (1 << 30):.1f} GB"
+    return f"{total / (1 << 20):.0f} MB"
+
+
+def _model_files_exist(model_dir: Path) -> bool:
+    """检查目录中是否包含 ProtT5-XL 模型文件。"""
+    return model_dir.is_dir() and (model_dir / "config.json").exists()
+
+
+def _download_prott5xl(target_dir: Path) -> None:
+    """从 HuggingFace Hub 下载 ProtT5-XL 到 target_dir。"""
+    from huggingface_hub import snapshot_download
+
+    print(f"[prottrans] 下载 ProtT5-XL 到 {target_dir} …")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_download(
+        _PROTT5_XL_MODEL_ID,
+        local_dir=str(target_dir),
+        local_dir_use_symlinks=False,
+    )
+    print(f"[prottrans] 下载完成")
 
 
 def generate_embeddings(
