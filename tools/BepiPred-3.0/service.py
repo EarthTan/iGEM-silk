@@ -48,31 +48,78 @@ class BepiPred3Service(FastaToolService):
         self._model_loaded = False
         self.gpu_info: dict = {}
 
+    _ESM_MODEL_NAME = "esm2_t33_650M_UR50D"
+    _ESM_MODEL_SIZE = "~2.5 GB"
+    _ESM_DOWNLOAD_URL = "https://dl.fbaipublicfiles.com/fair-esm/models/esm2_t33_650M_UR50D.pt"
+
     async def load_model(self):
-        """加载 BepiPred-3.0 模型和 ESM-2 编码器"""
+        """加载 BepiPred-3.0 模型并预下载 ESM-2 (~2.5 GB)。
+
+        bp3 通过 torch.hub.load_state_dict_from_url() 从 Facebook 下载 ESM-2。
+        设置 TORCH_HOME 将模型缓存重定向到项目 models/ 目录，然后用一条虚拟
+        序列触发下载 + 验证，确保 /health 反映真实状态。
+        """
         from bp3 import bepipred3
+        import torch
 
         self.antigens_class = bepipred3.Antigens
         self.predictor_class = bepipred3.BP3EnsemblePredict
 
+        # 模型缓存目录 (项目本地，gitignored)
+        self._model_dir = Path(__file__).parent / "models"
+        self._model_dir.mkdir(exist_ok=True)
+        os.environ["TORCH_HOME"] = str(self._model_dir / "torch")
+
+        # 序列嵌入缓存
         self.esm_dir = Path(__file__).parent / "esm_cache"
         self.esm_dir.mkdir(exist_ok=True)
 
-        gpu_info = detect_gpu()
-        self.gpu_info = gpu_info
+        self.gpu_info = detect_gpu()
         self._system_info = detect_system()
 
-        self._model_status = {
-            "status": "ready",
-            "model": "ESM-2 (facebook/esm2_t36_3B_UR50D)",
-            "model_source": "HuggingFace — 首次运行时自动下载",
-            "cache_dir": str(self.esm_dir),
-            "backend": gpu_info["backend"],
-        }
+        # 预下载 + 验证 ESM-2
+        checkpoint_path = (
+            self._model_dir / "torch" / "hub" / "checkpoints"
+            / f"{self._ESM_MODEL_NAME}.pt"
+        )
 
-        print(f"[bepipred3] {gpu_info['message']}")
-        print(f"[bepipred3] BepiPred-3.0 loaded, ESM cache: {self.esm_dir}")
-        print(f"[bepipred3] Note: First run will download ESM-2 model (~2.5GB)")
+        if checkpoint_path.exists():
+            self._model_status = {
+                "status": "ready",
+                "model": f"ESM-2 ({self._ESM_MODEL_NAME}, {self._ESM_MODEL_SIZE})",
+                "cache_path": str(checkpoint_path),
+                "backend": self.gpu_info["backend"],
+            }
+            print(f"[bepipred3] ESM-2 found at {checkpoint_path}")
+        else:
+            self._model_status = {
+                "status": "downloading",
+                "model": f"ESM-2 ({self._ESM_MODEL_NAME}, {self._ESM_MODEL_SIZE})",
+                "source": self._ESM_DOWNLOAD_URL,
+            }
+            print(f"[bepipred3] Downloading {self._ESM_MODEL_NAME} to {checkpoint_path} …")
+            try:
+                torch.hub.load_state_dict_from_url(
+                    self._ESM_DOWNLOAD_URL,
+                    model_dir=str(checkpoint_path.parent),
+                    map_location="cpu",
+                )
+                self._model_status = {
+                    "status": "ready",
+                    "model": f"ESM-2 ({self._ESM_MODEL_NAME}, {self._ESM_MODEL_SIZE})",
+                    "cache_path": str(checkpoint_path),
+                    "backend": self.gpu_info["backend"],
+                }
+            except Exception as exc:
+                self._model_status = {
+                    "status": "error",
+                    "model": f"ESM-2 ({self._ESM_MODEL_NAME})",
+                    "error": str(exc),
+                }
+                raise RuntimeError(f"ESM-2 download failed: {exc}") from exc
+
+        print(f"[bepipred3] {self.gpu_info['message']}")
+        print(f"[bepipred3] BepiPred-3.0 loaded | ESM-2: {self._ESM_MODEL_NAME}")
         self._model_loaded = True
 
     async def predict_impl(self, sequence: str) -> ToolResult:
