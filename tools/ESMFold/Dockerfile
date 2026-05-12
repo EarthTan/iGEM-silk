@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 安装 Python 依赖
 # 使用 PyTorch CUDA 12.1 wheel 确保 GPU 支持
-RUN pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     "fair-esm[esmfold]>=3.0.0" \
     torch --index-url https://download.pytorch.org/whl/cu121 \
     biotite \
