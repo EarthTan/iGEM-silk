@@ -1,0 +1,8 @@
+# Placeholder — download classifier model files before running the service.
+#
+# The 30 .pt checkpoint files (~80 MB total) are NOT committed to this repo.
+# Download them from the TemStaPro repository:
+#
+#   https://github.com/ievapudz/TemStaPro/tree/main/models
+#
+# Or run download_models.sh to automate.

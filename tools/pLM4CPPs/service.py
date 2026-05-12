@@ -43,7 +43,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
-from tools.utils import detect_gpu
+from tools.utils import detect_gpu, detect_system
 
 
 class pLM4CPPsService(FastaToolService):
@@ -69,6 +69,7 @@ class pLM4CPPsService(FastaToolService):
         import numpy as np
 
         self.gpu_info = detect_gpu()
+        self._system_info = detect_system()
         print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
         # 加载 ESM-2 模型
@@ -107,6 +108,16 @@ class pLM4CPPsService(FastaToolService):
 
         # 保存 generate_esm2_embeddings 供 predict_impl 使用
         self._generate_embeddings = generate_esm2_embeddings
+
+        self._model_status = {
+            "status": "ready",
+            "components": {
+                "esm2": {"model": "esm2_t6_8M_UR50D", "source": "HuggingFace"},
+                "cnn": {"path": str(model_path)},
+                "scaler": {"path": str(scaler_path)},
+            },
+            "backend": self.gpu_info["backend"],
+        }
 
         print(
             f"[{self.tool_name}] ESM-2 + CNN model loaded | "

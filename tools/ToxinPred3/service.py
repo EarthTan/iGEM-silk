@@ -38,6 +38,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.utils import detect_system
 
 
 class ToxinPred3Service(FastaToolService):
@@ -73,6 +74,14 @@ class ToxinPred3Service(FastaToolService):
 
         from toxinpred_features import extract_features
         self.extract_features = extract_features
+
+        self._system_info = detect_system()
+        self._model_status = {
+            "status": "ready",
+            "model": "sklearn ExtraTreesClassifier (AAC+DPC, 420-dim)",
+            "model_path": model_path,
+            "backend": "cpu",
+        }
 
         print(f"[{self.tool_name}] ExtraTreesClassifier loaded | sklearn={self._sklearn_ver} | path={model_path}")
 

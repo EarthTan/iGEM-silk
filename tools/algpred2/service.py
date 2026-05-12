@@ -37,6 +37,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.utils import detect_system
 
 
 class AlgPred2Service(FastaToolService):
@@ -70,6 +71,14 @@ class AlgPred2Service(FastaToolService):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="Trying to unpickle estimator")
             self.model = joblib.load(str(model_path))
+
+        self._system_info = detect_system()
+        self._model_status = {
+            "status": "ready",
+            "model": "sklearn RandomForest (AAC, 19-dim)",
+            "model_path": str(model_path),
+            "backend": "cpu",
+        }
 
         print(
             f"[{self.tool_name}] Model loaded from: {model_path} | "

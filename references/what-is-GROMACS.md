@@ -1,3 +1,7 @@
+# GRAMACS 
+
+The official git repo URL: https://github.com/gromacs/gromacs
+
 ## 先从输入输出讲清楚 GROMACS MD 是干什么的
 
 **一句话定义**：GROMACS 是把一个静态的 3D 分子结构"放进水里泡一段时间，然后录视频"的工具。

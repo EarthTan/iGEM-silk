@@ -187,6 +187,8 @@ class HealthResponse(BaseModel):
     tool_name: str
     version: str
     model_loaded: bool
+    model: dict | None = None
+    system: dict | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -267,6 +269,8 @@ class PdbScoringService:
     def __init__(self):
         self._lock = asyncio.Lock()
         self._loaded = False
+        self._model_status: dict | None = None
+        self._system_info: dict | None = None
 
     async def load_model(self) -> None:
         """
@@ -470,6 +474,8 @@ def create_app(ToolClass: type[PdbScoringService]) -> FastAPI:
             tool_name=ToolClass.tool_name,
             version=ToolClass.version,
             model_loaded=tool_instance._loaded,
+            model=tool_instance._model_status,
+            system=tool_instance._system_info,
         )
 
     @app.get("/info", response_model=InfoResponse)
