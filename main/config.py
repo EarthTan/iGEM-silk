@@ -71,6 +71,11 @@ SERVICES: dict[str, dict] = {
     # TemStaPro：蛋白质热稳定性预测 (ProtT5-XL + MLP 集成)
     # 预测 6 个温度阈值 (40–65°C) 的热稳定性，综合评分表示整体耐热性
 
+    "sodope":       {"port": 8012, "group": "score"},
+    # SoDoPE：蛋白质溶解度预测 (SWI — Solubility-Weighted Index)
+    # 基于预计算氨基酸溶解度权重表 + 逻辑回归的快速溶解度评分
+    # 纯 CPU 算法，无需 GPU，速度 <1ms/条
+
     # ═══════ 结构预测服务 ═══════
     "alphafold3":   {"port": 8201, "group": "structure"},
     # AlphaFold3：3D 蛋白质结构预测 (Google DeepMind, Docker 封装)
@@ -172,6 +177,7 @@ SCORE_WEIGHTS = {
     "tipred":        0.30,   # 酪氨酸酶抑制 — 核心功能（抗黑色素）
     "bepipred3":     0.15,   # B细胞表位 — 暴露度代理指标（分数高 ≈ 可能暴露在表面）
     "plm4cpps":      0.10,   # 细胞穿透 — 辅助递送功能
+    "sodope":        0.05,   # 蛋白质溶解度 — 表达可行性指标（SWI 快速评分）
     "mhcflurry":     0.05,   # MHC结合 — 免疫原性参考（反向指标）
     "graphcpp":      0.05,   # 细胞穿透（简化版，权重低于 plm4cpps）
 

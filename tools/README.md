@@ -67,6 +67,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | AlgPred2 | 中肽 ~ 蛋白质（针对较长序列优化） | 过敏原性风险预测工具 - 基于随机森林模型的蛋白过敏原性预测 | CPU | 📦 RandomForest pkl (~1 MB)<br>pip 包内 `algpred2/model/` | 8008 |
 | GraphCPP | 短肽（5~40 最优，>100 精度下降） | 基于图神经网络(GraphSAGE)的细胞穿透肽(CPP)预测工具 | 可 GPU 加速（PyTorch，可选，已配置dockerfile） | ✅ GCN ckpt (~200 KB) + RDKit<br>`model/checkpoints/` — 随仓库 | 8009 |
 | TemStaPro | 短肽 ~ 蛋白质（全范围） | 蛋白质热稳定性预测 — ProtT5-XL 嵌入 + MLP 集成，预测 40–65°C 区间热稳定性 | 可 GPU 加速（PyTorch，可选，已配置dockerfile） | ⬇ ProtT5-XL (~3 GB) `models/prot_t5_xl/`<br>⬇ 30 MLP (~80 MB) `models/classifiers/`<br>均 gitignored, Docker 挂载 | 8010 |
+| SoDoPE | 短肽 ~ 蛋白质（全范围） | 蛋白质溶解度预测 — SWI (Solubility-Weighted Index) 基于预计算氨基酸权重表 + 逻辑回归 | CPU（纯 Python，无外部模型文件） | — 无需模型文件，纯查表 + 数学运算 | 8012 |
 
 ##### PDB Service （8101+）
 | 服务 | 范围 | 作用 | 环境 | 速度 | 模型依赖 | 端口 |

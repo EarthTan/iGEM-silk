@@ -325,6 +325,24 @@ services:
       timeout: 10s
       retries: 3
 
+  sodope:
+    build:
+      context: ..
+      dockerfile: tools/SoDoPE_paper_2020/Dockerfile
+    image: igem-silk/sodope:latest
+    container_name: sodope
+    ports:
+      - "8012:8012"
+    environment:
+      - PORT=8012
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   tipred:
     build:
       context: ..
