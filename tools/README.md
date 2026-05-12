@@ -75,6 +75,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 |------|------|------|------|------|------|
 | AlphaFold3 | 8201 | 蛋白质/肽/DNA/RNA/配体 | 3D 生物分子结构预测 | GPU 必需（Docker，仅 Ubuntu） | [Docker] AF3 参数 + 遗传数据库 · TB 级 |
 | PEP-FOLD4 | 8202 | 短肽 5~40 aa | 肽从头结构预测 | CPU（Docker） | [Docker] sOPEP 力场内置 |
+| ESMFold | 8203 | 短肽~蛋白质（无上限） | 快速 3D 结构预测（ESM-2 3B, ~60x AF2） | GPU 必需 | [下载][共享] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB |
 
 ### 模型管理
 
@@ -96,9 +97,10 @@ tools/models/
     hub/checkpoints/
       esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务
       esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务
+      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干）
 ```
 
-BepiPred-3.0 和 pLM4CPPs 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
+BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
 
 共享池**仅存放被 ≥2 个服务使用的模型**。独有模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
 
