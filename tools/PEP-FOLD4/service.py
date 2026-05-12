@@ -131,7 +131,7 @@ class PEPFOLD4Service(StructureService):
         self._ready_message: str = "Not checked yet"
         self._pf4_image: str = os.environ.get("PF4_IMAGE", "pepfold4")
         self._keep_workspace: bool = os.environ.get("PF4_KEEP_WORKSPACE", "") == "1"
-        self._workspace_base: Path = Path(__file__).parent / "workspace"
+        self._workspace_base: Path = Path(os.environ.get("PF4_WORKSPACE", "/tmp/pf4_workspace"))
 
     # ── 环境验证 ──────────────────────────────────────────────
 

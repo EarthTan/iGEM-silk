@@ -13,21 +13,29 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 ```bash
 # Install deps
 uv sync                      # root project
-cd tools/<name> && uv sync   # single microservice
+cd tools/<name> && uv sync   # single microservice (includes ML/service deps)
 
-# Lint
+# Lint (run from project root)
 uv run ruff check .
 
+# Run tests (none exist yet — pytest is configured in pyproject.toml)
+uv run pytest
+
 # Start all microservices (each in its own tools/<name>/.venv)
-./tools/start_all.sh
-./tools/start_all.sh status
-./tools/start_all.sh stop
+./tools/start_all.sh          # start all
+./tools/start_all.sh status   # check status
+./tools/start_all.sh stop     # stop all
+# Logs: tools/logs/<name>.log
 
 # Start microservices via Docker (GPU + CPU profiles, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
 
 # Run the pipeline (CURRENTLY BROKEN — raises NotImplementedError)
-python -m main
+python -m main                # or: uv run igem-silk
+
+# Override any microservice host/port at runtime (no code changes needed)
+export ANOXPEPRED_HOST=192.168.1.100
+export ANOXPEPRED_PORT=8001
 ```
 
 ## Architecture
@@ -82,12 +90,29 @@ Each service directory also contains a `Dockerfile` and a `pyproject.toml` with 
 Full service catalog and I/O details: `main/docs/TOOLS-usage.md`
 Speed/resource reference: `main/docs/TOOLS-speed.md`
 
+### Service groups and port assignments
+
+Microservices are grouped by pipeline role (defined in `main/config.py`):
+
+| Group | Port range | Services | Pipeline role |
+|-------|-----------|----------|---------------|
+| `score` | 8001–8012 | AnOxPePred, BepiPred-3.0, MHCflurry, pLM4CPPs, TIPred, GraphCPP, TemStaPro, SoDoPE | Peptide-level scoring/ranking |
+| `filter` | 8003–8008 | ToxinPred3, HemoPI2, AlgPred2 | Hard-filter (toxic/hemolytic/allergenic — absolute elimination) |
+| `structure` | 8201–8202 | AlphaFold3, PEP-FOLD4 | 3D structure generation (PDB/mmCIF) |
+| `pdb_score` | 8101–8102 | SASA, Aggrescan3D | PDB-based residue-level scoring |
+
+Remote service override: set `{NAME}_HOST` (and optionally `{NAME}_PORT`) env vars to point any service at a different machine (see `main/config.py:service_url()`).
+
+See `tools/README.md` for the full per-service port table (including input ranges, model sources, and hardware requirements).
+
 ### Key design decisions (carried forward from old pipeline)
 
 - **Peptide-level scoring, not construct-level**: ML models were trained on short peptides (5–50 aa), not full fusion proteins (350+ aa). Constructs inherit their peptide's scores.
 - **Hard filters are absolute**: toxic/allergenic/hemolytic peptides are eliminated — no trade-offs allowed.
 - **Original implementation first**: When adding a microservice, use the tool author's code, model, and approach verbatim. No AI-synthesized approximations.
 - **Environment portability**: Auto-detect GPU, fall back to CPU. GPU-only services (AlphaFold3) error clearly on CPU.
+- **Pipeline is yet to be implemented**: `main/pipeline.py` raises `NotImplementedError`. No tests exist yet (pytest + pytest-asyncio are configured in `pyproject.toml` but no test directory created). The new pipeline should follow the funnel design in `main/README.md`.
+- **Output convention**: Results go in `output/` (root level, currently empty). Pipeline stages should write intermediate/final outputs here.
 
 ### Model file management
 
@@ -110,11 +135,12 @@ Docker deployments volume-mount `models/` — models are never baked into images
 
 ## Supporting documentation
 
-- `main/README.md` — new pipeline design philosophy and requirements
+- `main/README.md` — new pipeline design philosophy and requirements (Chinese + summary)
 - `main/docs/TOOLS-usage.md` — every microservice's I/O format, parameters, thresholds, calling methods
 - `main/docs/TOOLS-speed.md` — speed, memory, concurrency, and resource reference for all microservices
-- `main/docs/threshold.md` — (to be written)
+- `main/docs/threshold.md` — (not yet written)
 - `tools/README.md` — microservice port table, model management, design principles
+- `docs/HUMAN.md` — human-operated tools and analysis methods (outside the automated pipeline)
 
 ## Python environment
 

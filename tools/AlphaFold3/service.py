@@ -21,13 +21,19 @@ AlphaFold3 3D 结构预测微服务。
     AF3_MODEL_DIR     模型参数目录 (必需)
     AF3_DATABASE_DIR  遗传数据库目录 (必需)
     AF3_KEEP_WORKSPACE  设为 1 保留临时工作目录便于调试
+    JOBS_FILE         异步 Job 持久化路径 (可选; 不设置则仅在内存中)
 
 API 端点：
-    GET  /           → 服务信息
-    GET  /health     → 健康检查
-    GET  /info       → 工具信息
-    POST /predict    → 单序列结构预测
-    POST /predict/batch → 批量结构预测 (逐条处理)
+    GET  /                   → 服务信息
+    GET  /health             → 健康检查
+    GET  /info               → 工具信息
+    POST /predict            → 单序列结构预测（同步阻塞）
+    POST /predict/batch      → 批量结构预测 (逐条处理)
+    POST /predict/async      → 异步提交预测 → 202 {job_id, status_url}
+    GET  /status/{job_id}    → 查询任务状态
+    GET  /result/{job_id}    → 获取任务结果
+    GET  /jobs               → 列出所有任务
+    DELETE /jobs/{job_id}    → 清理任务
 """
 
 from __future__ import annotations
@@ -47,12 +53,12 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.structure_service import (
+    BatchPredictRequest,
+    StructureBatchPredictResponse,
+    StructurePredictResponse,
+    StructureResult,
     StructureService,
     create_app,
-    StructureResult,
-    StructurePredictResponse,
-    StructureBatchPredictResponse,
-    BatchPredictRequest,
     PredictRequest,
 )
 from tools.utils import detect_system
@@ -487,6 +493,8 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8201"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
-    app = create_app(AlphaFold3Service)
+    app = create_app(AlphaFold3Service, enable_async=True)
     print(f"[alphafold3] Starting on {HOST}:{PORT}")
+    print("[alphafold3] Async job endpoints enabled: "
+          "/predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
     uvicorn.run(app, host=HOST, port=PORT)

@@ -229,7 +229,7 @@ class Aggrescan3DService(PdbScoringService):
         self._ready_message = "Not checked yet"
         self._a3d_image = os.environ.get("A3D_IMAGE", "lcbio/a3d_server")
         self._keep_workspace = os.environ.get("A3D_KEEP_WORKSPACE", "") == "1"
-        self._workspace_base = Path(__file__).parent / "workspace"
+        self._workspace_base = Path(os.environ.get("A3D_WORKSPACE", "/tmp/a3d_workspace"))
         self._timeout = int(os.environ.get("A3D_TIMEOUT", str(DEFAULT_TIMEOUT_SECONDS)))
         self._distance = int(os.environ.get("A3D_DISTANCE", str(DEFAULT_DISTANCE_CUTOFF)))
 
