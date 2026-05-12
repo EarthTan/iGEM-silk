@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.source="https://freesasa.github.io/"
 
 # FreeSASA 需要编译依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libxml2-dev \
+    gcc libxml2-dev python3-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
@@ -26,6 +26,7 @@ RUN pip install --no-cache-dir \
 
 # 复制项目骨架
 WORKDIR /app
+COPY tools/utils.py ./tools/utils.py
 COPY tools/template/ ./tools/template/
 COPY tools/SASA/ ./tools/SASA/
 

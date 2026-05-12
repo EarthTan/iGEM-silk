@@ -231,8 +231,8 @@ services:
     environment:
       - PORT=8201
       - AF3_IMAGE=${AF3_IMAGE:-alphafold3}
-      - AF3_MODEL_DIR=${AF3_MODEL_DIR:-/root/models}
-      - AF3_DATABASE_DIR=${AF3_DATABASE_DIR:-/root/public_databases}
+      - AF3_MODEL_DIR=/root/models
+      - AF3_DATABASE_DIR=/root/public_databases
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${AF3_MODEL_DIR:-/tmp/af3_models}:/root/models
