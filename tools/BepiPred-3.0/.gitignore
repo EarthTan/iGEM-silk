@@ -1,1 +1,2 @@
-models/
+# ESM-2 checkpoint 已迁至共享池 tools/models/fair-esm/
+# 本地 esm_cache/ 保存序列嵌入缓存，需 git 追踪

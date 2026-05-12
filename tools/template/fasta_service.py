@@ -35,6 +35,7 @@ import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, ClassVar
 
 from fastapi import FastAPI, HTTPException
@@ -365,6 +366,16 @@ class FastaToolService:
         self._loaded = False  # 模型是否已加载的标记
         self._model_status: dict | None = None  # 模型状态详情
         self._system_info: dict | None = None  # 系统环境信息
+
+    @staticmethod
+    def shared_models_dir() -> Path:
+        """tools/models/ — cross-service shared model cache."""
+        return Path(__file__).parent.parent / "models"
+
+    @staticmethod
+    def shared_torch_home() -> Path:
+        """tools/models/fair-esm/ — shared TORCH_HOME for fair-esm models."""
+        return FastaToolService.shared_models_dir() / "fair-esm"
 
     async def load_model(self) -> None:
         """
