@@ -67,6 +67,10 @@ SERVICES: dict[str, dict] = {
     "graphcpp":     {"port": 8009, "group": "score"},
     # GraphCPP：细胞穿透肽预测（GraphSAGE GNN，权重低于 pLM4CPPs）
 
+    "temstapro":    {"port": 8010, "group": "score"},
+    # TemStaPro：蛋白质热稳定性预测 (ProtT5-XL + MLP 集成)
+    # 预测 6 个温度阈值 (40–65°C) 的热稳定性，综合评分表示整体耐热性
+
     # ═══════ 结构预测服务 ═══════
     "alphafold3":   {"port": 8201, "group": "structure"},
     # AlphaFold3：3D 蛋白质结构预测 (Google DeepMind, Docker 封装)

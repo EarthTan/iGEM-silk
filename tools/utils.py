@@ -84,3 +84,31 @@ def detect_gpu() -> dict:
         "message": message,
         "details": details,
     }
+
+
+def detect_system() -> dict:
+    """返回 /health 专用的系统环境信息。
+
+    基于 detect_gpu()，补充 GPU 名称和显存等细节。
+
+    GPU 环境:
+        {"device": "gpu", "gpu_available": true, "gpu_name": "NVIDIA RTX 5880", "gpu_memory": "48 GB"}
+    CPU 环境:
+        {"device": "cpu", "gpu_available": false}
+    """
+    info = detect_gpu()
+    result: dict = {
+        "device": info["backend"],
+        "gpu_available": info["backend"] == "gpu",
+    }
+
+    if result["gpu_available"]:
+        try:
+            import torch
+            result["gpu_name"] = torch.cuda.get_device_name(0)
+            total_mem = torch.cuda.get_device_properties(0).total_mem
+            result["gpu_memory"] = f"{total_mem / (1 << 30):.0f} GB"
+        except Exception:
+            pass
+
+    return result
