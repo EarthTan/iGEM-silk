@@ -22,6 +22,7 @@ ESMFold 使用 ESM-2 (3B) 语言模型直接从序列端到端预测蛋白质三
 
 环境变量:
     TORCH_HOME        PyTorch 模型缓存目录（推荐指向 tools/models/fair-esm/）
+    JOBS_FILE         异步 Job 持久化路径（可选）
 
 API 端点:
     GET  /                   → 服务信息
@@ -29,6 +30,11 @@ API 端点:
     GET  /info               → 工具信息
     POST /predict            → 单序列结构预测
     POST /predict/batch      → 批量结构预测（串行执行）
+    POST /predict/async      → 异步提交预测 → 202 {job_id, status_url}
+    GET  /status/{job_id}    → 查询任务状态
+    GET  /result/{job_id}    → 获取任务结果
+    GET  /jobs               → 列出所有任务
+    DELETE /jobs/{job_id}    → 清理任务
 """
 
 from __future__ import annotations
@@ -252,6 +258,8 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8203"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
-    app = create_app(ESMFoldService)
+    app = create_app(ESMFoldService, enable_async=True)
     print(f"[esmfold] Starting on {HOST}:{PORT}")
+    print("[esmfold] Async job endpoints enabled: "
+          "/predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
     uvicorn.run(app, host=HOST, port=PORT)
