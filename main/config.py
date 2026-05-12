@@ -45,6 +45,7 @@ SERVICES: dict[str, dict] = {
     # ═══════ 结构预测服务 ═══════
     "alphafold3":   {"port": 8201, "group": "structure"},
     "pepfold4":     {"port": 8202, "group": "structure"},
+    "esmfold":      {"port": 8203, "group": "structure"},
 
     # ═══════ PDB 评分服务 ═══════
     "sasa":         {"port": 8101, "group": "pdb_score"},
