@@ -1,0 +1,9 @@
+.venv
+.git
+__pycache__
+*.pyc
+models/
+Dockerfile
+.dockerignore
+README.md
+references/

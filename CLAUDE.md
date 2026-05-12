@@ -87,6 +87,7 @@ Each service directory also contains a `Dockerfile` for containerized deployment
 | AlgPred2 | 8008 | filter | Allergenicity prediction (veto if ≥ 0.3) |
 | GraphCPP | 8009 | score | CPP prediction (GraphSAGE GNN) |
 | TemStaPro | 8010 | score | Protein thermal stability prediction (ProtT5-XL + MLP ensemble) |
+| SoDoPE | 8012 | score | Protein solubility prediction (SWI — solubility-weighted index, CPU) |
 | AlphaFold3 | 8201 | structure | 3D structure prediction (Docker, Ubuntu+GPU only) |
 | PEP-FOLD4 | 8202 | structure | De novo peptide structure prediction (Docker, 5–40 aa) |
 | SASA | 8101 | score | Solvent accessible surface area analysis (FreeSASA) |
