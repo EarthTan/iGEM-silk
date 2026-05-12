@@ -55,6 +55,7 @@ from tools.template.structure_service import (
     BatchPredictRequest,
     PredictRequest,
 )
+from tools.utils import detect_system
 
 
 def _check_os() -> tuple[bool, str]:
@@ -238,6 +239,12 @@ class AlphaFold3Service(StructureService):
 
         if not failures:
             self._ready_message = "AlphaFold3 ready — Docker + GPU + image verified"
+            self._system_info = detect_system()
+            self._model_status = {
+                "status": "ready",
+                "runtime": "Docker (alphafold3 image)",
+                "checks": {name: msg for name, _ok, msg in checks},
+            }
             print(f"[{self.tool_name}] {self._ready_message}")
             return
 

@@ -29,7 +29,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse, PredictRequest,
 )
-from tools.utils import detect_gpu
+from tools.utils import detect_gpu, detect_system
 
 
 class BepiPred3Service(FastaToolService):
@@ -58,8 +58,19 @@ class BepiPred3Service(FastaToolService):
         self.esm_dir = Path(__file__).parent / "esm_cache"
         self.esm_dir.mkdir(exist_ok=True)
 
-        self.gpu_info = detect_gpu()
-        print(f"[bepipred3] {self.gpu_info['message']}")
+        gpu_info = detect_gpu()
+        self.gpu_info = gpu_info
+        self._system_info = detect_system()
+
+        self._model_status = {
+            "status": "ready",
+            "model": "ESM-2 (facebook/esm2_t36_3B_UR50D)",
+            "model_source": "HuggingFace — 首次运行时自动下载",
+            "cache_dir": str(self.esm_dir),
+            "backend": gpu_info["backend"],
+        }
+
+        print(f"[bepipred3] {gpu_info['message']}")
         print(f"[bepipred3] BepiPred-3.0 loaded, ESM cache: {self.esm_dir}")
         print(f"[bepipred3] Note: First run will download ESM-2 model (~2.5GB)")
         self._model_loaded = True
