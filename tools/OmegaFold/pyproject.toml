@@ -1,0 +1,30 @@
+[project]
+name = "omegafold-service"
+version = "1.0.0"
+description = "OmegaFold 3D 结构预测微服务 — HeliXon"
+requires-python = ">=3.11"
+dependencies = [
+    "omegafold @ git+https://github.com/HeliXonProtein/OmegaFold.git",
+    "torch>=2.0.0",
+    "biopython",
+]
+
+[project.optional-dependencies]
+ml = [
+    "omegafold @ git+https://github.com/HeliXonProtein/OmegaFold.git",
+    "torch>=2.0.0",
+    "biopython",
+]
+service = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+]
+all = [
+    "omegafold @ git+https://github.com/HeliXonProtein/OmegaFold.git",
+    "torch>=2.0.0",
+    "biopython",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+]
