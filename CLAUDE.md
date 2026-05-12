@@ -21,8 +21,8 @@ python -m main
 # Check microservice status
 ./tools/start_all.sh status
 
-# Start microservices via Docker (GPU + CPU profiles)
-docker compose --profile gpu --profile cpu up -d
+# Start microservices via Docker (GPU + CPU profiles, from tools/)
+cd tools && docker compose --profile gpu --profile cpu up -d
 
 # Install deps for a single microservice
 cd tools/<name> && uv sync
@@ -49,6 +49,7 @@ The orchestration layer runs a 7-step pipeline defined in `main/pipeline.py`:
 7. **Score & rank** — weighted average of microservice scores, output top 20 to terminal and all ranked to CSV
 
 Key files:
+- `main/pipeline.py` — **7-step pipeline orchestration** (`run()` function), step output management, caching logic
 - `main/config.py` — **single control panel** for all parameters: microservice URLs, filter thresholds, scoring weights, forbidden-zone rules. Edit only this file to tune the pipeline.
 - `main/data_loader.py` — FASTA and CSV parsing (scaffold, linkers, function peptides). Modify this when input formats change.
 - `main/client.py` — async HTTP client (`httpx`) for concurrent microservice calls
@@ -85,6 +86,7 @@ Each service directory also contains a `Dockerfile` for containerized deployment
 | TIPred | 8007 | score | Tyrosinase inhibitory peptide (anti-melanin core function) |
 | AlgPred2 | 8008 | filter | Allergenicity prediction (veto if ≥ 0.3) |
 | GraphCPP | 8009 | score | CPP prediction (GraphSAGE GNN) |
+| TemStaPro | 8010 | score | Protein thermal stability prediction (ProtT5-XL + MLP ensemble) |
 | AlphaFold3 | 8201 | structure | 3D structure prediction (Docker, Ubuntu+GPU only) |
 | PEP-FOLD4 | 8202 | structure | De novo peptide structure prediction (Docker, 5–40 aa) |
 | SASA | 8101 | score | Solvent accessible surface area analysis (FreeSASA) |

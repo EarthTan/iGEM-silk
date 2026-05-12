@@ -1,0 +1,8 @@
+# 模型权重文件 (~80MB) — 首次启动自动下载
+models/*.pt
+
+# ProtT5-XL 蛋白语言模型 (~3GB) — 首次启动自动下载
+models/prot_t5_xl/
+
+# 占位文件保留
+!models/.gitkeep

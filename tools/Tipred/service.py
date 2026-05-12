@@ -41,6 +41,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.utils import detect_system
 
 
 class TIPredService(FastaToolService):
@@ -70,6 +71,15 @@ class TIPredService(FastaToolService):
         sequences = ["YGGFL", "GHK"] * 50 + ["RRRRR", "DDDDD"] * 50
         labels = [1, 1] * 50 + [0, 0] * 50
         self.predictor.train(sequences, labels)
+
+        self._system_info = detect_system()
+        self._model_status = {
+            "status": "ready",
+            "model": "Stacked Ensemble (KNN+RF+SVM+GB → LR)",
+            "features": "547-dim (AAC/DPC/APAAC/PAAC/CTDC/CTDT/CTDD)",
+            "training": "synthetic (200 seqs, trained on startup)",
+            "backend": "cpu",
+        }
 
         print(
             f"[{self.tool_name}] Stacked Ensemble loaded | "
