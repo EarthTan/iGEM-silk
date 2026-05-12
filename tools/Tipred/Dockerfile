@@ -24,9 +24,9 @@ RUN pip install --no-cache-dir \
 WORKDIR /app
 COPY tools/utils.py ./tools/utils.py
 COPY tools/template/ ./tools/template/
-COPY tools/TIPred/ ./tools/TIPred/
+COPY tools/Tipred/ ./tools/Tipred/
 
-WORKDIR /app/tools/TIPred
+WORKDIR /app/tools/Tipred
 
 EXPOSE 8007
 ENV PORT=8007

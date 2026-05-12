@@ -19,10 +19,13 @@ RUN pip install --no-cache-dir \
     httpx>=0.27.0
 
 # Copy service code
-COPY TemStaPro/service.py .
-COPY TemStaPro/prottrans.py .
-COPY TemStaPro/mlp.py .
+COPY tools/utils.py ./tools/utils.py
+COPY tools/TemStaPro/service.py ./tools/TemStaPro/
+COPY tools/TemStaPro/prottrans.py ./tools/TemStaPro/
+COPY tools/TemStaPro/mlp.py ./tools/TemStaPro/
 COPY tools/template/ ./tools/template/
+
+WORKDIR /app/tools/TemStaPro
 
 ENV PORT=8010
 ENV HOST=0.0.0.0

@@ -56,7 +56,7 @@ class AnOxPePredService(FastaToolService):
         self._system_info = detect_system()
 
         import sys
-        sys.path.insert(0, str(Path(__file__).parent / "tools"))
+        sys.path.insert(0, str(Path(__file__).parent / "anoxpepred_sdk"))
         import anoxpepred_integration
         from anoxpepred_integration import AnOxPePredIntegration
 
