@@ -307,6 +307,35 @@ services:
       retries: 3
       start_period: 120s
 
+  omegafold:
+    build:
+      context: ..
+      dockerfile: tools/OmegaFold/Dockerfile
+    image: igem-silk/omegafold:latest
+    container_name: omegafold
+    ports:
+      - "8204:8204"
+    environment:
+      - PORT=8204
+      - OMEGAFOLD_CACHE=/app/tools/models/omegafold
+    volumes:
+      - ./models:/app/tools/models
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8204/health"]
+      interval: 30s
+      timeout: 60s
+      retries: 3
+      start_period: 120s
+
   sasa:
     build:
       context: ..
