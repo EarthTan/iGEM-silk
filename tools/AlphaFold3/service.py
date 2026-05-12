@@ -67,19 +67,19 @@ def _check_os() -> tuple[bool, str]:
 
 
 def _check_nvidia_gpu() -> tuple[bool, str]:
-    """检查 NVIDIA GPU 是否可用 (nvidia-smi)。"""
+    """检查 NVIDIA GPU 是否可用 (通过 Docker 信息查询，无拉取需求)。"""
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+            ["docker", "info", "--format", "{{json .Runtimes}}"],
             capture_output=True, text=True, timeout=15,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return True, f"GPU: {result.stdout.strip().split(chr(10))[0]}"
-        return False, "nvidia-smi found but no GPU detected"
+        if "nvidia" in result.stdout.lower():
+            return True, "NVIDIA runtime available (verified via docker info)"
+        return False, "NVIDIA runtime not found in Docker"
     except FileNotFoundError:
-        return False, "nvidia-smi not found — NVIDIA driver not installed"
+        return False, "docker CLI not found"
     except subprocess.TimeoutExpired:
-        return False, "nvidia-smi timed out"
+        return False, "docker info timed out"
     except Exception as exc:
         return False, f"GPU check error: {exc}"
 
@@ -181,8 +181,10 @@ class AlphaFold3Service(StructureService):
         self._af3_image: str = os.environ.get("AF3_IMAGE", "alphafold3")
         self._model_dir: str = os.environ.get("AF3_MODEL_DIR", "")
         self._database_dir: str = os.environ.get("AF3_DATABASE_DIR", "")
+        self._model_host_dir: str = os.environ.get("AF3_MODEL_HOST_DIR", self._model_dir)
+        self._database_host_dir: str = os.environ.get("AF3_DATABASE_HOST_DIR", self._database_dir)
         self._keep_workspace: bool = os.environ.get("AF3_KEEP_WORKSPACE", "") == "1"
-        self._workspace_base: Path = Path(__file__).parent / "workspace"
+        self._workspace_base: Path = Path(os.environ.get("AF3_WORKSPACE", "/tmp/af3_workspace"))
 
     # ── 环境验证 ──────────────────────────────────────────────
 
@@ -301,7 +303,7 @@ class AlphaFold3Service(StructureService):
                     }
                 ],
                 "dialect": "alphafold3",
-                "version": 4,
+                "version": 3,
             }
             input_path = input_dir / f"{job_name}.json"
             input_path.write_text(json.dumps(input_json, indent=2))
@@ -312,8 +314,8 @@ class AlphaFold3Service(StructureService):
                 "--gpus", "all",
                 "--volume", f"{input_dir}:/root/af_input",
                 "--volume", f"{output_dir}:/root/af_output",
-                "--volume", f"{self._model_dir}:/root/models",
-                "--volume", f"{self._database_dir}:/root/public_databases",
+                "--volume", f"{self._model_host_dir}:/root/models",
+                "--volume", f"{self._database_host_dir}:/root/public_databases",
                 self._af3_image,
                 "python", "run_alphafold.py",
                 "--json_path", f"/root/af_input/{job_name}.json",
