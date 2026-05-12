@@ -117,6 +117,8 @@ services:
       - "8005:8005"
     environment:
       - PORT=8005
+    volumes:
+      - ./MHCflurry/models:/app/tools/MHCflurry/models
     profiles: [gpu]
     deploy:
       resources:
@@ -233,10 +235,14 @@ services:
       - AF3_IMAGE=${AF3_IMAGE:-alphafold3}
       - AF3_MODEL_DIR=/root/models
       - AF3_DATABASE_DIR=/root/public_databases
+      - AF3_MODEL_HOST_DIR=${AF3_MODEL_DIR}
+      - AF3_DATABASE_HOST_DIR=${AF3_DATABASE_DIR}
+      - AF3_WORKSPACE=/tmp/af3_workspace
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${AF3_MODEL_DIR:-/tmp/af3_models}:/root/models
       - ${AF3_DATABASE_DIR:-/tmp/af3_databases}:/root/public_databases
+      - /tmp/af3_workspace:/tmp/af3_workspace
     profiles: [gpu]
     restart: unless-stopped
     healthcheck:
