@@ -67,19 +67,19 @@ def _check_os() -> tuple[bool, str]:
 
 
 def _check_nvidia_gpu() -> tuple[bool, str]:
-    """检查 NVIDIA GPU 是否可用 (nvidia-smi)。"""
+    """检查 NVIDIA GPU 是否可用 (通过 Docker 信息查询，无拉取需求)。"""
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+            ["docker", "info", "--format", "{{json .Runtimes}}"],
             capture_output=True, text=True, timeout=15,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return True, f"GPU: {result.stdout.strip().split(chr(10))[0]}"
-        return False, "nvidia-smi found but no GPU detected"
+        if "nvidia" in result.stdout.lower():
+            return True, "NVIDIA runtime available (verified via docker info)"
+        return False, "NVIDIA runtime not found in Docker"
     except FileNotFoundError:
-        return False, "nvidia-smi not found — NVIDIA driver not installed"
+        return False, "docker CLI not found"
     except subprocess.TimeoutExpired:
-        return False, "nvidia-smi timed out"
+        return False, "docker info timed out"
     except Exception as exc:
         return False, f"GPU check error: {exc}"
 

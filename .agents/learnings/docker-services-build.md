@@ -166,3 +166,71 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc python3-dev pkg-config libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
 ```
+
+---
+
+## 11. MHCflurry `| tail -5` 吞掉了模型下载错误
+
+### 教训
+Dockerfile 中：
+```dockerfile
+RUN ... mhcflurry-downloads fetch models_class1_pan 2>&1 | tail -5
+```
+`| tail -5` 的退出码永远是 0，即使 `mhcflurry-downloads` 失败。Docker 认为 RUN 成功了，镜像不含模型文件。
+
+### 修复
+移除 `| tail -5`，或改用：
+```dockerfile
+RUN ... mhcflurry-downloads fetch models_class1_pan && \
+    echo "OK" || (echo "FAIL" && exit 0)
+```
+
+### 更好的方案
+把模型文件下载到宿主机并用 volume 挂载，避免每层都 rebuild。
+```yaml
+volumes:
+  - ./MHCflurry/models:/app/tools/MHCflurry/models
+```
+
+---
+
+## 12. AlphaFold3 Docker-outside-Docker GPU 检测
+
+### 教训
+AlphaFold3 API 容器本身没有 GPU（通过 Docker socket 调用宿主机的 GPU），所以容器内没有 `nvidia-smi`。原来使用 `nvidia-smi` 检测 GPU 必然失败。
+
+### 修复
+1. 改从 Docker 信息查询：`docker info --format "{{json .Runtimes}}"` 检查 `nvidia` runtime
+2. `nvidia-container-toolkit` 检测（`docker run --rm --gpus all alpine:latest echo ok`）是更可靠的 GPU 可用性验证
+3. 避免使用需要从 Docker Hub 拉取的镜像做检测（`nvidia/cuda:12.0-base`），网络不通时会导致检测失败
+
+---
+
+## 13. 运行时下载的模型在容器重建后丢失
+
+### 教训
+用 `docker exec <container> mhcflurry-downloads fetch` 下载模型虽然成功，但容器被 `docker compose up -d --force-recreate` 重建后，文件全部消失。
+
+### 修复
+始终用 volume 挂载持久化模型文件：
+```yaml
+volumes:
+  - ./MHCflurry/models:/app/tools/MHCflurry/models
+```
+然后在宿主机准备好模型文件。
+
+---
+
+## 14. `pip install bp3` 不会自动安装所有依赖
+
+### 教训
+`bp3==0.0.12.7`（BepiPred-3.0 包）依赖 `fair-esm` 和 `plotly`，但 pip 不一定自动安装它们。首次运行时报 `ModuleNotFoundError: No module named 'esm'` 和 `No module named 'plotly'`。
+
+### 修复
+在 Dockerfile 中显式声明所有已知依赖：
+```dockerfile
+RUN pip install bp3 plotly "fair-esm>=1.0.3"
+```
+
+### 预防
+首次构建前先 `pip install` 测试一下，观察哪些包被实际安装。

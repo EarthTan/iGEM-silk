@@ -117,6 +117,8 @@ services:
       - "8005:8005"
     environment:
       - PORT=8005
+    volumes:
+      - ./MHCflurry/models:/app/tools/MHCflurry/models
     profiles: [gpu]
     deploy:
       resources:
