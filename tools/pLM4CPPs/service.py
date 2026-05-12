@@ -72,7 +72,12 @@ class pLM4CPPsService(FastaToolService):
         self._system_info = detect_system()
         print(f"[{self.tool_name}] {self.gpu_info['message']}")
 
-        # 加载 ESM-2 模型
+        # 将 ESM-2 模型缓存重定向到项目目录 (fair-esm 通过 torch.hub 下载)
+        self._model_dir = Path(__file__).parent / "models"
+        self._model_dir.mkdir(exist_ok=True)
+        os.environ["TORCH_HOME"] = str(self._model_dir / "torch")
+
+        # 加载 ESM-2 模型 (首次启动自动下载 ~8 MB)
         self.esm_model, self.alphabet = load_esm2_model("esm2_t6_8M_UR50D")
 
         # 加载 CNN 分类器
@@ -109,10 +114,18 @@ class pLM4CPPsService(FastaToolService):
         # 保存 generate_esm2_embeddings 供 predict_impl 使用
         self._generate_embeddings = generate_esm2_embeddings
 
+        esm_checkpoint = (
+            self._model_dir / "torch" / "hub" / "checkpoints"
+            / "esm2_t6_8M_UR50D.pt"
+        )
         self._model_status = {
             "status": "ready",
             "components": {
-                "esm2": {"model": "esm2_t6_8M_UR50D", "source": "HuggingFace"},
+                "esm2": {
+                    "model": "esm2_t6_8M_UR50D",
+                    "source": "fair-esm (torch.hub, Facebook CDN)",
+                    "cache_path": str(esm_checkpoint),
+                },
                 "cnn": {"path": str(model_path)},
                 "scaler": {"path": str(scaler_path)},
             },
