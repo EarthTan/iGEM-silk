@@ -21,6 +21,7 @@ PEP-FOLD4 使用结构字母表 (structural alphabet)、sOPEP 粗粒度力场和
 环境变量：
     PF4_IMAGE          PEP-FOLD4 Docker 镜像名 (默认: pepfold4)
     PF4_KEEP_WORKSPACE  设为 1 保留临时工作目录便于调试
+    PF4_WORKSPACE      workspace 根目录 (默认: /tmp/pf4_workspace; Docker Compose 下需 volume mount)
 
 API 端点：
     GET  /              → 服务信息

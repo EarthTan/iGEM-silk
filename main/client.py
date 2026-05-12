@@ -33,6 +33,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import httpx
 
@@ -263,7 +264,7 @@ class ServiceClient:
 
         参数
         ----
-        service_name : 服务名 ("alphafold3" 或 "pepfold4")
+        service_name : 服务名 (当前仅 "alphafold3" 支持 async 模式)
         sequence     : 氨基酸序列
         peptide_id   : 序列编号
         poll_interval: 轮询间隔（秒，默认 30s）
@@ -309,9 +310,9 @@ class ServiceClient:
             return {"success": False, "peptide_id": peptide_id, "error": str(e)}
 
         # 2. 轮询等待
-        start = asyncio.get_event_loop().time()
+        start = time.monotonic()
         while True:
-            elapsed = asyncio.get_event_loop().time() - start
+            elapsed = time.monotonic() - start
             if elapsed > timeout:
                 return {
                     "success": False,
@@ -326,6 +327,13 @@ class ServiceClient:
                 status_resp = await client.get(
                     f"{base_url}/status/{job_id}", timeout=15.0
                 )
+                if status_resp.status_code == 404:
+                    return {
+                        "success": False,
+                        "peptide_id": peptide_id,
+                        "error": f"Job {job_id!r} not found on server (may have been cleaned up or service restarted)",
+                        "job_id": job_id,
+                    }
                 if status_resp.status_code != 200:
                     continue
                 status_data = status_resp.json()

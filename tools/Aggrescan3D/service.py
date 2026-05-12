@@ -17,6 +17,13 @@ API 端点：
     GET  /info          → 工具信息
     POST /predict       → 单次 PDB 评分
     POST /predict/batch → 批量 PDB 评分
+
+环境变量：
+    A3D_IMAGE          Aggrescan3D Docker 镜像名 (默认: lcbio/a3d_server)
+    A3D_KEEP_WORKSPACE  设为 1 保留临时工作目录便于调试
+    A3D_WORKSPACE      workspace 根目录 (默认: /tmp/a3d_workspace; Docker Compose 下需 volume mount)
+    A3D_TIMEOUT        单次预测超时秒数 (默认: 900)
+    A3D_DISTANCE       聚集距离阈值 (默认: 10)
 """
 
 from __future__ import annotations

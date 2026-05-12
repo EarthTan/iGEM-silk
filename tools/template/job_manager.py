@@ -48,6 +48,7 @@ class JobManager:
             self._cleanup_expired()
 
     def create(self, job_id: str, sequence: str) -> Job:
+        self._cleanup_expired()
         job = Job(job_id=job_id, sequence=sequence)
         self._jobs[job_id] = job
         self._save()
@@ -85,6 +86,7 @@ class JobManager:
         return job
 
     def get(self, job_id: str) -> Job | None:
+        self._cleanup_expired()
         return self._jobs.get(job_id)
 
     def list_jobs(self) -> list[dict]:
