@@ -69,12 +69,13 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | TemStaPro | 短肽 ~ 蛋白质（全范围） | 蛋白质热稳定性预测 — ProtT5-XL 嵌入 + MLP 集成，预测 40–65°C 区间热稳定性 | 可 GPU 加速（PyTorch，可选，已配置dockerfile） | ⬇ ProtT5-XL (~3 GB) `models/prot_t5_xl/`<br>⬇ 30 MLP (~80 MB) `models/classifiers/`<br>均 gitignored, Docker 挂载 | 8010 |
 
 ##### PDB Service （8101+）
-| 服务 | 范围 | 作用 | 环境 | 模型依赖 | 端口 |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-| SASA | 蛋白质 / 肽 （无上限） | 溶剂可及表面积分析 — FreeSASA Lee-Richards 算法，逐残基暴露度量化 | CPU（Python 原生） | — 无 ML 模型<br>纯 FreeSASA 解析算法 | 8101 |
+| 服务 | 范围 | 作用 | 环境 | 速度 | 模型依赖 | 端口 |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| SASA | 蛋白质 / 肽 （无上限） | 溶剂可及表面积分析 — FreeSASA Lee-Richards 算法，逐残基暴露度量化 | CPU（Python 原生） | ms/条 | 无 (FreeSASA 解析算法，不依赖 ML 模型) | 8101 |
+| Aggrescan3D | 蛋白质 / 肽 PDB 结构 | 结构聚集倾向分析 — 原版 Aggrescan3D CLI，逐残基 A3D score 与聚集热点 | CPU（Docker 封装，需 `lcbio/a3d_server`） | 秒~分/条 | Docker 镜像内置 | 8102 |
 
 ##### Structure Service (8201+)
-| 服务 | 范围 | 作用 | 环境 | 模型依赖 | 端口 |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-| AlphaFold3 | 蛋白质（无上限）/ 肽 / DNA / RNA / 配体 | 3D 生物分子结构预测 (Google DeepMind) | GPU 必需（NVIDIA，Docker 封装，仅 Ubuntu） | ⬇ AF3 模型参数 + 遗传数据库 (~TB 级)<br>需预先下载到宿主机，Docker `-v` 挂载 | 8201 |
-| PEP-FOLD4 | 短肽（5~40 aa） | 肽从头结构预测 — sOPEP 力场 + 蒙特卡洛采样 | CPU（只有Docker 封装） | — 无外部模型<br>sOPEP 力场内置于 Docker 镜像 | 8202 |
+| 服务 | 范围 | 作用 | 环境 | 速度 | 模型依赖 | 端口 |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| AlphaFold3 | 蛋白质（无上限）/ 肽 / DNA / RNA / 配体 | 3D 生物分子结构预测 (Google DeepMind) | GPU 必需（NVIDIA，Docker 封装，仅 Ubuntu） | 分钟~小时/条 | AF3 模型参数 + 遗传数据库 (~TB 级)<br>需预先下载并通过 `-v` 挂载到容器 | 8201 |
+| PEP-FOLD4 | 短肽（5~40 aa） | 肽从头结构预测 — sOPEP 力场 + 蒙特卡洛采样 | CPU（只有Docker 封装） | 分钟/条 | 无 (sOPEP 力场，Docker 镜像内置) | 8202 |

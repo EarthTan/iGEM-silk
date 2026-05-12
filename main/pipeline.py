@@ -590,7 +590,10 @@ async def run() -> None:
         client = ServiceClient()
 
         try:
-            service_names = list(SERVICES.keys())
+            service_names = [
+                name for name, cfg in SERVICES.items()
+                if cfg.get("group") in {"score", "filter"}
+            ]
             print("  健康检查中 …")
             health = await client.check_health(service_names)
             available = [n for n, s in health.items() if s["available"]]
