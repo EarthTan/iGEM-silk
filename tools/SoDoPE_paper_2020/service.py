@@ -29,6 +29,7 @@ root_path = Path(__file__).parents[1]
 sys.path.insert(0, str(root_path))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.utils import detect_gpu, detect_system
 
 
 class SoDoPEService(FastaToolService):
@@ -57,10 +58,22 @@ class SoDoPEService(FastaToolService):
         """
         加载 SWI 权重表（纯内存操作，无外部模型文件）。
         """
+        # GPU/环境检测
+        gpu_info = detect_gpu()
+        self._system_info = detect_system()
+        print(f"[{self.tool_name}] {gpu_info['message']}")
+
         sys.path.insert(0, str(Path(__file__).parent / "tools"))
         from sodope_integration import SoDoPEIntegration
 
         self.model = SoDoPEIntegration(verbose=True)
+
+        self._model_status = {
+            "status": "loaded",
+            "method": "SWI (Solubility-Weighted Index)",
+            "backend": gpu_info.get("backend", "cpu"),
+            "gpu_info": gpu_info,
+        }
         print(f"[{self.tool_name}] SWI weights loaded, ready to predict")
 
     async def predict_impl(self, sequence: str) -> ToolResult:
