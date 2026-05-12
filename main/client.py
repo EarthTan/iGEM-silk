@@ -33,6 +33,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import httpx
 
@@ -239,6 +240,141 @@ class ServiceClient:
             return resp.json()
         except Exception as e:
             return {"success": False, "error": str(e), "results": [], "total": 0}
+
+    # ────────────────────────────────────────────────────────────────
+    # 异步结构预测（AlphaFold3 async Job 模式）
+    # ────────────────────────────────────────────────────────────────
+
+    async def predict_structure_async(
+        self,
+        service_name: str,
+        sequence: str,
+        peptide_id: str = "unknown",
+        poll_interval: float = 30.0,
+        timeout: float = 7200.0,
+    ) -> dict:
+        """
+        通过异步 Job 模式提交结构预测，轮询等待完成。
+
+        对上层保持同步接口（await 返回最终结果），内部轮询:
+
+            1. POST /predict/async        → job_id
+            2. 每隔 poll_interval 秒 GET /status/{job_id}
+            3. 完成后 GET /result/{job_id} → StructureResult
+
+        参数
+        ----
+        service_name : 服务名 (当前仅 "alphafold3" 支持 async 模式)
+        sequence     : 氨基酸序列
+        peptide_id   : 序列编号
+        poll_interval: 轮询间隔（秒，默认 30s）
+        timeout      : 总超时（秒，默认 2h）
+
+        返回
+        ----
+        {
+            "success": True/False,
+            "peptide_id": "...",
+            "sequence": "...",
+            "pdb_content": "...",
+            "confidence": 0.87,
+            "details": {...},
+            "error": null / "error message"
+        }
+        """
+        client = await self._get_client()
+        base_url = service_url(service_name)
+
+        # 1. 提交异步任务
+        try:
+            resp = await client.post(
+                f"{base_url}/predict/async",
+                json={"sequence": sequence, "peptide_id": peptide_id},
+                timeout=30.0,
+            )
+            if resp.status_code != 202:
+                return {
+                    "success": False,
+                    "peptide_id": peptide_id,
+                    "error": f"Submit failed: HTTP {resp.status_code}",
+                }
+            data = resp.json()
+            job_id = data.get("job_id")
+            if not job_id:
+                return {
+                    "success": False,
+                    "peptide_id": peptide_id,
+                    "error": "No job_id in response",
+                }
+        except Exception as e:
+            return {"success": False, "peptide_id": peptide_id, "error": str(e)}
+
+        # 2. 轮询等待
+        start = time.monotonic()
+        while True:
+            elapsed = time.monotonic() - start
+            if elapsed > timeout:
+                return {
+                    "success": False,
+                    "peptide_id": peptide_id,
+                    "error": f"Timed out after {timeout}s",
+                    "job_id": job_id,
+                }
+
+            await asyncio.sleep(poll_interval)
+
+            try:
+                status_resp = await client.get(
+                    f"{base_url}/status/{job_id}", timeout=15.0
+                )
+                if status_resp.status_code == 404:
+                    return {
+                        "success": False,
+                        "peptide_id": peptide_id,
+                        "error": f"Job {job_id!r} not found on server (may have been cleaned up or service restarted)",
+                        "job_id": job_id,
+                    }
+                if status_resp.status_code != 200:
+                    continue
+                status_data = status_resp.json()
+                job_status = status_data.get("status", "unknown")
+
+                if job_status == "success":
+                    # 获取结果
+                    result_resp = await client.get(
+                        f"{base_url}/result/{job_id}", timeout=30.0
+                    )
+                    if result_resp.status_code == 200:
+                        r = result_resp.json()
+                        return {
+                            "success": True,
+                            "peptide_id": peptide_id,
+                            "sequence": sequence,
+                            "pdb_content": r.get("pdb_content", ""),
+                            "confidence": r.get("confidence"),
+                            "details": r.get("details", {}),
+                            "job_id": job_id,
+                            "error": None,
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "peptide_id": peptide_id,
+                            "error": "Result endpoint failed after success",
+                            "job_id": job_id,
+                        }
+
+                elif job_status == "failed":
+                    return {
+                        "success": False,
+                        "peptide_id": peptide_id,
+                        "error": status_data.get("progress", "Job failed"),
+                        "job_id": job_id,
+                    }
+
+            except Exception as e:
+                # 网络抖动等临时错误 — 继续轮询
+                continue
 
     # ────────────────────────────────────────────────────────────────
     # 全服务评估（流水线 Step 5 的核心调用）

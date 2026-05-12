@@ -31,11 +31,14 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+from tools.template.job_manager import JobManager
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -204,6 +207,47 @@ class InfoResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 异步 Job 模式 — 请求/响应模型 (仅 enable_async=True 时注册)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class AsyncPredictResponse(BaseModel):
+    """POST /predict/async 的立即响应。"""
+
+    job_id: str
+    status_url: str
+    status: str = "pending"
+
+
+class JobStatusResponse(BaseModel):
+    """GET /status/{job_id} 的响应。"""
+
+    job_id: str
+    status: str
+    progress: str = ""
+    created_at: float
+    finished_at: float | None = None
+
+
+class JobResultResponse(BaseModel):
+    """GET /result/{job_id} 的响应。"""
+
+    job_id: str
+    sequence: str
+    status: str
+    pdb_content: str = ""
+    confidence: float | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    error: str = ""
+
+
+class JobListResponse(BaseModel):
+    """GET /jobs 的响应。"""
+
+    jobs: list[dict]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 第二部分：StructureService 基类
 # ═══════════════════════════════════════════════════════════════════════════════
 #
@@ -366,12 +410,15 @@ class StructureService:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def create_app(ToolClass: type[StructureService]) -> FastAPI:
+def create_app(ToolClass: type[StructureService], enable_async: bool = False) -> FastAPI:
     """
     工厂函数：基于工具类创建完整的 FastAPI 应用。
 
     【参数】
     - ToolClass: 一个继承自 StructureService 的类
+    - enable_async: 为 True 时额外注册异步 Job 端点
+      (POST /predict/async, GET /status/{id}, GET /result/{id},
+       GET /jobs, DELETE /jobs/{id})
 
     【返回值】
     - 一个配置好的 FastAPI 应用
@@ -381,7 +428,8 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
     class MyFoldService(StructureService):
         ...
 
-    app = create_app(MyFoldService)
+    app = create_app(MyFoldService)                     # 同步模式
+    app = create_app(MyFoldService, enable_async=True)  # 异步 Job 模式
     uvicorn.run(app, host="0.0.0.0", port=8101)
     """
     tool_instance = ToolClass()
@@ -460,15 +508,116 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
     @app.get("/info", response_model=InfoResponse)
     async def info():
         """工具信息：GET /info"""
+        capabilities = ["predict", "predict/batch"]
+        if enable_async:
+            capabilities += ["predict/async", "jobs"]
         return InfoResponse(
             tool_name=ToolClass.tool_name,
             version=ToolClass.version,
             description=ToolClass.description,
-            capabilities=["predict", "predict/batch"],
+            capabilities=capabilities,
             input_format={"sequence": "string (amino acid sequence)"},
             output_format={"pdb_content": "string (PDB format)", "confidence": "float 0-1"},
             recommended_batch_size=ToolClass.recommended_batch_size,
         )
+
+    # ── 异步 Job 端点 (仅 enable_async=True) ────────────────
+
+    if enable_async:
+        job_manager = JobManager(
+            persist_path=os.environ.get("JOBS_FILE"),
+        )
+
+        async def _run_job(job_id: str, sequence: str) -> None:
+            """后台执行 predict_structure，更新 JobManager 状态。"""
+            try:
+                job_manager.update(
+                    job_id, status="running", progress="Starting prediction ..."
+                )
+                result = await tool_instance.predict_structure(sequence)
+                if result.pdb_content:
+                    job_manager.update(
+                        job_id,
+                        status="success",
+                        progress="Completed",
+                        pdb_content=result.pdb_content,
+                        confidence=result.confidence,
+                        details=result.details,
+                    )
+                else:
+                    err = result.details.get("error", "Unknown error")
+                    job_manager.update(
+                        job_id,
+                        status="failed",
+                        progress=f"Failed: {err}",
+                        error=err,
+                        details=result.details,
+                    )
+            except Exception as exc:
+                job_manager.update(
+                    job_id,
+                    status="failed",
+                    progress=f"Exception: {exc}",
+                    error=str(exc),
+                )
+
+        @app.post("/predict/async", status_code=202, response_model=AsyncPredictResponse)
+        async def predict_async(request: PredictRequest):
+            """提交异步预测任务，立即返回 job_id。"""
+            job_id = uuid.uuid4().hex[:12]
+            job_manager.create(job_id, request.sequence)
+            asyncio.create_task(_run_job(job_id, request.sequence))
+            return AsyncPredictResponse(
+                job_id=job_id,
+                status_url=f"/status/{job_id}",
+                status="pending",
+            )
+
+        @app.get("/status/{job_id}", response_model=JobStatusResponse)
+        async def get_job_status(job_id: str):
+            """查询任务状态。"""
+            job = job_manager.get(job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            return JobStatusResponse(
+                job_id=job.job_id,
+                status=job.status,
+                progress=job.progress,
+                created_at=job.created_at,
+                finished_at=job.finished_at,
+            )
+
+        @app.get("/result/{job_id}", response_model=JobResultResponse)
+        async def get_job_result(job_id: str):
+            """获取任务结果 (仅 success 状态可获取)。"""
+            job = job_manager.get(job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            if job.status in ("pending", "running"):
+                raise HTTPException(
+                    status_code=425, detail=f"Job {job_id!r} is still {job.status}"
+                )
+            return JobResultResponse(
+                job_id=job.job_id,
+                sequence=job.sequence,
+                status=job.status,
+                pdb_content=job.pdb_content,
+                confidence=job.confidence,
+                details=job.details,
+                error=job.error,
+            )
+
+        @app.get("/jobs", response_model=JobListResponse)
+        async def list_jobs():
+            """列出所有任务状态摘要。"""
+            return JobListResponse(jobs=job_manager.list_jobs())
+
+        @app.delete("/jobs/{job_id}")
+        async def delete_job(job_id: str):
+            """清理任务。"""
+            if not job_manager.delete(job_id):
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            return {"deleted": job_id, "status": "ok"}
 
     return app
 
