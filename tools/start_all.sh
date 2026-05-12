@@ -22,6 +22,7 @@
 #   AlphaFold3   8201  3D结构预测 (Docker, GPU必需)
 #   PEP-FOLD4    8202  肽从头结构预测 (Docker, CPU)
 #   SASA         8101  溶剂可及表面积分析 (FreeSASA)
+#   Aggrescan3D  8102  结构聚集倾向分析 (Aggrescan3D)
 #
 # 日志输出: tools/logs/<name>.log
 # PID 文件: tools/logs/<name>.pid
@@ -31,7 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGS_DIR="$SCRIPT_DIR/logs"
 
 # 所有服务名（迭代顺序）
-SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp temstapro alphafold3 pepfold4 sasa"
+SERVICE_NAMES="anoxpepred bepipred3 toxinpred3 hemopi2 mhcflurry plm4cpps tipred algpred2 graphcpp temstapro alphafold3 pepfold4 sasa aggrescan3d"
 
 # ── 根据服务名查目录名 ──
 dir_of() {
@@ -49,6 +50,7 @@ dir_of() {
         alphafold3)  echo "AlphaFold3"   ;;
         pepfold4)    echo "PEP-FOLD4"    ;;
         sasa)        echo "SASA"         ;;
+        aggrescan3d) echo "Aggrescan3D"  ;;
     esac
 }
 
@@ -68,6 +70,7 @@ port_of() {
         alphafold3)  echo "8201" ;;
         pepfold4)    echo "8202" ;;
         sasa)        echo "8101" ;;
+        aggrescan3d) echo "8102" ;;
     esac
 }
 
