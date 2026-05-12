@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.description="细胞穿膜肽预测 — GraphSAGE 
 LABEL org.opencontainers.image.source="https://github.com/drkumarnandan/GraphCPP"
 
 # 安装服务依赖 (torch 已由基础镜像提供)
-# torch_scatter 需要 --no-build-isolation
+# torch_scatter 从 PyG 官方 wheel 安装，避免源码编译
 RUN pip install --no-cache-dir \
     torch-geometric>=2.7.0 \
     deepchem>=2.8.0 \
@@ -27,7 +27,8 @@ RUN pip install --no-cache-dir \
     numpy pandas \
     fastapi "uvicorn[standard]" pydantic \
     httpx \
-    && pip install --no-cache-dir --no-build-isolation torch-scatter
+    && pip install --no-cache-dir --no-build-isolation \
+    torch-scatter -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
 
 # 复制项目骨架
 WORKDIR /app

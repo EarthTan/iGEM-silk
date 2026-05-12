@@ -21,15 +21,9 @@ LABEL org.opencontainers.image.source="https://bitbucket.org/lcbio/aggrescan3d"
 # 安装 uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# 安装 Docker CLI
+# 安装 Docker CLI（使用 Debian 源，避免 download.docker.com 被墙）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl gnupg \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] \
-        https://download.docker.com/linux/debian bookworm stable" \
-        > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli \
+    docker-cli \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -37,10 +31,10 @@ COPY tools/template/ ./tools/template/
 COPY tools/Aggrescan3D/ ./tools/Aggrescan3D/
 
 WORKDIR /app/tools/Aggrescan3D
-RUN uv sync --system --no-dev
+RUN uv sync
 
 EXPOSE 8102
 ENV PORT=8102
 ENV A3D_IMAGE=lcbio/a3d_server
 
-CMD ["python", "service.py"]
+CMD [".venv/bin/python", "service.py"]

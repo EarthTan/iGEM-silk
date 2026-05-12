@@ -25,9 +25,9 @@ RUN pip install --no-cache-dir \
 WORKDIR /app
 COPY tools/utils.py ./tools/utils.py
 COPY tools/template/ ./tools/template/
-COPY tools/AlgPred2/ ./tools/AlgPred2/
+COPY tools/algpred2/ ./tools/algpred2/
 
-WORKDIR /app/tools/AlgPred2
+WORKDIR /app/tools/algpred2
 
 EXPOSE 8008
 ENV PORT=8008

@@ -21,15 +21,9 @@ LABEL org.opencontainers.image.title="PEP-FOLD4 API"
 LABEL org.opencontainers.image.description="PEP-FOLD4 肽从头结构预测 API — Docker 封装"
 LABEL org.opencontainers.image.source="https://bioserv.rpbs.univ-paris-diderot.fr/services/PEP-FOLD4/"
 
-# 安装 Docker CLI
+# 安装 Docker CLI（使用 Debian 源，避免 download.docker.com 被墙）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl gnupg \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] \
-        https://download.docker.com/linux/debian bookworm stable" \
-        > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli \
+    docker-cli \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Python 依赖

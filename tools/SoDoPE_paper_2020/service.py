@@ -33,7 +33,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
 from tools.utils import detect_gpu, detect_system
 
-sys.path.insert(0, str(Path(__file__).parent / "tools"))
+sys.path.insert(0, str(Path(__file__).parent / "sodope_sdk"))
 from sodope_integration import SoDoPEIntegration
 
 

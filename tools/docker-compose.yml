@@ -31,7 +31,7 @@ services:
   anoxpepred:
     build:
       context: ..
-      dockerfile: AnOxPePred/Dockerfile
+      dockerfile: tools/AnOxPePred/Dockerfile
     image: igem-silk/anoxpepred:latest
     container_name: anoxpepred
     ports:
@@ -56,7 +56,7 @@ services:
   bepipred3:
     build:
       context: ..
-      dockerfile: BepiPred-3.0/Dockerfile
+      dockerfile: tools/BepiPred-3.0/Dockerfile
     image: igem-silk/bepipred3:latest
     container_name: bepipred3
     ports:
@@ -84,7 +84,7 @@ services:
   hemopi2:
     build:
       context: ..
-      dockerfile: HemoPI2/Dockerfile
+      dockerfile: tools/HemoPI2/Dockerfile
     image: igem-silk/hemopi2:latest
     container_name: hemopi2
     ports:
@@ -110,7 +110,7 @@ services:
   mhcflurry:
     build:
       context: ..
-      dockerfile: MHCflurry/Dockerfile
+      dockerfile: tools/MHCflurry/Dockerfile
     image: igem-silk/mhcflurry:latest
     container_name: mhcflurry
     ports:
@@ -136,7 +136,7 @@ services:
   plm4cpps:
     build:
       context: ..
-      dockerfile: pLM4CPPs/Dockerfile
+      dockerfile: tools/pLM4CPPs/Dockerfile
     image: igem-silk/plm4cpps:latest
     container_name: plm4cpps
     ports:
@@ -164,7 +164,7 @@ services:
   temstapro:
     build:
       context: ..
-      dockerfile: TemStaPro/Dockerfile
+      dockerfile: tools/TemStaPro/Dockerfile
     image: igem-silk/temstapro:latest
     container_name: temstapro
     ports:
@@ -193,7 +193,7 @@ services:
   graphcpp:
     build:
       context: ..
-      dockerfile: GraphCPP/Dockerfile
+      dockerfile: tools/GraphCPP/Dockerfile
     image: igem-silk/graphcpp:latest
     container_name: graphcpp
     ports:
@@ -223,7 +223,7 @@ services:
   alphafold3:
     build:
       context: ..
-      dockerfile: AlphaFold3/Dockerfile
+      dockerfile: tools/AlphaFold3/Dockerfile
     image: igem-silk/alphafold3-api:latest
     container_name: alphafold3
     ports:
@@ -231,8 +231,8 @@ services:
     environment:
       - PORT=8201
       - AF3_IMAGE=${AF3_IMAGE:-alphafold3}
-      - AF3_MODEL_DIR=${AF3_MODEL_DIR:-/root/models}
-      - AF3_DATABASE_DIR=${AF3_DATABASE_DIR:-/root/public_databases}
+      - AF3_MODEL_DIR=/root/models
+      - AF3_DATABASE_DIR=/root/public_databases
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${AF3_MODEL_DIR:-/tmp/af3_models}:/root/models
@@ -249,7 +249,7 @@ services:
   pepfold4:
     build:
       context: ..
-      dockerfile: PEP-FOLD4/Dockerfile
+      dockerfile: tools/PEP-FOLD4/Dockerfile
     image: igem-silk/pepfold4-api:latest
     container_name: pepfold4
     ports:
@@ -271,7 +271,7 @@ services:
   sasa:
     build:
       context: ..
-      dockerfile: SASA/Dockerfile
+      dockerfile: tools/SASA/Dockerfile
     image: igem-silk/sasa:latest
     container_name: sasa
     ports:
@@ -314,7 +314,7 @@ services:
   toxinpred3:
     build:
       context: ..
-      dockerfile: ToxinPred3/Dockerfile
+      dockerfile: tools/ToxinPred3/Dockerfile
     image: igem-silk/toxinpred3:latest
     container_name: toxinpred3
     ports:
@@ -350,7 +350,7 @@ services:
   tipred:
     build:
       context: ..
-      dockerfile: TIPred/Dockerfile
+      dockerfile: tools/Tipred/Dockerfile
     image: igem-silk/tipred:latest
     container_name: tipred
     ports:
@@ -368,7 +368,7 @@ services:
   algpred2:
     build:
       context: ..
-      dockerfile: AlgPred2/Dockerfile
+      dockerfile: tools/algpred2/Dockerfile
     image: igem-silk/algpred2:latest
     container_name: algpred2
     ports:
