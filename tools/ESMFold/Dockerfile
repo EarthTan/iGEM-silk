@@ -24,13 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     build-essential \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Python 依赖
-# openfold/dllogger 从 GitHub 安装，因为 pip 包不包含 CUDA 编译扩展
+# 使用 PyTorch CUDA 12.1 wheel 确保 GPU 支持
 RUN pip install --no-cache-dir \
     "fair-esm[esmfold]>=3.0.0" \
-    torch \
+    torch --index-url https://download.pytorch.org/whl/cu121 \
     biotite \
     fastapi "uvicorn[standard]" pydantic
 
