@@ -18,6 +18,9 @@ LABEL org.opencontainers.image.title="Aggrescan3D API"
 LABEL org.opencontainers.image.description="Aggrescan3D PDB aggregation propensity API — Docker wrapper"
 LABEL org.opencontainers.image.source="https://bitbucket.org/lcbio/aggrescan3d"
 
+# 安装 uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
 # 安装 Docker CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl gnupg \
@@ -29,16 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir \
-    fastapi "uvicorn[standard]" pydantic \
-    httpx
-
 WORKDIR /app
 COPY tools/template/ ./tools/template/
 COPY tools/Aggrescan3D/ ./tools/Aggrescan3D/
 
 WORKDIR /app/tools/Aggrescan3D
+RUN uv sync --system --no-dev
 
 EXPOSE 8102
 ENV PORT=8102
