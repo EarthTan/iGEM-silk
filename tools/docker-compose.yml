@@ -223,7 +223,7 @@ services:
   alphafold3:
     build:
       context: ..
-      dockerfile: AlphaFold3/Dockerfile
+      dockerfile: tools/AlphaFold3/Dockerfile
     image: igem-silk/alphafold3-api:latest
     container_name: alphafold3
     ports:
@@ -249,7 +249,7 @@ services:
   pepfold4:
     build:
       context: ..
-      dockerfile: PEP-FOLD4/Dockerfile
+      dockerfile: tools/PEP-FOLD4/Dockerfile
     image: igem-silk/pepfold4-api:latest
     container_name: pepfold4
     ports:
@@ -368,7 +368,7 @@ services:
   algpred2:
     build:
       context: ..
-      dockerfile: AlgPred2/Dockerfile
+      dockerfile: tools/algpred2/Dockerfile
     image: igem-silk/algpred2:latest
     container_name: algpred2
     ports:
