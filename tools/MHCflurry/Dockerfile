@@ -25,8 +25,12 @@ RUN pip install --no-cache-dir \
     fastapi "uvicorn[standard]" pydantic \
     httpx
 
-# 预下载 MHCflurry 模型权重 (避免首次请求延迟)
-RUN mhcflurry-downloads fetch 2>&1 | tail -5
+# 预下载 MHCflurry 模型权重到项目目录 (避免首次请求延迟)
+RUN mkdir -p /app/tools/MHCflurry/models && \
+    MHCFLURRY_DOWNLOADS_DIR=/app/tools/MHCflurry/models \
+    mhcflurry-downloads fetch models_class1_pan 2>&1 && \
+    echo "[MHCflurry] Models downloaded successfully" || \
+    (echo "[MHCflurry] WARNING: Model download failed (may succeed at runtime)" && exit 0)
 
 # 复制项目骨架
 WORKDIR /app
