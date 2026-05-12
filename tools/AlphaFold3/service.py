@@ -332,7 +332,7 @@ class AlphaFold3Service(StructureService):
             print(f"[{self.tool_name}] Running AF3 for {job_name} "
                   f"(sequence length={len(sequence)}) …")
 
-            proc = await _run_subprocess(cmd, timeout=3600)
+            proc = await _run_subprocess(cmd, timeout=14400)
 
             if proc.returncode != 0:
                 error_msg = proc.stderr[-2000:] if proc.stderr else f"exit code {proc.returncode}"
@@ -408,7 +408,7 @@ class AlphaFold3Service(StructureService):
                 pdb_content="",
                 confidence=None,
                 details={
-                    "error": "AlphaFold3 prediction timed out (3600s limit)",
+                    "error": "AlphaFold3 prediction timed out (14400s limit)",
                     "job_name": job_name,
                 },
             )
@@ -474,7 +474,7 @@ class AlphaFold3Service(StructureService):
 
 # ── 异步 subprocess ──────────────────────────────────────────────
 
-async def _run_subprocess(cmd: list[str], timeout: int = 3600):
+async def _run_subprocess(cmd: list[str], timeout: int = 14400):
     """在线程池中运行 subprocess，不阻塞事件循环。"""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
