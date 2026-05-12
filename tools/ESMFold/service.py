@@ -11,7 +11,7 @@ ESMFold 使用 ESM-2 (3B) 语言模型直接从序列端到端预测蛋白质三
 相比 AlphaFold2 快 ~60 倍，无需 MSA/数据库搜索。
 
 注意事项:
-  - GPU (CUDA) 必需；CPU 环境下服务正常启动但 /health 返回 model_loaded: false
+  - GPU (CUDA) 必需；CPU 环境下 load_model() 抛出异常，/health 返回 status: "loading"
   - 首次启动自动下载模型权重 (~8 GB) 到 TORCH_HOME 目录
   - 显存建议 ≥16 GB（可通过 set_chunk_size 降低显存占用）
 
@@ -176,7 +176,8 @@ class ESMFoldService(StructureService):
                     struct = pdb_file.get_structure(model=1)
                     if struct is not None and hasattr(struct, "b_factor"):
                         b_factors = struct.b_factor
-                        confidence = float(b_factors.mean())
+                        raw_plddt = float(b_factors.mean())
+                        confidence = raw_plddt / 100.0  # 归一化到 0-1 范围
                 except Exception:
                     confidence = None
 
