@@ -63,6 +63,8 @@ services:
       - "8002:8002"
     environment:
       - PORT=8002
+    volumes:
+      - ./models:/app/tools/models  # 共享 ESM-2 模型缓存
     profiles: [gpu]
     deploy:
       resources:
@@ -141,6 +143,8 @@ services:
       - "8006:8006"
     environment:
       - PORT=8006
+    volumes:
+      - ./models:/app/tools/models  # 共享 ESM-2 模型缓存
     profiles: [gpu]
     deploy:
       resources:
