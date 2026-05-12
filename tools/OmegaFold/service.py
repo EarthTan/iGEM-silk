@@ -86,7 +86,13 @@ class OmegaFoldService(StructureService):
     def __init__(self):
         super().__init__()
         self._ready_message: str = "Not checked yet"
-        self._model_idx: int = int(os.environ.get("OMEGAFOLD_MODEL", "1"))
+        raw_model_idx = int(os.environ.get("OMEGAFOLD_MODEL", "1"))
+        if raw_model_idx not in (1, 2):
+            raise ValueError(
+                f"OMEGAFOLD_MODEL={raw_model_idx} is not supported, "
+                f"must be 1 or 2"
+            )
+        self._model_idx: int = raw_model_idx
         self._num_cycle: int = int(os.environ.get("OMEGAFOLD_NUM_CYCLE", "10"))
         self._subbatch: int | None = (
             int(v) if (v := os.environ.get("OMEGAFOLD_SUBBATCH")) else None
@@ -216,8 +222,6 @@ class OmegaFoldService(StructureService):
                     mask_rate=0.12,
                     num_cycle=self._num_cycle,
                 ):
-                    seq_in_data: list[dict] = [d.to(device) if hasattr(d, "to") else d
-                                                for d in input_data]
 
                     output = self.model(
                         input_data,
@@ -246,7 +250,8 @@ class OmegaFoldService(StructureService):
 
                     # 清理显存
                     del output
-                    torch.cuda.empty_cache()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
 
                     return StructureResult(
                         sequence=sequence,
@@ -269,7 +274,8 @@ class OmegaFoldService(StructureService):
                 )
 
             except Exception as exc:
-                torch.cuda.empty_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 return StructureResult(
                     sequence=sequence,
                     pdb_content="",
@@ -314,7 +320,8 @@ class OmegaFoldService(StructureService):
             result.peptide_id = item.peptide_id or "unknown"
             result.sequence = item.sequence
             results.append(result)
-            torch.cuda.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         return StructureBatchPredictResponse(
             success=True,

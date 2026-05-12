@@ -26,11 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # OmegaFold 从 GitHub 安装，依赖 torch + biopython
-RUN pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     torch --index-url https://download.pytorch.org/whl/cu121 \
     biopython \
     fastapi "uvicorn[standard]" pydantic \
-    && pip install --no-cache-dir \
+    && python3.11 -m pip install --no-cache-dir \
     git+https://github.com/HeliXonProtein/OmegaFold.git
 
 WORKDIR /app

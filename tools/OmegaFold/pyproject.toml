@@ -1,5 +1,5 @@
 [project]
-name = "omegafold"
+name = "omegafold-service"
 version = "1.0.0"
 description = "OmegaFold 3D 结构预测微服务 — HeliXon"
 requires-python = ">=3.11"
