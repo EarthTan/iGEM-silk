@@ -1,0 +1,3 @@
+- [Docker-outside-Docker 路径解析](docker-outside-docker-paths.md) — 通过 Docker socket 启动容器时，volume 源路径由宿主机 Docker 守护进程解析，而非 API 容器内部
+- [Docker 服务镜像构建](docker-services-build.md) — Docker Hub 在中国网络不可达时，预拉取镜像到缓存即可，无需修改 compose 配置
+- [GPU 显存争用](gpu-memory-contention.md) — 多个 GPU 微服务同时运行时，48GB 显存会被耗尽，需逐个测试并确认显存空闲
