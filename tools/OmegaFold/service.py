@@ -224,11 +224,12 @@ class OmegaFoldService(StructureService):
                     num_cycle=self._num_cycle,
                 ):
 
-                    output = self.model(
-                        input_data,
-                        predict_with_confidence=True,
-                        fwd_cfg=fwd_cfg,
-                    )
+                    with torch.no_grad():
+                        output = self.model(
+                            input_data,
+                            predict_with_confidence=True,
+                            fwd_cfg=fwd_cfg,
+                        )
 
                     # 3. 保存 PDB
                     pipeline.save_pdb(
