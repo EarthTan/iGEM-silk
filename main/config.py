@@ -47,6 +47,7 @@ SERVICES: dict[str, dict] = {
     "pepfold4":     {"port": 8202, "group": "structure"},
     "esmfold":      {"port": 8203, "group": "structure"},
     "omegafold":    {"port": 8204, "group": "structure"},
+    "waveflow":     {"port": 8205, "group": "structure"},
 
     # ═══════ PDB 评分服务 ═══════
     "sasa":         {"port": 8101, "group": "pdb_score"},

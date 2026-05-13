@@ -77,6 +77,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | PEP-FOLD4 | 8202 | 短肽 5~40 aa | 肽从头结构预测 | CPU（Docker） | [Docker] sOPEP 力场内置 |
 | ESMFold | 8203 | 短肽~蛋白质（无上限） | 快速 3D 结构预测（ESM-2 3B, ~60x AF2） | GPU 必需 | [下载][共享] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB |
 | OmegaFold | 8204 | 短肽~蛋白质（无上限） | PLM + 几何变换器结构预测 | GPU/CPU/MPS | [下载] OmegaFold ~1.5 GB（S3 自动下载） |
+| **Waveflow** | **8205** | **全范围** | **Tamarind.bio 云端代理：URL 指定工具类型（esmfold/omegafold/alphafold 等），无需本地 GPU/模型** | **CPU** | **[—] 纯远程 API，无需本地模型** |
 
 ### 模型管理
 
