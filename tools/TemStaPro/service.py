@@ -70,6 +70,7 @@ from tools.template.fasta_service import (
     PredictRequest,
     BatchPredictRequest,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_system
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -177,15 +178,15 @@ class TemStaProService(FastaToolService):
             "cuda" if torch.cuda.is_available() else "cpu"
         )
         self._system_info = detect_system()
-        print(f"[{self.tool_name}] Device: {self._device}")
+        self.logger.info("Device: %s", self._device)
 
         # ── 步骤 1: ProtT5-XL ──────────────────────────────
-        print(f"[{self.tool_name}] Loading ProtT5-XL …")
+        self.logger.info("Loading ProtT5-XL …")
         self._prottrans_model, self._tokenizer = load_prottrans(
             os.environ.get("PROTTRANS_MODEL_DIR") or None,
             on_status=lambda d: _set("prot_t5_xl", d),
         )
-        print(f"[{self.tool_name}] ProtT5-XL loaded on {self._device}")
+        self.logger.info("ProtT5-XL loaded on %s", self._device)
 
         # ── 步骤 2: MLP 分类器 ──────────────────────────────
         models_dir = os.environ.get(
@@ -194,10 +195,10 @@ class TemStaProService(FastaToolService):
         )
         if not _classifiers_exist(models_dir):
             _set("mlp_classifiers", {"status": "downloading", "detail": "从 GitHub 获取 30 个权重文件…"})
-            print(f"[{self.tool_name}] MLP 分类器缺失，自动下载到 {models_dir} …")
+            self.logger.info("MLP classifiers missing, downloading to %s ...", models_dir)
             _download_classifiers(models_dir)
 
-        print(f"[{self.tool_name}] Loading MLP classifiers from {models_dir} …")
+        self.logger.info("Loading MLP classifiers from %s ...", models_dir)
 
         loaded = 0
         for threshold in TEMPERATURE_THRESHOLDS:
@@ -236,7 +237,7 @@ class TemStaProService(FastaToolService):
                 self._classifiers[key] = mlp
                 loaded += 1
 
-        print(f"[{self.tool_name}] {loaded} MLP classifiers loaded")
+        self.logger.info("%d MLP classifiers loaded", loaded)
         _set("mlp_classifiers", {
             "status": "local", "path": models_dir, "count": loaded,
         })
@@ -682,5 +683,6 @@ if __name__ == "__main__":
     HOST = os.environ.get("HOST", "0.0.0.0")
 
     app = create_app(TemStaProService)
-    print(f"[temstapro] Starting on {HOST}:{PORT}")
+    logger = get_logger("temstapro")
+    logger.info("Starting on %s:%d", HOST, PORT)
     uvicorn.run(app, host=HOST, port=PORT)

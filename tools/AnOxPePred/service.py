@@ -70,7 +70,7 @@ class AnOxPePredService(FastaToolService):
             "load_error": self.model._load_error,
         }
 
-        print(f"[{self.tool_name}] Model loaded (mode={self.model.model_mode}), ready to predict")
+        self.logger.info("Model loaded (mode=%s), ready to predict", self.model.model_mode)
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """
@@ -112,5 +112,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8001"))
-    print(f"Starting AnOxPePred service on port {port}...")
+    logger = __import__("tools.template.logger", fromlist=["get_logger"]).get_logger("anoxpepred")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

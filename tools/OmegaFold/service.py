@@ -61,6 +61,7 @@ from tools.template.structure_service import (
     PredictRequest,
 )
 from tools.utils import detect_system
+from tools.template.logger import get_logger
 
 
 class OmegaFoldService(StructureService):
@@ -111,7 +112,7 @@ class OmegaFoldService(StructureService):
         2. 下载/加载权重
         3. 构建并初始化 OmegaFold 模型
         """
-        print(f"[{self.tool_name}] Loading OmegaFold (model {self._model_idx}) …")
+        self.logger.info("Loading OmegaFold (model %d) …", self._model_idx)
 
         import torch
 
@@ -119,13 +120,13 @@ class OmegaFoldService(StructureService):
         if torch.cuda.is_available():
             device = "cuda"
             gpu_name = torch.cuda.get_device_name(0)
-            print(f"[{self.tool_name}] GPU: {gpu_name}")
+            self.logger.info("GPU: %s", gpu_name)
         elif torch.backends.mps.is_available():
             device = "mps"
-            print(f"[{self.tool_name}] Using Apple MPS")
+            self.logger.info("Using Apple MPS")
         else:
             device = "cpu"
-            print(f"[{self.tool_name}] No GPU found, falling back to CPU")
+            self.logger.warning("No GPU found, falling back to CPU")
 
         import omegafold as of
         from omegafold import pipeline
@@ -140,7 +141,7 @@ class OmegaFoldService(StructureService):
 
         os.makedirs(self._cache_dir, exist_ok=True)
 
-        print(f"[{self.tool_name}] Weights: {weights_file}")
+        self.logger.info("Weights: %s", weights_file)
         state_dict = pipeline._load_weights(weights_url, weights_file)
 
         # 构建模型
@@ -161,7 +162,7 @@ class OmegaFoldService(StructureService):
         self._ready_message = (
             f"OmegaFold ready — model {self._model_idx} on {device}"
         )
-        print(f"[{self.tool_name}] {self._ready_message}")
+        self.logger.info("%s", self._ready_message)
 
     # ── 结构预测 ──────────────────────────────────────────────
 
@@ -314,8 +315,9 @@ class OmegaFoldService(StructureService):
 
         results: list[StructureResult] = []
         for i, item in enumerate(request.sequences):
-            print(f"[{self.tool_name}] Batch {i + 1}/{len(request.sequences)}: "
-                  f"{item.peptide_id or 'unnamed'} (len={len(item.sequence)})")
+            self.logger.info("Batch %d/%d: %s (len=%d)",
+                              i + 1, len(request.sequences),
+                              item.peptide_id or 'unnamed', len(item.sequence))
             result = await self.predict_structure(item.sequence)
             result.peptide_id = item.peptide_id or "unknown"
             result.sequence = item.sequence
@@ -341,8 +343,8 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8204"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
+    logger = get_logger("omegafold")
     app = create_app(OmegaFoldService, enable_async=True)
-    print(f"[omegafold] Starting on {HOST}:{PORT}")
-    print("[omegafold] Async job endpoints enabled: "
-          "/predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
+    logger.info("Starting on %s:%s", HOST, PORT)
+    logger.info("Async job endpoints enabled: /predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
     uvicorn.run(app, host=HOST, port=PORT)

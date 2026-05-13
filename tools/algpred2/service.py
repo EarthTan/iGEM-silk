@@ -80,10 +80,7 @@ class AlgPred2Service(FastaToolService):
             "backend": "cpu",
         }
 
-        print(
-            f"[{self.tool_name}] Model loaded from: {model_path} | "
-            f"model=RandomForest | threshold=0.3"
-        )
+        self.logger.info("Model loaded from: %s | model=RandomForest | threshold=0.3", model_path)
 
     def _compute_aac(self, sequence: str) -> list[float]:
         """计算氨基酸组成 (AAC) — 19 维特征向量。
@@ -184,5 +181,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8008"))
-    print(f"Starting AlgPred2 service on port {port}...")
+    logger = __import__("tools.template.logger", fromlist=["get_logger"]).get_logger("algpred2")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

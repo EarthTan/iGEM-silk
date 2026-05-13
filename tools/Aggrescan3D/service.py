@@ -42,6 +42,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from tools.template.logger import get_logger
 from tools.template.pdb_service import (
     PdbBatchScoreRequest,
     PdbBatchScoreResponse,
@@ -211,12 +212,45 @@ def _summarize_scores(residues: list[A3DResidue]) -> dict[str, Any]:
     }
 
 
-async def _run_subprocess(cmd: list[str], timeout: int):
-    """在线程池中运行 subprocess，不阻塞事件循环。"""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        None,
-        lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=timeout),
+async def _run_subprocess(cmd: list[str], timeout: int, logger=None):
+    """异步运行子进程，实时流式输出 stdout/stderr 到 logger。"""
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+
+    async def _stream(stream, label: str, collector: list[str]) -> None:
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            decoded = line.decode("utf-8", errors="replace").rstrip()
+            collector.append(decoded)
+            if logger and decoded.strip():
+                logger.info("[%s] %s", label, decoded)
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(
+                _stream(process.stdout, "A3D-out", stdout_lines),
+                _stream(process.stderr, "A3D", stderr_lines),
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        process.kill()
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    await process.wait()
+
+    return subprocess.CompletedProcess(
+        cmd, process.returncode or 0,
+        stdout="\n".join(stdout_lines),
+        stderr="\n".join(stderr_lines),
     )
 
 
@@ -242,7 +276,7 @@ class Aggrescan3DService(PdbScoringService):
 
     async def load_model(self) -> None:
         """验证 Docker 与 Aggrescan3D 镜像。"""
-        print(f"[{self.tool_name}] Checking Aggrescan3D environment …")
+        self.logger.info("Checking Aggrescan3D environment …")
 
         checks: list[tuple[str, bool, str]] = []
         ok_docker, msg_docker = _check_docker()
@@ -257,7 +291,7 @@ class Aggrescan3DService(PdbScoringService):
         failures: list[str] = []
         for name, ok, msg in checks:
             status = "✓" if ok else "✗"
-            print(f"  [{status}] {name}: {msg}")
+            self.logger.info("  [%s] %s: %s", status, name, msg)
             if not ok:
                 failures.append(f"{name}: {msg}")
 
@@ -266,11 +300,11 @@ class Aggrescan3DService(PdbScoringService):
                 "Aggrescan3D NOT available. Failed checks: "
                 + "; ".join(failures)
             )
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.warning("%s", self._ready_message)
             raise RuntimeError(self._ready_message)
 
         self._ready_message = "Aggrescan3D ready — Docker + image verified"
-        print(f"[{self.tool_name}] {self._ready_message}")
+        self.logger.info("%s", self._ready_message)
 
     async def score_pdb(
         self,
@@ -315,10 +349,10 @@ class Aggrescan3DService(PdbScoringService):
             "-D",
             str(self._distance),
         ]
-        print(f"[{self.tool_name}] Running Aggrescan3D job {job_name} …")
+        self.logger.info("Running Aggrescan3D job %s …", job_name)
 
         try:
-            proc = await _run_subprocess(cmd, timeout=self._timeout)
+            proc = await _run_subprocess(cmd, timeout=self._timeout, logger=self.logger)
             if proc.returncode != 0:
                 stderr = proc.stderr[-3000:] if proc.stderr else ""
                 stdout = proc.stdout[-1000:] if proc.stdout else ""
@@ -400,7 +434,7 @@ class Aggrescan3DService(PdbScoringService):
                     result.peptide_id = item.peptide_id or "unknown"
                     return result
                 except Exception as exc:
-                    print(f"[{self.tool_name}] Batch item failed: {exc}")
+                    self.logger.error("Batch item failed: %s", exc)
                     return None
 
         results = await asyncio.gather(
@@ -433,6 +467,7 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8102"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
+    logger = get_logger("aggrescan3d")
     app = create_app(Aggrescan3DService)
-    print(f"[aggrescan3d] Starting on {HOST}:{PORT}")
+    logger.info("Starting on %s:%s", HOST, PORT)
     uvicorn.run(app, host=HOST, port=PORT)

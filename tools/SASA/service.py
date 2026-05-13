@@ -44,6 +44,7 @@ from tools.template.pdb_service import (
     PdbBatchScoreRequest,
 )
 from tools.utils import detect_system
+from tools.template.logger import get_logger
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 标准氨基酸最大 SASA 参考值 (Å²)
@@ -94,7 +95,7 @@ class SASAService(PdbScoringService):
 
     async def load_model(self) -> None:
         """验证 FreeSASA 库可用 (无需加载 ML 模型, 纯算法)。"""
-        print(f"[{self.tool_name}] Checking FreeSASA …")
+        self.logger.info("Checking FreeSASA …")
         try:
             import freesasa  # noqa: F401
             self._ready_message = "FreeSASA ready"
@@ -104,12 +105,12 @@ class SASAService(PdbScoringService):
                 "engine": "FreeSASA (Lee-Richards)",
                 "backend": "cpu",
             }
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.info("%s", self._ready_message)
         except ImportError:
             self._ready_message = (
                 "FreeSASA not installed. Run: pip install freesasa"
             )
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.warning("%s", self._ready_message)
             raise RuntimeError(self._ready_message)
 
     # ── 辅助: 在 PDB 残基列表中定位肽序列 ────────────────────
@@ -313,6 +314,7 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8101"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
+    logger = get_logger("sasa")
     app = create_app(SASAService)
-    print(f"[sasa] Starting on {HOST}:{PORT}")
+    logger.info("Starting on %s:%s", HOST, PORT)
     uvicorn.run(app, host=HOST, port=PORT)

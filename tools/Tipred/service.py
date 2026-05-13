@@ -41,6 +41,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_system
 
 
@@ -81,10 +82,7 @@ class TIPredService(FastaToolService):
             "backend": "cpu",
         }
 
-        print(
-            f"[{self.tool_name}] Stacked Ensemble loaded | "
-            f"features=547 | base_models=KNN+RF+SVM+GB | meta=LR"
-        )
+        self.logger.info("Stacked Ensemble loaded | features=547 | base_models=KNN+RF+SVM+GB | meta=LR")
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """预测单条序列的 TIP 活性。
@@ -156,5 +154,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8007"))
-    print(f"Starting TIPred service on port {port}...")
+    logger = get_logger("tipred")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
