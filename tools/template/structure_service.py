@@ -31,11 +31,16 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+from tools.template.job_manager import JobManager
+from tools.template.logger import get_logger
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -204,6 +209,47 @@ class InfoResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 异步 Job 模式 — 请求/响应模型 (仅 enable_async=True 时注册)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class AsyncPredictResponse(BaseModel):
+    """POST /predict/async 的立即响应。"""
+
+    job_id: str
+    status_url: str
+    status: str = "pending"
+
+
+class JobStatusResponse(BaseModel):
+    """GET /status/{job_id} 的响应。"""
+
+    job_id: str
+    status: str
+    progress: str = ""
+    created_at: float
+    finished_at: float | None = None
+
+
+class JobResultResponse(BaseModel):
+    """GET /result/{job_id} 的响应。"""
+
+    job_id: str
+    sequence: str
+    status: str
+    pdb_content: str = ""
+    confidence: float | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    error: str = ""
+
+
+class JobListResponse(BaseModel):
+    """GET /jobs 的响应。"""
+
+    jobs: list[dict]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 第二部分：StructureService 基类
 # ═══════════════════════════════════════════════════════════════════════════════
 #
@@ -256,6 +302,7 @@ class StructureService:
         self._loaded = False
         self._model_status: dict | None = None
         self._system_info: dict | None = None
+        self.logger = get_logger(self.tool_name)
 
     async def load_model(self) -> None:
         """
@@ -366,12 +413,15 @@ class StructureService:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def create_app(ToolClass: type[StructureService]) -> FastAPI:
+def create_app(ToolClass: type[StructureService], enable_async: bool = False) -> FastAPI:
     """
     工厂函数：基于工具类创建完整的 FastAPI 应用。
 
     【参数】
     - ToolClass: 一个继承自 StructureService 的类
+    - enable_async: 为 True 时额外注册异步 Job 端点
+      (POST /predict/async, GET /status, GET /status/{id},
+       GET /result/{id}, GET /jobs, DELETE /jobs/{id})
 
     【返回值】
     - 一个配置好的 FastAPI 应用
@@ -381,7 +431,8 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
     class MyFoldService(StructureService):
         ...
 
-    app = create_app(MyFoldService)
+    app = create_app(MyFoldService)                     # 同步模式
+    app = create_app(MyFoldService, enable_async=True)  # 异步 Job 模式
     uvicorn.run(app, host="0.0.0.0", port=8101)
     """
     tool_instance = ToolClass()
@@ -389,17 +440,18 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """服务生命周期：启动时加载模型，关闭时清理资源"""
+        tool_instance.logger.info("Starting service ...")
         try:
             await tool_instance.load_model()
             tool_instance._loaded = True
-            print(f"[{ToolClass.tool_name}] Model loaded successfully")
+            tool_instance.logger.info("Model loaded successfully")
         except Exception as e:
-            print(f"[{ToolClass.tool_name}] Failed to load model: {e}")
+            tool_instance.logger.error("Failed to load model: %s", e)
         yield
         # 清理 GPU 资源
         if hasattr(tool_instance.model, "clear_session"):
             tool_instance.model.clear_session()
-        print(f"[{ToolClass.tool_name}] Shutdown")
+        tool_instance.logger.info("Shutdown")
 
     app = FastAPI(
         title=ToolClass.tool_name,
@@ -421,29 +473,39 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
 
     @app.post("/predict", response_model=StructurePredictResponse)
     async def predict(request: PredictRequest):
-        """
-        单序列结构预测：POST /predict
-
-        【请求格式】
-        {"sequence": "YVPLPNVPQG", "peptide_id": "pep_001"}
-
-        【响应格式】
-        {"success": true, "result": {"pdb_content": "...", "confidence": 0.87}, ...}
-        """
-        return await tool_instance.predict_single(request)
+        """单序列结构预测：POST /predict"""
+        pid = request.peptide_id or "unknown"
+        tool_instance.logger.info(
+            "Predict structure: %s seq_len=%d", pid, len(request.sequence),
+        )
+        t0 = time.time()
+        result = await tool_instance.predict_single(request)
+        elapsed = time.time() - t0
+        if result.success:
+            tool_instance.logger.info(
+                "Predict structure done: %s conf=%.4f (%.2fs)",
+                pid, result.result.confidence or 0, elapsed,
+            )
+        else:
+            tool_instance.logger.warning(
+                "Predict structure failed: %s error=%s (%.2fs)",
+                pid, result.error, elapsed,
+            )
+        return result
 
     @app.post("/predict/batch", response_model=StructureBatchPredictResponse)
     async def predict_batch(request: BatchPredictRequest):
-        """
-        批量结构预测：POST /predict/batch
-
-        【请求格式】
-        {"sequences": [{"sequence": "...", "peptide_id": "..."}, ...]}
-
-        【响应格式】
-        {"success": true, "results": [...], "total": N, "error": null}
-        """
-        return await tool_instance.predict_batch(request)
+        """批量结构预测：POST /predict/batch"""
+        n = len(request.sequences)
+        tool_instance.logger.info("Batch predict structure: %d sequences", n)
+        t0 = time.time()
+        result = await tool_instance.predict_batch(request)
+        elapsed = time.time() - t0
+        tool_instance.logger.info(
+            "Batch predict structure done: %d/%d success (%.2fs)",
+            result.total, n, elapsed,
+        )
+        return result
 
     @app.get("/health", response_model=HealthResponse)
     async def health():
@@ -460,15 +522,142 @@ def create_app(ToolClass: type[StructureService]) -> FastAPI:
     @app.get("/info", response_model=InfoResponse)
     async def info():
         """工具信息：GET /info"""
+        capabilities = ["predict", "predict/batch"]
+        if enable_async:
+            capabilities += ["predict/async", "status", "jobs"]
         return InfoResponse(
             tool_name=ToolClass.tool_name,
             version=ToolClass.version,
             description=ToolClass.description,
-            capabilities=["predict", "predict/batch"],
+            capabilities=capabilities,
             input_format={"sequence": "string (amino acid sequence)"},
             output_format={"pdb_content": "string (PDB format)", "confidence": "float 0-1"},
             recommended_batch_size=ToolClass.recommended_batch_size,
         )
+
+    # ── 异步 Job 端点 (仅 enable_async=True) ────────────────
+
+    if enable_async:
+        persist_path = os.environ.get("JOBS_FILE")
+        job_manager_kwargs = {}
+        if persist_path:
+            job_manager_kwargs["persist_path"] = persist_path
+        job_manager = JobManager(**job_manager_kwargs)
+
+        async def _run_job(job_id: str, sequence: str) -> None:
+            """后台执行 predict_structure，更新 JobManager 状态。"""
+            tool_instance.logger.info("Job %s: started (seq_len=%d)", job_id, len(sequence))
+            job = job_manager.get(job_id)
+            created_at = job.created_at if job else time.time()
+            try:
+                job_manager.update(
+                    job_id, status="running", progress="Starting prediction ..."
+                )
+                result = await tool_instance.predict_structure(sequence)
+                if result.pdb_content:
+                    job_manager.update(
+                        job_id,
+                        status="success",
+                        progress="Completed",
+                        pdb_content=result.pdb_content,
+                        confidence=result.confidence,
+                        details=result.details,
+                    )
+                    tool_instance.logger.info(
+                        "Job %s: completed conf=%.4f (%.2fs)",
+                        job_id, result.confidence or 0,
+                        time.time() - created_at,
+                    )
+                else:
+                    err = result.details.get("error", "Unknown error")
+                    job_manager.update(
+                        job_id,
+                        status="failed",
+                        progress=f"Failed: {err}",
+                        error=err,
+                        details=result.details,
+                    )
+                    tool_instance.logger.warning("Job %s: failed — %s", job_id, err)
+            except Exception as exc:
+                job_manager.update(
+                    job_id,
+                    status="failed",
+                    progress=f"Exception: {exc}",
+                    error=str(exc),
+                )
+                tool_instance.logger.error("Job %s: exception — %s", job_id, exc)
+
+        @app.get("/status")
+        async def list_running_jobs():
+            """列出当前运行中的任务。"""
+            running = [
+                j for j in job_manager.list_jobs()
+                if j["status"] in ("pending", "running")
+            ]
+            return {"jobs": running, "total": len(running)}
+
+        @app.post("/predict/async", status_code=202, response_model=AsyncPredictResponse)
+        async def predict_async(request: PredictRequest):
+            """提交异步预测任务，立即返回 job_id。"""
+            job_id = uuid.uuid4().hex[:12]
+            job_manager.create(job_id, request.sequence)
+            asyncio.create_task(_run_job(job_id, request.sequence))
+            tool_instance.logger.info(
+                "Async predict: %s job_id=%s seq_len=%d",
+                request.peptide_id or "unknown", job_id, len(request.sequence),
+            )
+            return AsyncPredictResponse(
+                job_id=job_id,
+                status_url=f"/status/{job_id}",
+                status="pending",
+            )
+
+        @app.get("/status/{job_id}", response_model=JobStatusResponse)
+        async def get_job_status(job_id: str):
+            """查询指定任务状态。"""
+            job = job_manager.get(job_id)
+            if job is None:
+                tool_instance.logger.warning("Job status query: %s not found", job_id)
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            return JobStatusResponse(
+                job_id=job.job_id,
+                status=job.status,
+                progress=job.progress,
+                created_at=job.created_at,
+                finished_at=job.finished_at,
+            )
+
+        @app.get("/result/{job_id}", response_model=JobResultResponse)
+        async def get_job_result(job_id: str):
+            """获取任务结果 (仅 success 状态可获取)。"""
+            job = job_manager.get(job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            if job.status in ("pending", "running"):
+                raise HTTPException(
+                    status_code=425, detail=f"Job {job_id!r} is still {job.status}"
+                )
+            return JobResultResponse(
+                job_id=job.job_id,
+                sequence=job.sequence,
+                status=job.status,
+                pdb_content=job.pdb_content,
+                confidence=job.confidence,
+                details=job.details,
+                error=job.error,
+            )
+
+        @app.get("/jobs", response_model=JobListResponse)
+        async def list_jobs():
+            """列出所有任务状态摘要。"""
+            return JobListResponse(jobs=job_manager.list_jobs())
+
+        @app.delete("/jobs/{job_id}")
+        async def delete_job(job_id: str):
+            """清理任务。"""
+            if not job_manager.delete(job_id):
+                raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+            return {"deleted": job_id, "status": "ok"}
 
     return app
 

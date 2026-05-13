@@ -238,11 +238,13 @@ services:
       - AF3_MODEL_HOST_DIR=${AF3_MODEL_DIR}
       - AF3_DATABASE_HOST_DIR=${AF3_DATABASE_DIR}
       - AF3_WORKSPACE=/tmp/af3_workspace
+      - JOBS_FILE=/tmp/af3_jobs/jobs.json
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${AF3_MODEL_DIR:-/tmp/af3_models}:/root/models
       - ${AF3_DATABASE_DIR:-/tmp/af3_databases}:/root/public_databases
       - /tmp/af3_workspace:/tmp/af3_workspace
+      - /tmp/af3_jobs:/tmp/af3_jobs
     profiles: [gpu]
     restart: unless-stopped
     healthcheck:
@@ -263,8 +265,10 @@ services:
     environment:
       - PORT=8202
       - PF4_IMAGE=${PF4_IMAGE:-pepfold4}
+      - PF4_WORKSPACE=/tmp/pf4_workspace
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/pf4_workspace:/tmp/pf4_workspace
     profiles: [cpu]
     restart: unless-stopped
     healthcheck:
@@ -273,6 +277,64 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  esmfold:
+    build:
+      context: ..
+      dockerfile: tools/ESMFold/Dockerfile
+    image: igem-silk/esmfold:latest
+    container_name: esmfold
+    ports:
+      - "8203:8203"
+    environment:
+      - PORT=8203
+      - TORCH_HOME=/app/tools/models/fair-esm/
+    volumes:
+      - ./models:/app/tools/models
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8203/health"]
+      interval: 30s
+      timeout: 60s
+      retries: 3
+      start_period: 120s
+
+  omegafold:
+    build:
+      context: ..
+      dockerfile: tools/OmegaFold/Dockerfile
+    image: igem-silk/omegafold:latest
+    container_name: omegafold
+    ports:
+      - "8204:8204"
+    environment:
+      - PORT=8204
+      - OMEGAFOLD_CACHE=/app/tools/models/omegafold
+    volumes:
+      - ./models:/app/tools/models
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8204/health"]
+      interval: 30s
+      timeout: 60s
+      retries: 3
+      start_period: 120s
 
   sasa:
     build:
@@ -303,8 +365,10 @@ services:
     environment:
       - PORT=8102
       - A3D_IMAGE=${A3D_IMAGE:-lcbio/a3d_server}
+      - A3D_WORKSPACE=/tmp/a3d_workspace
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/a3d_workspace:/tmp/a3d_workspace
     profiles: [cpu]
     restart: unless-stopped
     healthcheck:

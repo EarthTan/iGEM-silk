@@ -34,12 +34,15 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, ClassVar
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+from tools.template.logger import get_logger
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -366,6 +369,7 @@ class FastaToolService:
         self._loaded = False  # 模型是否已加载的标记
         self._model_status: dict | None = None  # 模型状态详情
         self._system_info: dict | None = None  # 系统环境信息
+        self.logger = get_logger(self.tool_name)  # 统一日志
 
     @staticmethod
     def shared_models_dir() -> Path:
@@ -614,18 +618,19 @@ def create_app(ToolClass: type[FastaToolService]) -> FastAPI:
         - 清理资源（比如释放 GPU 内存）
         """
         # 启动时：加载模型
+        tool_instance.logger.info("Starting service ...")
         try:
             await tool_instance.load_model()
             tool_instance._loaded = True
-            print(f"[{ToolClass.tool_name}] Model loaded successfully")
+            tool_instance.logger.info("Model loaded successfully")
         except Exception as e:
-            print(f"[{ToolClass.tool_name}] Failed to load model: {e}")
+            tool_instance.logger.error("Failed to load model: %s", e)
             # 不退出，允许服务启动但标记为未就绪
         yield
         # 关闭时：清理资源
         if hasattr(tool_instance.model, "clear_session"):
             tool_instance.model.clear_session()
-        print(f"[{ToolClass.tool_name}] Shutdown")
+        tool_instance.logger.info("Shutdown")
 
     # 创建 FastAPI 应用
     app = FastAPI(
@@ -663,45 +668,46 @@ def create_app(ToolClass: type[FastaToolService]) -> FastAPI:
     async def predict(request: PredictRequest):
         """
         预测接口：POST /predict
-
-        【什么时候用？】
-        用户想预测单条序列时，发送 POST 请求到这个接口。
-
-        【请求格式】
-        {"sequence": "YVPLPNVPQG", "peptide_id": "pep_001"}
-
-        【响应格式】
-        {"success": true, "peptide_id": "pep_001", "sequence": "YVPLPNVPQG", "result": {...}, "error": null}
         """
-        return await tool_instance.predict_single(request)
+        pid = request.peptide_id or "unknown"
+        tool_instance.logger.info(
+            "Predict: %s seq_len=%d seq_prefix=%s ...",
+            pid, len(request.sequence), request.sequence[:30],
+        )
+        t0 = time.time()
+        result = await tool_instance.predict_single(request)
+        elapsed = time.time() - t0
+        if result.success:
+            tool_instance.logger.info(
+                "Predict done: %s score=%.4f label=%s (%.2fs)",
+                pid, result.result.score, result.result.label, elapsed,
+            )
+        else:
+            tool_instance.logger.warning(
+                "Predict failed: %s error=%s (%.2fs)", pid, result.error, elapsed,
+            )
+        return result
 
     @app.post("/predict/batch", response_model=BatchPredictResponse)
     async def predict_batch(request: BatchPredictRequest):
         """
         批量预测接口：POST /predict/batch
-
-        【什么时候用？】
-        用户想一次预测多条序列时，使用这个接口。
-        比一条一条预测快很多（并行处理）。
-
-        【请求格式】
-        {"sequences": [{"sequence": "...", "peptide_id": "..."}, ...]}
-
-        【响应格式】
-        {"success": true, "results": [...], "total": 100, "error": null}
         """
-        return await tool_instance.predict_batch(request)
+        n = len(request.sequences)
+        tool_instance.logger.info("Batch predict: %d sequences", n)
+        t0 = time.time()
+        result = await tool_instance.predict_batch(request)
+        elapsed = time.time() - t0
+        tool_instance.logger.info(
+            "Batch predict done: %d/%d success (%.2fs)",
+            result.total, n, elapsed,
+        )
+        return result
 
     @app.get("/health", response_model=HealthResponse)
     async def health():
         """
         健康检查接口：GET /health
-
-        【什么时候用？】
-         会定期调用这个接口，检查服务是否正常。
-
-        【响应格式】
-        {"status": "healthy", "tool_name": "anoxpepred", "version": "1.1.0", "model_loaded": true}
         """
         return HealthResponse(
             status="healthy" if tool_instance._loaded else "loading",

@@ -33,6 +33,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.template.logger import get_logger
 from tools.utils import detect_gpu, detect_system
 
 
@@ -59,7 +60,7 @@ class HemoPI2Service(FastaToolService):
 
         self.gpu_info = detect_gpu()
         self._system_info = detect_system()
-        print(f"[{self.tool_name}] {self.gpu_info['message']}")
+        self.logger.info("%s", self.gpu_info["message"])
 
         hp_path = list(hemopi2.__path__)[0]
         sys.path.insert(0, os.path.join(hp_path, "python_scripts"))
@@ -88,9 +89,9 @@ class HemoPI2Service(FastaToolService):
             "backend": self.gpu_info["backend"],
         }
 
-        print(
-            f"[{self.tool_name}] ESM-2 loaded | device={self.device} | "
-            f"backend={self.gpu_info['backend']}"
+        self.logger.info(
+            "ESM-2 loaded | device=%s | backend=%s",
+            self.device, self.gpu_info["backend"],
         )
 
     async def predict_impl(self, sequence: str) -> ToolResult:
@@ -143,6 +144,7 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8004"))
-    print(f"Starting HemoPI2 service on port {port}...")
+    logger = get_logger("hemopi2")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
 

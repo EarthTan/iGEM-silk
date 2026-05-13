@@ -21,13 +21,19 @@ AlphaFold3 3D 结构预测微服务。
     AF3_MODEL_DIR     模型参数目录 (必需)
     AF3_DATABASE_DIR  遗传数据库目录 (必需)
     AF3_KEEP_WORKSPACE  设为 1 保留临时工作目录便于调试
+    JOBS_FILE         异步 Job 持久化路径 (可选; 不设置则仅在内存中)
 
 API 端点：
-    GET  /           → 服务信息
-    GET  /health     → 健康检查
-    GET  /info       → 工具信息
-    POST /predict    → 单序列结构预测
-    POST /predict/batch → 批量结构预测 (逐条处理)
+    GET  /                   → 服务信息
+    GET  /health             → 健康检查
+    GET  /info               → 工具信息
+    POST /predict            → 单序列结构预测（同步阻塞）
+    POST /predict/batch      → 批量结构预测 (逐条处理)
+    POST /predict/async      → 异步提交预测 → 202 {job_id, status_url}
+    GET  /status/{job_id}    → 查询任务状态
+    GET  /result/{job_id}    → 获取任务结果
+    GET  /jobs               → 列出所有任务
+    DELETE /jobs/{job_id}    → 清理任务
 """
 
 from __future__ import annotations
@@ -47,15 +53,16 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.structure_service import (
+    BatchPredictRequest,
+    StructureBatchPredictResponse,
+    StructurePredictResponse,
+    StructureResult,
     StructureService,
     create_app,
-    StructureResult,
-    StructurePredictResponse,
-    StructureBatchPredictResponse,
-    BatchPredictRequest,
     PredictRequest,
 )
 from tools.utils import detect_system
+from tools.template.logger import get_logger
 
 
 def _check_os() -> tuple[bool, str]:
@@ -194,7 +201,7 @@ class AlphaFold3Service(StructureService):
         环境不满足时抛出 RuntimeError，模板 lifespan 会捕获并将 _loaded 保持为
         False，从而 /health 正确返回 model_loaded: false。
         """
-        print(f"[{self.tool_name}] Checking AlphaFold3 environment …")
+        self.logger.info("Checking AlphaFold3 environment …")
 
         checks: list[tuple[str, bool, str]] = []
 
@@ -235,7 +242,7 @@ class AlphaFold3Service(StructureService):
         failures: list[str] = []
         for name, ok, msg in checks:
             status = "✓" if ok else "✗"
-            print(f"  [{status}] {name}: {msg}")
+            self.logger.info("  [%s] %s: %s", status, name, msg)
             if not ok:
                 failures.append(f"{name}: {msg}")
 
@@ -247,14 +254,14 @@ class AlphaFold3Service(StructureService):
                 "runtime": "Docker (alphafold3 image)",
                 "checks": {name: msg for name, _ok, msg in checks},
             }
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.info("%s", self._ready_message)
             return
 
         self._ready_message = (
             f"AlphaFold3 NOT available on this machine. "
             f"Failed checks: {'; '.join(failures)}"
         )
-        print(f"[{self.tool_name}] {self._ready_message}")
+        self.logger.warning("%s", self._ready_message)
         raise RuntimeError(self._ready_message)
 
     # ── 结构预测 ──────────────────────────────────────────────
@@ -323,10 +330,10 @@ class AlphaFold3Service(StructureService):
                 "--output_dir", "/root/af_output",
             ]
 
-            print(f"[{self.tool_name}] Running AF3 for {job_name} "
-                  f"(sequence length={len(sequence)}) …")
+            self.logger.info("Running AF3 for %s (sequence length=%d) …",
+                              job_name, len(sequence))
 
-            proc = await _run_subprocess(cmd, timeout=3600)
+            proc = await _run_subprocess(cmd, timeout=14400, logger=self.logger)
 
             if proc.returncode != 0:
                 error_msg = proc.stderr[-2000:] if proc.stderr else f"exit code {proc.returncode}"
@@ -402,7 +409,7 @@ class AlphaFold3Service(StructureService):
                 pdb_content="",
                 confidence=None,
                 details={
-                    "error": "AlphaFold3 prediction timed out (3600s limit)",
+                    "error": "AlphaFold3 prediction timed out (14400s limit)",
                     "job_name": job_name,
                 },
             )
@@ -439,8 +446,9 @@ class AlphaFold3Service(StructureService):
 
         results: list[StructureResult] = []
         for i, item in enumerate(request.sequences):
-            print(f"[{self.tool_name}] Batch {i + 1}/{len(request.sequences)}: "
-                  f"{item.peptide_id or 'unnamed'} (len={len(item.sequence)})")
+            self.logger.info("Batch %d/%d: %s (len=%d)",
+                              i + 1, len(request.sequences),
+                              item.peptide_id or 'unnamed', len(item.sequence))
             result = await self.predict_structure(item.sequence)
             result.peptide_id = item.peptide_id or "unknown"
             results.append(result)
@@ -468,12 +476,50 @@ class AlphaFold3Service(StructureService):
 
 # ── 异步 subprocess ──────────────────────────────────────────────
 
-async def _run_subprocess(cmd: list[str], timeout: int = 3600):
-    """在线程池中运行 subprocess，不阻塞事件循环。"""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        None,
-        lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=timeout),
+async def _run_subprocess(cmd: list[str], timeout: int = 14400, logger=None):
+    """异步运行子进程，实时流式输出 stdout/stderr 到 logger。
+
+    使用 asyncio.create_subprocess_exec 逐行读取输出并转发到 logger，
+    同时累积完整输出用于错误报告。兼容 .returncode / .stdout / .stderr 访问。
+    """
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+
+    async def _stream(stream, label: str, collector: list[str]) -> None:
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            decoded = line.decode("utf-8", errors="replace").rstrip()
+            collector.append(decoded)
+            if logger and decoded.strip():
+                logger.info("[%s] %s", label, decoded)
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(
+                _stream(process.stdout, "AF3-out", stdout_lines),
+                _stream(process.stderr, "AF3", stderr_lines),
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    await process.wait()
+
+    return subprocess.CompletedProcess(
+        cmd, process.returncode or 0,
+        stdout="\n".join(stdout_lines),
+        stderr="\n".join(stderr_lines),
     )
 
 
@@ -487,6 +533,8 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8201"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
-    app = create_app(AlphaFold3Service)
-    print(f"[alphafold3] Starting on {HOST}:{PORT}")
+    logger = get_logger("alphafold3")
+    app = create_app(AlphaFold3Service, enable_async=True)
+    logger.info("Starting on %s:%s", HOST, PORT)
+    logger.info("Async job endpoints enabled: /predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
     uvicorn.run(app, host=HOST, port=PORT)
