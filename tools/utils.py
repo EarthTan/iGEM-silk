@@ -106,7 +106,8 @@ def detect_system() -> dict:
         try:
             import torch
             result["gpu_name"] = torch.cuda.get_device_name(0)
-            total_mem = torch.cuda.get_device_properties(0).total_mem
+            props = torch.cuda.get_device_properties(0)
+            total_mem = getattr(props, 'total_memory', getattr(props, 'total_mem', 0))
             result["gpu_memory"] = f"{total_mem / (1 << 30):.0f} GB"
         except Exception:
             pass
