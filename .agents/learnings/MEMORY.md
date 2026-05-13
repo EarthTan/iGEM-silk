@@ -15,4 +15,4 @@
 - [Docker latest tag 版本不确定性](docker/latest-tag-pinning.md) — GEP: pin 具体版本避免 :latest 的 breaking change
 - [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
 - [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
-- [Linux 文件系统大小写敏感](docker/linux-case-sensitivity.md) — GEP: macOS→Linux 跨平台 Docker 构建的目录名大小写校验
+- [Waveflow 远程 API 代理微服务模式](gep-waveflow-remote-api-service.md) — GEP: Tamarind.bio REST API 包装为本地结构预测微服务；工具类型 URL 路由；ZIP 结果解压；API 响应格式适配
