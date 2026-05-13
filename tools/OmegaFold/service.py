@@ -100,7 +100,7 @@ class OmegaFoldService(StructureService):
         )
         self._cache_dir: str = os.environ.get(
             "OMEGAFOLD_CACHE",
-            os.path.expanduser("~/.cache/omegafold_ckpt/"),
+            str(Path(__file__).resolve().parents[2] / "tools" / "models" / "omegafold"),
         )
 
     # ── 模型加载 ──────────────────────────────────────────────
