@@ -40,7 +40,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from tools.template.job_manager import JobManager
-from tools.template.logger import get_logger, LOG_DIR
+from tools.template.logger import get_logger
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -538,10 +538,11 @@ def create_app(ToolClass: type[StructureService], enable_async: bool = False) ->
     # ── 异步 Job 端点 (仅 enable_async=True) ────────────────
 
     if enable_async:
-        default_persist = str(LOG_DIR / f"{ToolClass.tool_name}_jobs.json")
-        job_manager = JobManager(
-            persist_path=os.environ.get("JOBS_FILE") or default_persist,
-        )
+        persist_path = os.environ.get("JOBS_FILE")
+        job_manager_kwargs = {}
+        if persist_path:
+            job_manager_kwargs["persist_path"] = persist_path
+        job_manager = JobManager(**job_manager_kwargs)
 
         async def _run_job(job_id: str, sequence: str) -> None:
             """后台执行 predict_structure，更新 JobManager 状态。"""
@@ -563,7 +564,7 @@ def create_app(ToolClass: type[StructureService], enable_async: bool = False) ->
                     tool_instance.logger.info(
                         "Job %s: completed conf=%.4f (%.2fs)",
                         job_id, result.confidence or 0,
-                        time.time() - (job_manager.get(job_id).created_at if job_manager.get(job_id) else 0),
+                        time.time() - job_manager.get(job_id).created_at,
                     )
                 else:
                     err = result.details.get("error", "Unknown error")

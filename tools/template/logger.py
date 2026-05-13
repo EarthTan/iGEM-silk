@@ -35,19 +35,24 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         return logger
 
     logger.setLevel(level)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logger.propagate = False
 
     fmt = logging.Formatter(_LOG_FORMAT, datefmt=_DATE_FORMAT)
 
-    fh = RotatingFileHandler(
-        LOG_DIR / f"{name}.log",
-        maxBytes=10_000_000,
-        backupCount=5,
-        encoding="utf-8",
-    )
-    fh.setLevel(level)
-    fh.setFormatter(fmt)
-    logger.addHandler(fh)
+    # 文件 handler — 不可写时静默退化到仅控制台
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        fh = RotatingFileHandler(
+            LOG_DIR / f"{name}.log",
+            maxBytes=10_000_000,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        fh.setLevel(level)
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+    except (OSError, PermissionError):
+        pass
 
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(level)

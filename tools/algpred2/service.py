@@ -180,7 +180,9 @@ app = create_app(AlgPred2Service)
 if __name__ == "__main__":
     import uvicorn
 
+    from tools.template.logger import get_logger as _get_logger
+
     port = int(os.environ.get("PORT", "8008"))
-    logger = __import__("tools.template.logger", fromlist=["get_logger"]).get_logger("algpred2")
+    logger = _get_logger("algpred2")
     logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

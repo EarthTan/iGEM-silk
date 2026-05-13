@@ -427,6 +427,7 @@ async def _run_subprocess(cmd: list[str], timeout: int = 1800, logger=None):
         )
     except asyncio.TimeoutError:
         process.kill()
+        await process.wait()
         raise subprocess.TimeoutExpired(cmd, timeout)
 
     await process.wait()
