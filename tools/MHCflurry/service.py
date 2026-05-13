@@ -111,6 +111,17 @@ class MHCflurryService(FastaToolService):
         Returns:
             ToolResult: score=结合强度(0-1，越高越强), label=Strong/Weak/Non-Binder
         """
+        if not (5 <= len(sequence) <= 15):
+            return ToolResult(
+                score=0.0,
+                label="Invalid Length",
+                details={
+                    "error": f"Peptide length {len(sequence)} outside supported range [5, 15]",
+                    "allele": self.DEFAULT_ALLELE,
+                    "peptide_length": len(sequence),
+                },
+            )
+
         affinity = float(
             self.predictor.predict(
                 peptides=[sequence], allele=self.DEFAULT_ALLELE
@@ -131,9 +142,10 @@ class MHCflurryService(FastaToolService):
         )
 
     async def predict_batch(self, request: BatchPredictRequest) -> BatchPredictResponse:
-        """批量预测 — 单次 predict() 调用处理全部序列。
+        """批量预测 — 按长度过滤后批量调用，超范围序列单独跳过。
 
-        覆盖基类逐条 predict_impl 方式，避免 N 次 DataFrame 构造开销。
+        MHCflurry 只支持 5-15 aa，混入超范围序列会导致整个批次失败。
+        这里拆为两批: 合法长度的走单次 predict()，不合法的标记为 Invalid Length。
         """
         if not self._loaded:
             async with self._lock:
@@ -147,24 +159,52 @@ class MHCflurryService(FastaToolService):
         peptides = [item.sequence for item in request.sequences]
         ids = [item.peptide_id or "unknown" for item in request.sequences]
 
-        affinities = self.predictor.predict(peptides=peptides, allele=self.DEFAULT_ALLELE)
+        valid_indices = [i for i, s in enumerate(peptides) if 5 <= len(s) <= 15]
+        invalid_indices = [i for i, s in enumerate(peptides) if not (5 <= len(s) <= 15)]
 
-        results: list[ToolResult] = []
-        for pid, seq, aff in zip(ids, peptides, affinities):
-            score, label = self._affinity_to_score(float(aff))
+        results: list[ToolResult | None] = [None] * len(peptides)
+
+        # 批量预测合法长度的序列
+        if valid_indices:
+            valid_peptides = [peptides[i] for i in valid_indices]
+            affinities = self.predictor.predict(
+                peptides=valid_peptides, allele=self.DEFAULT_ALLELE
+            )
+            for idx, seq, aff in zip(valid_indices, valid_peptides, affinities):
+                score, label = self._affinity_to_score(float(aff))
+                result = ToolResult(
+                    score=score,
+                    label=label,
+                    details={
+                        "affinity_nM": round(float(aff), 2),
+                        "allele": self.DEFAULT_ALLELE,
+                        "peptide_length": len(seq),
+                        "gpu_backend": self.gpu_info.get("backend", "unknown"),
+                    },
+                )
+                result.peptide_id = ids[idx]
+                result.sequence = seq
+                results[idx] = result
+
+        # 超范围序列标记跳过
+        for idx in invalid_indices:
+            seq = peptides[idx]
+            self.logger.warning(
+                "Skipping '%s' (len=%d): outside MHCflurry range [5,15]",
+                seq, len(seq),
+            )
             result = ToolResult(
-                score=score,
-                label=label,
+                score=0.0,
+                label="Invalid Length",
                 details={
-                    "affinity_nM": round(float(aff), 2),
+                    "error": f"Peptide length {len(seq)} outside supported range [5, 15]",
                     "allele": self.DEFAULT_ALLELE,
                     "peptide_length": len(seq),
-                    "gpu_backend": self.gpu_info.get("backend", "unknown"),
                 },
             )
-            result.peptide_id = pid
+            result.peptide_id = ids[idx]
             result.sequence = seq
-            results.append(result)
+            results[idx] = result
 
         return BatchPredictResponse(
             success=True, results=results, total=len(results), error=None
