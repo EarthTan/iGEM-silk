@@ -3,3 +3,5 @@
 - [GPU 显存争用](gpu-memory-contention.md) — 多个 GPU 微服务同时运行时，48GB 显存会被耗尽，需逐个测试并确认显存空闲
 - [Structure Service Patterns](structure-service-pattern.md) — Docker base, torch CUDA wheel, model cache, pLDDT normalization, pyproject naming
 - [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — Worktree workflow, docker-compose merge fix pattern for parallel service PRs
+- [微服务网络绑定策略](microservice-host-binding.md) — 所有服务绑 0.0.0.0，不修改服务代码，由 Docker Compose 端口映射控制暴露范围
+- [依赖版本排错教训](dependency-version-troubleshooting.md) — 遇到依赖冲突先查官方文档，不要盲目试版本号；ESMFold 要求 Python <= 3.9

@@ -116,6 +116,21 @@ class ESMFoldService(StructureService):
         gpu_mem = total_mem / (1 << 30)
         self.logger.info("GPU: %s (%.0f GB)", gpu_name, gpu_mem)
 
+        # numpy<2.0 compat: BUFSIZE removed in numpy 2.0+
+        import numpy as np
+        np.BUFSIZE = 8192
+
+        # torch._six was removed in PyTorch 2.5+; fair-esm still imports it
+        if not hasattr(torch, '_six'):
+            import types
+            torch._six = types.ModuleType('torch._six')
+            torch._six.PY3 = True
+            torch._six.PY37 = True
+            torch._six.inf = float('inf')
+            torch._six.string_classes = (str, bytes)
+            import sys
+            sys.modules['torch._six'] = torch._six
+
         import esm
 
         self.model = esm.pretrained.esmfold_v1()
