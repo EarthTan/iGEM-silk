@@ -19,10 +19,11 @@ RUN python3.10 -m pip install --no-cache-dir --no-build-isolation \
     https://github.com/aqlaboratory/openfold/archive/refs/tags/v2.2.0.tar.gz
 
 # Layer 3: remaining deps (fast iteration)
+# deepspeed>=0.9 required by openfold v2.2.0
 RUN python3.10 -m pip install --no-cache-dir \
     biotite biopython einops ml-collections dm-tree modelcif omegaconf scipy \
-    "deepspeed==0.5.9" \
-    "fastapi<=0.99.1" "uvicorn[standard]" "pydantic==1.9.2" "fair-esm==2.0.0"
+    "deepspeed>=0.9.0" \
+    "fastapi>=0.100.0" "uvicorn[standard]" "pydantic>=2.0.0" "fair-esm==2.0.0"
 
 WORKDIR /app
 COPY tools/utils.py ./tools/utils.py
