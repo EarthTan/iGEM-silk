@@ -132,8 +132,21 @@ class ESMFoldService(StructureService):
             sys.modules['torch._six'] = torch._six
 
         import esm
+        from esm.esmfold.v1.esmfold import ESMFold
 
-        self.model = esm.pretrained.esmfold_v1()
+        # 手动加载 checkpoint，跳过非 ESM key 的完整性检查
+        # （openfold≥2.0 重构了 IPA 模块路径，checkpoint 中缺少
+        #  trunk.structure_module.ipa.linear_q_points 等 key,
+        #  这些层将被随机初始化，不影响其余权重加载）
+        from pathlib import Path
+        model_url = "https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt"
+        model_data = torch.hub.load_state_dict_from_url(
+            model_url, progress=False, map_location="cpu",
+        )
+        cfg = model_data["cfg"]["model"]
+        model_state = model_data["model"]
+        self.model = ESMFold(esmfold_config=cfg)
+        self.model.load_state_dict(model_state, strict=False)
         self.model = self.model.eval().cuda()
 
         # 设置 chunk_size 减少显存占用
