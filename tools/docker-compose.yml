@@ -364,11 +364,6 @@ services:
       - "8102:8102"
     environment:
       - PORT=8102
-      - A3D_IMAGE=${A3D_IMAGE:-lcbio/a3d_server}
-      - A3D_WORKSPACE=/tmp/a3d_workspace
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/a3d_workspace:/tmp/a3d_workspace
     profiles: [cpu]
     restart: unless-stopped
     healthcheck:
@@ -376,6 +371,31 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ===========================================================================
+  # Waveflow — Tamarind.bio API 代理 (profile: cpu)
+  # ===========================================================================
+
+  waveflow:
+    build:
+      context: ..
+      dockerfile: tools/Waveflow/Dockerfile
+    image: igem-silk/waveflow:latest
+    container_name: waveflow
+    ports:
+      - "8205:8205"
+    environment:
+      - PORT=8205
+      - TAMARIND_API_KEY=${TAMARIND_API_KEY:-}
+      - WAVEFLOW_TOOL_TYPE=${WAVEFLOW_TOOL_TYPE:-esmfold}
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8205/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 15s
 
   # ===========================================================================
   # CPU 服务 (profile: cpu)
