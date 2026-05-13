@@ -1,6 +1,6 @@
->Flex_GGGGSx1 | 最短柔性，低扰动
+>Flex_GGGGSx1 | 最短柔性，低扰动 ｜ P0 
 GGGGS
->Flex_GGGGSx2 | 经典柔性 linker，提供中等自由度
+>Flex_GGGGSx2 | 经典柔性 linker，提供中等自由度 | P0
 GGGGSGGGGS
 >Flex_GGGGSx3 | 长柔性，用于末端融合或需要高暴露度场景
 GGGGSGGGGSGGGGS
