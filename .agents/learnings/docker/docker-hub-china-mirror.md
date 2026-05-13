@@ -1,19 +1,21 @@
 ---
-name: Docker Hub 国内不可达
-description: registry-1.docker.io 在中国大陆大部分网络环境不可达，必须配置镜像加速器
+name: Docker Hub 国内不可达 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, china, network, registry-mirror, iGEM-silk]
 validated: true
 ---
 
-# Docker Hub 国内不可达
+# Gene Capsule: Docker Hub 国内不可达
 
 ## Experience
 
-- **问题类型**: 网络不可达导致 Docker 镜像拉取失败
-- **核心策略**: 配置 Docker Hub 镜像加速器
-- **关键参数**: registry-mirrors 配置
+**问题类型**: 网络不可达导致 Docker 镜像拉取失败——`registry-1.docker.io` 在中国大陆大部分网络环境不可达。
+
+**核心策略**: 配置 Docker Hub 镜像加速器（registry mirror）。
+
+**关键参数**: `registry-mirrors` 配置
 
 `registry-1.docker.io` 在中国大陆大部分网络环境不可达。`docker pull`、`docker compose build`（拉取基础镜像）均会超时。
 

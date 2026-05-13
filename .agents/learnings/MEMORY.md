@@ -1,8 +1,18 @@
-- [Docker-outside-Docker 路径解析](docker-outside-docker-paths.md) — 通过 Docker socket 启动容器时，volume 源路径由宿主机 Docker 守护进程解析，而非 API 容器内部
-- [Docker 服务镜像构建](docker-services-build.md) — Docker Hub 在中国网络不可达时，预拉取镜像到缓存即可，无需修改 compose 配置
-- [GPU 显存争用](gpu-memory-contention.md) — 多个 GPU 微服务同时运行时，48GB 显存会被耗尽，需逐个测试并确认显存空闲
-- [Structure Service Patterns](structure-service-pattern.md) — Docker base, torch CUDA wheel, model cache, pLDDT normalization, pyproject naming
-- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — Worktree workflow, docker-compose merge fix pattern for parallel service PRs
-- [微服务网络绑定策略](microservice-host-binding.md) — 所有服务绑 0.0.0.0，不修改服务代码，由 Docker Compose 端口映射控制暴露范围
-- [依赖版本排错教训](dependency-version-troubleshooting.md) — ESMFold/openfold/fair-esm 版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
-- [ESMFold Docker 构建](esmfold-docker-build.md) — 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查
+- [GPU 显存争用](gpu-memory-contention.md) — GEP: 多个 GPU 微服务共享 48GB 显存的 OOM 排查与避免策略
+- [Structure Service Patterns](structure-service-pattern.md) — GEP: 结构预测微服务的 Docker 镜像/CUDA/模型缓存/包命名标准化模式
+- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — GEP: 多分支并行开发的 worktree 隔离与可预测的合并冲突解决
+- [微服务网络绑定策略](microservice-host-binding.md) — GEP: 所有服务绑 0.0.0.0，由 Docker Compose 端口映射控制暴露范围
+- [ESMFold 依赖版本矩阵](gep-esmfold-dependency-matrix.md) — GEP: ESMFold 依赖版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
+- [ESMFold Docker 三层构建模式](gep-esmfold-docker-build.md) — GEP: 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查
+- [多层依赖链排错方法论](gep-dependency-troubleshooting-methodology.md) — GEP: 完整栈追踪→排除法→双向尝试→连锁升级→运行时补丁，通用排错策略
+- [Docker-outside-Docker 路径解析](docker/docker-outside-docker-paths.md) — GEP: docker.sock 嵌套调用时 volume 宿主机路径与容器路径分离
+- [容器内 Docker CLI 安装](docker/docker-cli-in-container.md) — GEP: 挂载宿主机 docker 二进制而非在容器内安装
+- [Docker Compose 构建原子性缺陷](docker/compose-atomic-build.md) — GEP: 多服务构建一个失败全回滚，应分批构建
+- [slim 镜像缺少 C 扩展编译依赖](docker/slim-image-build-deps.md) — GEP: python:slim 需 gcc/python3-dev/pkg-config 编译原生扩展
+- [Dockerfile COPY 遗漏审计](docker/dockerfile-copy-audit.md) — GEP: 批量扫描 Dockerfile 确保共享文件（utils.py/template/）被 COPY
+- [docker-compose dockerfile 路径一致性](docker/dockerfile-path-compose.md) — GEP: dockerfile 路径相对于 build context，含批量校验脚本
+- [构建失败时的批量审计策略](docker/batch-failure-audit.md) — GEP: 全量审计替代逐轮 CI 修复，大幅缩短多服务调试周期
+- [Docker latest tag 版本不确定性](docker/latest-tag-pinning.md) — GEP: pin 具体版本避免 :latest 的 breaking change
+- [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
+- [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
+- [Linux 文件系统大小写敏感](docker/linux-case-sensitivity.md) — GEP: macOS→Linux 跨平台 Docker 构建的目录名大小写校验

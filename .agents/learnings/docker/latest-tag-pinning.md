@@ -1,19 +1,21 @@
 ---
-name: Docker latest tag 版本不确定性
-description: :latest tag 在不同时间拉取不同版本，可能导致 CLI 参数不兼容；应 pin 具体版本或使用稳定安装方式
+name: Docker latest tag 版本不确定性 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, version-pinning, uv, pip, reproducibility, iGEM-silk]
 validated: true
 ---
 
-# Docker latest tag 版本不确定性
+# Gene Capsule: Docker latest tag 版本不确定性
 
 ## Experience
 
-- **问题类型**: 基础镜像版本漂移导致的构建失败
-- **核心策略**: Pin 具体版本号或使用更稳定的安装方式
-- **关键参数**: 镜像 tag（`:latest` vs `:0.4.30`）
+**问题类型**: 基础镜像的 `:latest` tag 在不同时间拉取不同版本，导致 CLI 参数不兼容的构建失败。
+
+**核心策略**: Pin 具体版本号或使用更稳定的安装方式。不用 `:latest`。
+
+**关键参数**: 镜像 tag（`:latest` vs `:0.4.30`）
 
 `ghcr.io/astral-sh/uv:latest` 在不同时间拉取不同版本。uv 在 0.5.x 中移除了 `--system` 参数，导致 `uv sync --system --no-dev` 在新版本中报错。
 

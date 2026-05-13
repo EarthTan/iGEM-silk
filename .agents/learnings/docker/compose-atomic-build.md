@@ -1,19 +1,21 @@
 ---
-name: Docker Compose 构建原子性缺陷
-description: docker compose --build 在构建多个服务时一荣俱荣一损俱损——任一失败则全部取消；应分批构建或单独构建
+name: Docker Compose 构建原子性缺陷 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, docker-compose, build-strategy, atomicity, iGEM-silk]
 validated: true
 ---
 
-# Docker Compose 构建原子性缺陷
+# Gene Capsule: Docker Compose 构建原子性缺陷
 
 ## Experience
 
-- **问题类型**: Docker Compose 批量构建失败回滚
-- **核心策略**: 分批次构建——按 profile 分组或单独构建失败的服务
-- **关键参数**: `--profile` 分组、`docker compose build <service>`
+**问题类型**: Docker Compose 批量构建时，任一服务失败则全部回滚——前面成功的构建被浪费。
+
+**核心策略**: 分批次构建——按 profile 分组或单独构建失败的服务。
+
+**关键参数**: `--profile` 分组、`docker compose build <service>`
 
 `docker compose --profile gpu --profile cpu up -d --build` 在构建 15 个服务时，任意一个失败则**全部取消**。前面 10 个可能已构建成功，但因最后一个失败全部浪费。
 

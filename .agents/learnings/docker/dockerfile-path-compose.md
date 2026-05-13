@@ -1,19 +1,21 @@
 ---
-name: docker-compose dockerfile 路径一致性
-description: docker-compose.yml 中 dockerfile 路径相对于 build context 而非 compose 文件位置，context 指向父目录时路径前缀必须包含子目录
+name: docker-compose dockerfile 路径一致性 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, docker-compose, build-context, path-resolution, iGEM-silk]
 validated: true
 ---
 
-# docker-compose dockerfile 路径一致性
+# Gene Capsule: docker-compose dockerfile 路径一致性
 
 ## Experience
 
-- **问题类型**: Docker Compose 构建配置错误
-- **核心策略**: `dockerfile` 路径相对于 `context`（而非 compose 文件位置）。当 `context: ..` 而 Dockerfile 在 `tools/<name>/` 下时，必须写 `dockerfile: tools/<name>/Dockerfile`
-- **关键参数**: `context` 和 `dockerfile` 的相对关系
+**问题类型**: Docker Compose 中 `dockerfile` 路径相对于 `context` 而非 compose 文件位置，导致找不到 Dockerfile。
+
+**核心策略**: `dockerfile` 路径相对于 `context`。当 `context: ..` 而 Dockerfile 在 `tools/<name>/` 下时，必须写 `dockerfile: tools/<name>/Dockerfile`。
+
+**关键参数**: `context` 和 `dockerfile` 的相对关系
 
 ### 错误模式
 
