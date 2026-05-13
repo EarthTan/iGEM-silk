@@ -54,6 +54,7 @@ from tools.template.structure_service import (
     BatchPredictRequest,
     PredictRequest,
 )
+from tools.template.logger import get_logger
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -138,7 +139,7 @@ class PEPFOLD4Service(StructureService):
 
     async def load_model(self) -> None:
         """验证 PEP-FOLD4 Docker 环境。"""
-        print(f"[{self.tool_name}] Checking PEP-FOLD4 environment …")
+        self.logger.info("Checking PEP-FOLD4 environment …")
 
         checks: list[tuple[str, bool, str]] = []
 
@@ -154,20 +155,20 @@ class PEPFOLD4Service(StructureService):
         failures: list[str] = []
         for name, ok, msg in checks:
             status = "✓" if ok else "✗"
-            print(f"  [{status}] {name}: {msg}")
+            self.logger.info("  [%s] %s: %s", status, name, msg)
             if not ok:
                 failures.append(f"{name}: {msg}")
 
         if not failures:
             self._ready_message = "PEP-FOLD4 ready — Docker + image verified"
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.info("%s", self._ready_message)
             return
 
         self._ready_message = (
             f"PEP-FOLD4 NOT available on this machine. "
             f"Failed checks: {'; '.join(failures)}"
         )
-        print(f"[{self.tool_name}] {self._ready_message}")
+        self.logger.warning("%s", self._ready_message)
         raise RuntimeError(self._ready_message)
 
     # ── 序列校验 ──────────────────────────────────────────────
@@ -251,10 +252,10 @@ class PEPFOLD4Service(StructureService):
                 "--num_models", str(self.DEFAULT_NUM_MODELS),
             ]
 
-            print(f"[{self.tool_name}] Running PEP-FOLD4 for {job_name} "
-                  f"(sequence length={len(sequence)}) …")
+            self.logger.info("Running PEP-FOLD4 for %s (sequence length=%d) …",
+                              job_name, len(sequence))
 
-            proc = await _run_subprocess(cmd, timeout=1800)
+            proc = await _run_subprocess(cmd, timeout=1800, logger=self.logger)
 
             if proc.returncode != 0:
                 error_msg = proc.stderr[-2000:] if proc.stderr else f"exit code {proc.returncode}"
@@ -362,8 +363,9 @@ class PEPFOLD4Service(StructureService):
 
         results: list[StructureResult] = []
         for i, item in enumerate(request.sequences):
-            print(f"[{self.tool_name}] Batch {i + 1}/{len(request.sequences)}: "
-                  f"{item.peptide_id or 'unnamed'} (len={len(item.sequence)})")
+            self.logger.info("Batch %d/%d: %s (len=%d)",
+                              i + 1, len(request.sequences),
+                              item.peptide_id or 'unnamed', len(item.sequence))
             result = await self.predict_structure(item.sequence)
             result.peptide_id = item.peptide_id or "unknown"
             results.append(result)
@@ -394,12 +396,46 @@ class PEPFOLD4Service(StructureService):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def _run_subprocess(cmd: list[str], timeout: int = 1800):
-    """在线程池中运行 subprocess，不阻塞事件循环。"""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        None,
-        lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=timeout),
+async def _run_subprocess(cmd: list[str], timeout: int = 1800, logger=None):
+    """异步运行子进程，实时流式输出 stdout/stderr 到 logger。"""
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+
+    async def _stream(stream, label: str, collector: list[str]) -> None:
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            decoded = line.decode("utf-8", errors="replace").rstrip()
+            collector.append(decoded)
+            if logger and decoded.strip():
+                logger.info("[%s] %s", label, decoded)
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(
+                _stream(process.stdout, "PF4-out", stdout_lines),
+                _stream(process.stderr, "PF4", stderr_lines),
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    await process.wait()
+
+    return subprocess.CompletedProcess(
+        cmd, process.returncode or 0,
+        stdout="\n".join(stdout_lines),
+        stderr="\n".join(stderr_lines),
     )
 
 
@@ -413,6 +449,7 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8202"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
+    logger = get_logger("pepfold4")
     app = create_app(PEPFOLD4Service)
-    print(f"[pepfold4] Starting on {HOST}:{PORT}")
+    logger.info("Starting on %s:%s", HOST, PORT)
     uvicorn.run(app, host=HOST, port=PORT)

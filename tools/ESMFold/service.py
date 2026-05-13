@@ -56,6 +56,7 @@ from tools.template.structure_service import (
     PredictRequest,
 )
 from tools.utils import detect_system
+from tools.template.logger import get_logger
 
 
 class ESMFoldService(StructureService):
@@ -96,8 +97,8 @@ class ESMFoldService(StructureService):
         2. 加载 esmfold_v1() 权重（首次自动下载 ~8 GB）
         3. 移至 GPU 并设置 chunk_size 控制显存
         """
-        print(f"[{self.tool_name}] Loading ESMFold model …")
-        print(f"[{self.tool_name}] TORCH_HOME={os.environ.get('TORCH_HOME', '~/.cache/torch/hub/')}")
+        self.logger.info("Loading ESMFold model …")
+        self.logger.info("TORCH_HOME=%s", os.environ.get('TORCH_HOME', '~/.cache/torch/hub/'))
 
         import torch
 
@@ -106,12 +107,12 @@ class ESMFoldService(StructureService):
                 "ESMFold requires CUDA GPU but torch.cuda is not available. "
                 "This machine has no NVIDIA GPU or no CUDA-capable PyTorch installed."
             )
-            print(f"[{self.tool_name}] {self._ready_message}")
+            self.logger.warning("%s", self._ready_message)
             raise RuntimeError(self._ready_message)
 
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1 << 30)
-        print(f"[{self.tool_name}] GPU: {gpu_name} ({gpu_mem:.0f} GB)")
+        self.logger.info("GPU: %s (%.0f GB)", gpu_name, gpu_mem)
 
         import esm
 
@@ -132,7 +133,7 @@ class ESMFoldService(StructureService):
         }
         self._system_info = detect_system()
         self._ready_message = f"ESMFold ready — {gpu_name} ({gpu_mem:.0f} GB)"
-        print(f"[{self.tool_name}] {self._ready_message}")
+        self.logger.info("%s", self._ready_message)
 
     # ── 结构预测 ──────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ class ESMFoldService(StructureService):
         import torch
 
         try:
-            print(f"[{self.tool_name}] Predicting structure (len={len(sequence)}) …")
+            self.logger.info("Predicting structure (len=%d) …", len(sequence))
 
             pdb_content: str = ""
             confidence: float | None = None
@@ -233,8 +234,9 @@ class ESMFoldService(StructureService):
 
         results: list[StructureResult] = []
         for i, item in enumerate(request.sequences):
-            print(f"[{self.tool_name}] Batch {i + 1}/{len(request.sequences)}: "
-                  f"{item.peptide_id or 'unnamed'} (len={len(item.sequence)})")
+            self.logger.info("Batch %d/%d: %s (len=%d)",
+                              i + 1, len(request.sequences),
+                              item.peptide_id or 'unnamed', len(item.sequence))
             result = await self.predict_structure(item.sequence)
             result.peptide_id = item.peptide_id or "unknown"
             result.sequence = item.sequence
@@ -258,8 +260,8 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8203"))
     HOST = os.environ.get("HOST", "0.0.0.0")
 
+    logger = get_logger("esmfold")
     app = create_app(ESMFoldService, enable_async=True)
-    print(f"[esmfold] Starting on {HOST}:{PORT}")
-    print("[esmfold] Async job endpoints enabled: "
-          "/predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
+    logger.info("Starting on %s:%s", HOST, PORT)
+    logger.info("Async job endpoints enabled: /predict/async, /status/{id}, /result/{id}, /jobs, DELETE /jobs/{id}")
     uvicorn.run(app, host=HOST, port=PORT)

@@ -39,6 +39,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_system
 
 
@@ -118,11 +119,9 @@ class GraphCPPService(FastaToolService):
             "device": str(self.device),
         }
 
-        print(
-            f"[{self.tool_name}] GraphSAGE GNN loaded | "
-            f"device={self.device} | "
-            f"threshold={self.threshold} | "
-            f"fingerprint={params['fingerprint_type']}"
+        self.logger.info(
+            "GraphSAGE GNN loaded | device=%s | threshold=%s | fingerprint=%s",
+            self.device, self.threshold, params["fingerprint_type"],
         )
 
     def _predict_score(self, sequence: str) -> float:
@@ -226,5 +225,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8009"))
-    print(f"Starting GraphCPP service on port {port}...")
+    logger = get_logger("graphcpp")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

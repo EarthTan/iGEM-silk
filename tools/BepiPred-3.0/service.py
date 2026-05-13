@@ -29,6 +29,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse, PredictRequest,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_gpu, detect_system
 
 
@@ -90,14 +91,14 @@ class BepiPred3Service(FastaToolService):
                 "cache_path": str(checkpoint_path),
                 "backend": self.gpu_info["backend"],
             }
-            print(f"[bepipred3] ESM-2 found at {checkpoint_path}")
+            self.logger.info("ESM-2 found at %s", checkpoint_path)
         else:
             self._model_status = {
                 "status": "downloading",
                 "model": f"ESM-2 ({self._ESM_MODEL_NAME}, {self._ESM_MODEL_SIZE})",
                 "source": self._ESM_DOWNLOAD_URL,
             }
-            print(f"[bepipred3] Downloading {self._ESM_MODEL_NAME} to {checkpoint_path} …")
+            self.logger.info("Downloading %s to %s ...", self._ESM_MODEL_NAME, checkpoint_path)
             try:
                 torch.hub.load_state_dict_from_url(
                     self._ESM_DOWNLOAD_URL,
@@ -118,8 +119,8 @@ class BepiPred3Service(FastaToolService):
                 }
                 raise RuntimeError(f"ESM-2 download failed: {exc}") from exc
 
-        print(f"[bepipred3] {self.gpu_info['message']}")
-        print(f"[bepipred3] BepiPred-3.0 loaded | ESM-2: {self._ESM_MODEL_NAME}")
+        self.logger.info("%s", self.gpu_info["message"])
+        self.logger.info("BepiPred-3.0 loaded | ESM-2: %s", self._ESM_MODEL_NAME)
         self._model_loaded = True
 
     async def predict_impl(self, sequence: str) -> ToolResult:
@@ -316,6 +317,7 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8002"))
-    print(f"Starting BepiPred-3.0 service on port {port}...")
-    print(f"Note: First run will download ESM-2 model (~2.5GB)")
+    logger = get_logger("bepipred3")
+    logger.info("Starting on port %d ...", port)
+    logger.info("Note: First run will download ESM-2 model (~2.5GB)")
     uvicorn.run(app, host="0.0.0.0", port=port)

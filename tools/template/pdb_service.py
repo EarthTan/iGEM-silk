@@ -39,11 +39,14 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+
+from tools.template.logger import get_logger
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -271,6 +274,7 @@ class PdbScoringService:
         self._loaded = False
         self._model_status: dict | None = None
         self._system_info: dict | None = None
+        self.logger = get_logger(self.tool_name)
 
     async def load_model(self) -> None:
         """
@@ -411,16 +415,17 @@ def create_app(ToolClass: type[PdbScoringService]) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """服务生命周期：启动时加载模型，关闭时清理资源"""
+        tool_instance.logger.info("Starting service ...")
         try:
             await tool_instance.load_model()
             tool_instance._loaded = True
-            print(f"[{ToolClass.tool_name}] Model loaded successfully")
+            tool_instance.logger.info("Model loaded successfully")
         except Exception as e:
-            print(f"[{ToolClass.tool_name}] Failed to load model: {e}")
+            tool_instance.logger.error("Failed to load model: %s", e)
         yield
         if hasattr(tool_instance.model, "clear_session"):
             tool_instance.model.clear_session()
-        print(f"[{ToolClass.tool_name}] Shutdown")
+        tool_instance.logger.info("Shutdown")
 
     app = FastAPI(
         title=ToolClass.tool_name,
@@ -442,29 +447,35 @@ def create_app(ToolClass: type[PdbScoringService]) -> FastAPI:
 
     @app.post("/predict", response_model=PdbScoreResponse)
     async def predict(request: PdbScoreRequest):
-        """
-        单次 PDB 评分：POST /predict
-
-        【请求格式】
-        {"pdb_content": "ATOM ...", "sequence": "...", "chain_id": "A", "peptide_id": "..."}
-
-        【响应格式】
-        {"success": true, "peptide_id": "...", "result": {"score": 0.82, "label": "stable"}, "error": null}
-        """
-        return await tool_instance.predict_single(request)
+        """单次 PDB 评分：POST /predict"""
+        pid = request.peptide_id or "unknown"
+        tool_instance.logger.info("PDB predict: %s", pid)
+        t0 = time.time()
+        result = await tool_instance.predict_single(request)
+        elapsed = time.time() - t0
+        if result.success:
+            tool_instance.logger.info(
+                "PDB predict done: %s score=%.4f label=%s (%.2fs)",
+                pid, result.result.score, result.result.label, elapsed,
+            )
+        else:
+            tool_instance.logger.warning(
+                "PDB predict failed: %s error=%s (%.2fs)", pid, result.error, elapsed,
+            )
+        return result
 
     @app.post("/predict/batch", response_model=PdbBatchScoreResponse)
     async def predict_batch(request: PdbBatchScoreRequest):
-        """
-        批量 PDB 评分：POST /predict/batch
-
-        【请求格式】
-        {"requests": [{"pdb_content": "...", "peptide_id": "..."}, ...]}
-
-        【响应格式】
-        {"success": true, "results": [...], "total": N, "error": null}
-        """
-        return await tool_instance.predict_batch(request)
+        """批量 PDB 评分：POST /predict/batch"""
+        n = len(request.requests)
+        tool_instance.logger.info("Batch PDB predict: %d requests", n)
+        t0 = time.time()
+        result = await tool_instance.predict_batch(request)
+        elapsed = time.time() - t0
+        tool_instance.logger.info(
+            "Batch PDB predict done: %d/%d success (%.2fs)", result.total, n, elapsed,
+        )
+        return result
 
     @app.get("/health", response_model=HealthResponse)
     async def health():
