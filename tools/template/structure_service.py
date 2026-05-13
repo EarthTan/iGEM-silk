@@ -547,6 +547,8 @@ def create_app(ToolClass: type[StructureService], enable_async: bool = False) ->
         async def _run_job(job_id: str, sequence: str) -> None:
             """后台执行 predict_structure，更新 JobManager 状态。"""
             tool_instance.logger.info("Job %s: started (seq_len=%d)", job_id, len(sequence))
+            job = job_manager.get(job_id)
+            created_at = job.created_at if job else time.time()
             try:
                 job_manager.update(
                     job_id, status="running", progress="Starting prediction ..."
@@ -564,7 +566,7 @@ def create_app(ToolClass: type[StructureService], enable_async: bool = False) ->
                     tool_instance.logger.info(
                         "Job %s: completed conf=%.4f (%.2fs)",
                         job_id, result.confidence or 0,
-                        time.time() - job_manager.get(job_id).created_at,
+                        time.time() - created_at,
                     )
                 else:
                     err = result.details.get("error", "Unknown error")
