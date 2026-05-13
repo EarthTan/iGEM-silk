@@ -1,0 +1,8 @@
+- [Docker-outside-Docker 路径解析](docker-outside-docker-paths.md) — 通过 Docker socket 启动容器时，volume 源路径由宿主机 Docker 守护进程解析，而非 API 容器内部
+- [Docker 服务镜像构建](docker-services-build.md) — Docker Hub 在中国网络不可达时，预拉取镜像到缓存即可，无需修改 compose 配置
+- [GPU 显存争用](gpu-memory-contention.md) — 多个 GPU 微服务同时运行时，48GB 显存会被耗尽，需逐个测试并确认显存空闲
+- [Structure Service Patterns](structure-service-pattern.md) — Docker base, torch CUDA wheel, model cache, pLDDT normalization, pyproject naming
+- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — Worktree workflow, docker-compose merge fix pattern for parallel service PRs
+- [微服务网络绑定策略](microservice-host-binding.md) — 所有服务绑 0.0.0.0，不修改服务代码，由 Docker Compose 端口映射控制暴露范围
+- [依赖版本排错教训](dependency-version-troubleshooting.md) — ESMFold/openfold/fair-esm 版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
+- [ESMFold Docker 构建](esmfold-docker-build.md) — 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查

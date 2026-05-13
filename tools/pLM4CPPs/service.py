@@ -43,6 +43,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_gpu, detect_system
 
 
@@ -70,7 +71,7 @@ class pLM4CPPsService(FastaToolService):
 
         self.gpu_info = detect_gpu()
         self._system_info = detect_system()
-        print(f"[{self.tool_name}] {self.gpu_info['message']}")
+        self.logger.info("%s", self.gpu_info["message"])
 
         # 将 ESM-2 模型缓存指向共享目录 (tools/models/fair-esm/)
         os.environ["TORCH_HOME"] = str(
@@ -132,10 +133,9 @@ class pLM4CPPsService(FastaToolService):
             "backend": self.gpu_info["backend"],
         }
 
-        print(
-            f"[{self.tool_name}] ESM-2 + CNN model loaded | "
-            f"scaler fitted on training data | "
-            f"backend={self.gpu_info['backend']}"
+        self.logger.info(
+            "ESM-2 + CNN model loaded | scaler fitted on training data | backend=%s",
+            self.gpu_info["backend"],
         )
 
     async def predict_impl(self, sequence: str) -> ToolResult:
@@ -248,5 +248,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8006"))
-    print(f"Starting pLM4CPPs service on port {port}...")
+    logger = get_logger("plm4cpps")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

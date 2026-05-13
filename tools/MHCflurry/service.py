@@ -39,6 +39,7 @@ from tools.template.fasta_service import (
     FastaToolService, create_app, ToolResult,
     BatchPredictRequest, BatchPredictResponse,
 )
+from tools.template.logger import get_logger
 from tools.utils import detect_gpu, detect_system
 
 
@@ -65,7 +66,7 @@ class MHCflurryService(FastaToolService):
         """
         self.gpu_info = detect_gpu()
         self._system_info = detect_system()
-        print(f"[{self.tool_name}] {self.gpu_info['message']}")
+        self.logger.info("%s", self.gpu_info["message"])
 
         # 将 MHCflurry 模型下载重定向到项目目录
         self._model_dir = Path(__file__).parent / "models"
@@ -96,11 +97,9 @@ class MHCflurryService(FastaToolService):
             "backend": self.gpu_info["backend"],
         }
 
-        print(
-            f"[{self.tool_name}] MHCflurry loaded | "
-            f"alleles={self._allele_count} | "
-            f"default_allele={self.DEFAULT_ALLELE} | "
-            f"backend={self.gpu_info['backend']}"
+        self.logger.info(
+            "MHCflurry loaded | alleles=%d | default_allele=%s | backend=%s",
+            self._allele_count, self.DEFAULT_ALLELE, self.gpu_info["backend"],
         )
 
     async def predict_impl(self, sequence: str) -> ToolResult:
@@ -200,5 +199,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8005"))
-    print(f"Starting MHCflurry service on port {port}...")
+    logger = get_logger("mhcflurry")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

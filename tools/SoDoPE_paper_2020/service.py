@@ -31,6 +31,7 @@ sys.path.insert(0, str(SERVICE_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.template.logger import get_logger
 from tools.utils import detect_gpu, detect_system
 
 sys.path.insert(0, str(Path(__file__).parent / "sodope_sdk"))
@@ -66,7 +67,7 @@ class SoDoPEService(FastaToolService):
         # GPU/环境检测
         gpu_info = detect_gpu()
         self._system_info = detect_system()
-        print(f"[{self.tool_name}] {gpu_info['message']}")
+        self.logger.info("%s", gpu_info["message"])
 
         self.model = SoDoPEIntegration(verbose=True)
 
@@ -76,7 +77,7 @@ class SoDoPEService(FastaToolService):
             "backend": gpu_info.get("backend", "cpu"),
             "gpu_info": gpu_info,
         }
-        print(f"[{self.tool_name}] SWI weights loaded, ready to predict")
+        self.logger.info("SWI weights loaded, ready to predict")
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """
@@ -110,5 +111,6 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8012"))
-    print(f"Starting SoDoPE service on port {port}...")
+    logger = get_logger("sodope")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)

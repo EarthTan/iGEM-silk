@@ -38,6 +38,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 
 # 直接导入 template 模块，避免触发 services/__init__.py 的完整初始化
 from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.template.logger import get_logger
 from tools.utils import detect_system
 
 
@@ -83,7 +84,7 @@ class ToxinPred3Service(FastaToolService):
             "backend": "cpu",
         }
 
-        print(f"[{self.tool_name}] ExtraTreesClassifier loaded | sklearn={self._sklearn_ver} | path={model_path}")
+        self.logger.info("ExtraTreesClassifier loaded | sklearn=%s | path=%s", self._sklearn_ver, model_path)
 
     async def predict_impl(self, sequence: str) -> ToolResult:
         """预测单条序列的毒性。
@@ -126,6 +127,7 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8003"))
-    print(f"Starting ToxinPred3 service on port {port}...")
+    logger = get_logger("toxinpred3")
+    logger.info("Starting on port %d ...", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
 

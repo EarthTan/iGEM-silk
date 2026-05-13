@@ -13,21 +13,29 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 ```bash
 # Install deps
 uv sync                      # root project
-cd tools/<name> && uv sync   # single microservice
+cd tools/<name> && uv sync   # single microservice (includes ML/service deps)
 
-# Lint
+# Lint (run from project root)
 uv run ruff check .
 
-# Start all microservices (each in its own tools/<name>/.venv)
-./tools/start_all.sh
-./tools/start_all.sh status
-./tools/start_all.sh stop
+# Run tests (none exist yet — pytest is configured in pyproject.toml)
+uv run pytest
 
-# Start microservices via Docker (GPU + CPU profiles, from tools/)
+# Start all microservices (Docker, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
+# Profiles: --profile gpu (CUDA services), --profile cpu (CPU-only services)
+# Mounts shared model cache (tools/models/) into containers
+# Logs: tools/logs/<name>.log (or: docker compose logs -f)
 
 # Run the pipeline (CURRENTLY BROKEN — raises NotImplementedError)
-python -m main
+python -m main                # or: uv run igem-silk
+
+# Test all microservices (health checks + prediction tests)
+cd tools && python test_all_services.py
+
+# Override any microservice host/port at runtime (no code changes needed)
+export ANOXPEPRED_HOST=192.168.1.100
+export ANOXPEPRED_PORT=8001
 ```
 
 ## Architecture
@@ -67,20 +75,40 @@ POST /predict       → single prediction
 POST /predict/batch → batch prediction (up to 1000 sequences)
 ```
 
-Three service templates exist in `tools/template/`:
+Three service templates exist in `tools/template/` (along with shared utilities):
 
 | Template | Pattern | Concurrency | Used by |
 |----------|---------|-------------|---------|
 | `fasta_service.py` → `FastaToolService` | sequence → score | semaphore 10 | AnOxPePred, BepiPred-3.0, ToxinPred3, HemoPI2, MHCflurry, pLM4CPPs, TIPred, AlgPred2, GraphCPP, TemStaPro, SoDoPE |
-| `structure_service.py` → `StructureService` | sequence → PDB/mmCIF | semaphore 3 | AlphaFold3, PEP-FOLD4 |
+| `structure_service.py` → `StructureService` | sequence → PDB/mmCIF | semaphore 3 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold |
 | `pdb_service.py` → `PdbScoringService` | PDB → score | semaphore 10 | SASA, Aggrescan3D |
 
 To add a new microservice: subclass the appropriate template, implement `load_model()` and the prediction method (`predict_impl()` / `predict_structure()` / `score_pdb()`). The template handles HTTP, concurrency, and health checks.
 
 Each service directory also contains a `Dockerfile` and a `pyproject.toml` with optional dependency groups (`ml`, `service`, `all`).
 
+**Supporting template files:**
+- `tools/template/logger.py` — unified `get_logger(name)` with rotating file handler (10 MB, 5 backups) in `tools/logs/<name>.log` plus console output
+- `tools/template/job_manager.py` — `JobManager` for async structure prediction jobs (used via `create_app(..., enable_async=True)`); supports in-memory or JSON-file-persisted job tracking with 24h TTL cleanup
+- `tools/utils.py` — `detect_gpu()` and `detect_system()` for cross-service GPU detection (CUDA > MPS > CPU), called by each service's `load_model()`
+
 Full service catalog and I/O details: `main/docs/TOOLS-usage.md`
 Speed/resource reference: `main/docs/TOOLS-speed.md`
+
+### Service groups and port assignments
+
+Microservices are grouped by pipeline role (defined in `main/config.py`):
+
+| Group | Port range | Services | Pipeline role |
+|-------|-----------|----------|---------------|
+| `score` | 8001–8012 | AnOxPePred, BepiPred-3.0, MHCflurry, pLM4CPPs, TIPred, GraphCPP, TemStaPro, SoDoPE | Peptide-level scoring/ranking |
+| `filter` | 8003–8008 | ToxinPred3, HemoPI2, AlgPred2 | Hard-filter (toxic/hemolytic/allergenic — absolute elimination) |
+| `structure` | 8201–8204 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold | 3D structure generation (PDB/mmCIF) |
+| `pdb_score` | 8101–8102 | SASA, Aggrescan3D | PDB-based residue-level scoring |
+
+Remote service override: set `{NAME}_HOST` (and optionally `{NAME}_PORT`) env vars to point any service at a different machine (see `main/config.py:service_url()`).
+
+See `tools/README.md` for the full per-service port table (including input ranges, model sources, and hardware requirements).
 
 ### Key design decisions (carried forward from old pipeline)
 
@@ -88,6 +116,8 @@ Speed/resource reference: `main/docs/TOOLS-speed.md`
 - **Hard filters are absolute**: toxic/allergenic/hemolytic peptides are eliminated — no trade-offs allowed.
 - **Original implementation first**: When adding a microservice, use the tool author's code, model, and approach verbatim. No AI-synthesized approximations.
 - **Environment portability**: Auto-detect GPU, fall back to CPU. GPU-only services (AlphaFold3) error clearly on CPU.
+- **Pipeline is yet to be implemented**: `main/pipeline.py` raises `NotImplementedError`. No tests exist yet (pytest + pytest-asyncio are configured in `pyproject.toml` but no test directory created). The new pipeline should follow the funnel design in `main/README.md`.
+- **Output convention**: Results go in `output/` (root level, currently empty). Pipeline stages should write intermediate/final outputs here.
 
 ### Model file management
 
@@ -110,11 +140,12 @@ Docker deployments volume-mount `models/` — models are never baked into images
 
 ## Supporting documentation
 
-- `main/README.md` — new pipeline design philosophy and requirements
+- `main/README.md` — new pipeline design philosophy and requirements (Chinese + summary)
 - `main/docs/TOOLS-usage.md` — every microservice's I/O format, parameters, thresholds, calling methods
 - `main/docs/TOOLS-speed.md` — speed, memory, concurrency, and resource reference for all microservices
-- `main/docs/threshold.md` — (to be written)
+- `main/docs/threshold.md` — (not yet written)
 - `tools/README.md` — microservice port table, model management, design principles
+- `docs/HUMAN.md` — human-operated tools and analysis methods (outside the automated pipeline)
 
 ## Python environment
 
