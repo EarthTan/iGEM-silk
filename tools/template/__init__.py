@@ -1,6 +1,9 @@
 # tools/template/__init__.py
 # 工具服务模板包 —— 三类微服务模板
 
+# ── logger：统一日志配置 ────────────────────────────────────
+from .logger import get_logger
+
 # ── fasta_service：序列 → 评分 ────────────────────────────
 from .fasta_service import (
     BatchPredictRequest,
@@ -35,6 +38,8 @@ from .pdb_service import (
 )
 
 __all__ = [
+    # logger
+    "get_logger",
     # fasta_service
     "FastaToolService",
     "create_fasta_app",
