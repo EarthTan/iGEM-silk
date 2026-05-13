@@ -1,19 +1,21 @@
 ---
-name: Python 命名空间遮蔽
-description: 当微服务内部存在与项目顶层同名的 tools/ 目录时，Python 导入系统会优先找到本地包，遮蔽项目级命名空间包
+name: Python 命名空间遮蔽 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [python, namespace, import, package, docker, iGEM-silk]
 validated: true
 ---
 
-# Python 命名空间遮蔽
+# Gene Capsule: Python 命名空间遮蔽
 
 ## Experience
 
-- **问题类型**: Python 导入系统命名空间冲突
-- **核心策略**: 将微服务内部 SDK 目录重命名为唯一名称（如 `anoxpepred_sdk/`），避免与项目级 `tools/` 冲突
-- **关键参数**: `sys.path[0]`（CWD）、`__init__.py` 的存在
+**问题类型**: Python 导入系统中，微服务内部的 `tools/` 子目录遮蔽项目级 `tools/` 命名空间包，导致 `ModuleNotFoundError`。
+
+**核心策略**: 将微服务内部 SDK 目录重命名为唯一名称（如 `anoxpepred_sdk/`），避免与项目级 `tools/` 冲突。
+
+**关键参数**: `sys.path[0]`（CWD）、`__init__.py` 的存在
 
 ### 现象
 

@@ -1,21 +1,21 @@
 ---
-name: Linux 文件系统大小写敏感
-description: macOS 开发时大小写不敏感，Linux 严格区分大小写，Dockerfile 中的 COPY、WORKDIR 和 compose 的 dockerfile 路径三处都可能不一致
+name: Linux 文件系统大小写敏感 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [linux, macos, case-sensitivity, filesystem, docker, iGEM-silk]
 validated: true
 ---
 
-# Linux 文件系统大小写敏感
+# Gene Capsule: Linux 文件系统大小写敏感
 
 ## Experience
 
-- **问题类型**: 跨平台（macOS → Linux）文件路径不一致
-- **核心策略**: 用 `ls` 逐字符确认实际目录名，不要"目测一致"就认为正确
-- **关键参数**: 目录名的大小写必须与实际文件系统完全匹配
+**问题类型**: macOS 开发时 APFS 大小写不敏感，Linux（ext4/xfs）严格区分大小写，导致跨平台 Docker 构建中路径不匹配。
 
-macOS 默认文件系统（APFS）大小写不敏感，Linux（ext4/xfs）严格区分。`Tipred` vs `TIPred`、`algpred2` vs `AlgPred2` 是不同的路径。
+**核心策略**: 用 `ls` 逐字符确认实际目录名，不要"目测一致"就认为正确。`Tipred` vs `TIPred`、`algpred2` vs `AlgPred2` 是不同的路径。
+
+**关键参数**: 目录名的大小写必须与实际文件系统完全匹配
 
 ### 影响三处
 
