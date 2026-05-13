@@ -100,6 +100,6 @@ tools/models/
 
 BepiPred-3.0 和 pLM4CPPs 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
 
-共享池**仅存放被 ≥2 个服务使用的模型**。独有模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
+共享池**仅存放被 ≥2 个服务使用的模型**或者**体积较大的模型**。独有且体积较小模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
 
 Docker 部署通过 volume 挂载 `tools/models/` 到容器内对应路径，模型不进入镜像。
