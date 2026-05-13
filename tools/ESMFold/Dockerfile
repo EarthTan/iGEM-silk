@@ -13,11 +13,10 @@ RUN python3.10 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
     python3.10 -m pip install --no-cache-dir torch "numpy<2" --index-url https://download.pytorch.org/whl/cu121
 
 # Layer 2: openfold CUDA compile (~12min, isolated layer)
-# Use v1.0.1 (compatible with fair-esm 2.0.0 IPA module naming).
-# Override TORCH_CUDA_ARCH_LIST to drop sm_37 (unsupported by CUDA 12.x).
-ENV TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9"
+# Use v2.2.0 (CUDA 12.x 兼容)。IPA 模块 key 不匹配的问题在
+# service.py 中通过 strict=False 绕开（缺失层随机初始化）。
 RUN python3.10 -m pip install --no-cache-dir --no-build-isolation \
-    https://github.com/aqlaboratory/openfold/archive/refs/tags/v1.0.1.tar.gz
+    https://github.com/aqlaboratory/openfold/archive/refs/tags/v2.2.0.tar.gz
 
 # Layer 3: remaining deps (fast iteration)
 RUN python3.10 -m pip install --no-cache-dir \
