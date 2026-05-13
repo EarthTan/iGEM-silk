@@ -131,7 +131,6 @@ class ESMFoldService(StructureService):
             import sys
             sys.modules['torch._six'] = torch._six
 
-        import esm
         from esm.esmfold.v1.esmfold import ESMFold
 
         # 手动加载 checkpoint，跳过非 ESM key 的完整性检查
@@ -198,17 +197,20 @@ class ESMFoldService(StructureService):
                 pdb_content = self.model.infer_pdb(sequence)
 
             # 从 PDB b_factor 提取 pLDDT
+            # ESMFold 的 PDB 输出包含 PARENT/MODEL 等非标准头部，
+            # biotite 解析会失败，所以直接按列提取 ATOM 行的 b_factor。
             if pdb_content:
                 try:
-                    import biotite.structure.io as bsio
-                    import io
-
-                    pdb_file = bsio.PDBFile.read(io.StringIO(pdb_content))
-                    struct = pdb_file.get_structure(model=1)
-                    if struct is not None and hasattr(struct, "b_factor"):
-                        b_factors = struct.b_factor
-                        raw_plddt = float(b_factors.mean())
-                        confidence = raw_plddt / 100.0  # 归一化到 0-1 范围
+                    b_factors = []
+                    for line in pdb_content.splitlines():
+                        if line.startswith(("ATOM  ", "HETATM")):
+                            # PDB 格式: b_factor 在列 61-66 (1-indexed)
+                            bf_str = line[60:66].strip()
+                            if bf_str:
+                                b_factors.append(float(bf_str))
+                    if b_factors:
+                        raw_plddt = sum(b_factors) / len(b_factors)
+                        confidence = raw_plddt / 100.0
                 except Exception:
                     confidence = None
 
