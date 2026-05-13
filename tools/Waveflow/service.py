@@ -22,7 +22,9 @@ API 端点:
     GET  /                         → 服务信息
     GET  /health                   → 健康检查
     POST /predict/{tool}           → 单序列结构预测（tool = esmfold / omegafold / alphafold ...）
+    POST /predict                  → 同上，使用默认工具（WAVEFLOW_DEFAULT_TOOL, 默认 esmfold）
     POST /predict/batch/{tool}     → 批量结构预测
+    POST /predict/batch            → 同上，使用默认工具
     POST /predict/async/{tool}     → 异步提交（立即返回 job_id）
     GET  /status/{job_id}          → 查询异步任务状态
     GET  /result/{job_id}          → 获取异步任务结果
@@ -101,6 +103,7 @@ class InfoResponse(BaseModel):
     description: str = "Waveflow — Tamarind.bio 云端结构预测代理"
     capabilities: list[str] = [
         "predict/{tool}", "predict/batch/{tool}", "predict/async/{tool}",
+        "predict", "predict/batch",
     ]
     input_format: dict[str, str] = {"sequence": "string (amino acid sequence)"}
     output_format: dict[str, str] = {
@@ -282,7 +285,8 @@ class WaveflowService:
             json=payload,
         )
         resp.raise_for_status()
-        return resp.json()
+        # tamarind submit-batch 可能返回字符串，统一用 text 避免 JSON 解析异常
+        return resp.text
 
     async def _poll_job(self, job_name: str) -> dict[str, Any]:
         """轮询 tamarind GET /jobs 直到任务完成。
@@ -401,7 +405,8 @@ class WaveflowService:
             if pdb_lines:
                 return "\n".join(pdb_lines)
 
-        return text if text else None
+        # 非 PDB 文本不应冒充成功结果
+        return None
 
     # ── 核心预测方法 ──────────────────────────────────────────
 
@@ -594,6 +599,8 @@ def create_app() -> FastAPI:
 
     # ── 按工具类型预测 ────────────────────────────────
 
+    _default_tool = os.environ.get("WAVEFLOW_DEFAULT_TOOL", "esmfold")
+
     @app.post("/predict/{tool}", response_model=StructurePredictResponse)
     async def predict_with_tool(tool: str, request: PredictRequest):
         """单序列结构预测，工具类型在 URL 路径中指定。
@@ -604,10 +611,20 @@ def create_app() -> FastAPI:
         """
         return await _predict_single(tool, request)
 
+    @app.post("/predict", response_model=StructurePredictResponse)
+    async def predict_default(request: PredictRequest):
+        """兼容路由：使用默认工具 (esmfold) 预测。"""
+        return await _predict_single(_default_tool, request)
+
     @app.post("/predict/batch/{tool}", response_model=StructureBatchPredictResponse)
     async def predict_batch_with_tool(tool: str, request: BatchPredictRequest):
         """批量结构预测，工具类型在 URL 路径中指定。"""
         return await _predict_batch(tool, request)
+
+    @app.post("/predict/batch", response_model=StructureBatchPredictResponse)
+    async def predict_batch_default(request: BatchPredictRequest):
+        """兼容路由：使用默认工具 (esmfold) 批量预测。"""
+        return await _predict_batch(_default_tool, request)
 
     # ── 异步 Job 模式 ────────────────────────────────
 
