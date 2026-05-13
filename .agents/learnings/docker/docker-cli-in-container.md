@@ -20,7 +20,7 @@ PEP-FOLD4、AlphaFold3、Aggrescan3D 需要在容器内运行 `docker` 命令访
 ### 方案一（不推荐）：容器内安装
 
 ```dockerfile
-# ❌ download.docker.com 同样被墙，且增加镜像体积
+# ❌ 增加镜像体积，且容器内 docker 版本可能与宿主机不匹配
 RUN apt-get update && apt-get install -y docker.io
 ```
 
