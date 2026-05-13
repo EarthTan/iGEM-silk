@@ -10,7 +10,7 @@
 
 1. **原作优先**。优先使用工具原作者的代码、设计思路、模型和实现方法，做到原汁原味。这代表了项目的学术背景，避免 AI 幻觉和搪塞工作。
 
-2. **环境兼容**。本项目主要开发环境为最新版 macOS，实际部署使用 Ubuntu + RTX5880。对可 CUDA 加速的工具：配置 Dockerfile 方便 GPU 环境部署；代码自动检测 GPU 可用性并 fallback 到 CPU；仅 GPU 可运行的服务在 CPU 环境下明确报错。在Ubuntu上实际生产部署的时候，统一使用`docker compose`一键启动所有微服务。
+2. **环境兼容**。本项目主要开发环境为最新版 macOS，实际部署使用 Ubuntu + RTX5880。对可 CUDA 加速的工具：配置 Dockerfile 方便 GPU 环境部署；代码自动检测 GPU 可用性并 fallback 到 CPU；仅 GPU 可运行的服务在 CPU 环境下明确报错。在Ubuntu上实际生产部署的时候，使用`docker compose`一键启动所有微服务（推荐）；本地开发调试则用`./tools/start_all.sh`快速启动。
 
 3. **模型文件集中管理**。模型文件落在 `tools/<name>/models/`（服务专属）或 `tools/models/`（跨服务共享）。四种来源类型（Git 随仓库 / 首次下载 / pip 包 / 无需模型）详见下方「模型管理」章节。
 
