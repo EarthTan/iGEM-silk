@@ -21,16 +21,11 @@ uv run ruff check .
 # Run tests (none exist yet — pytest is configured in pyproject.toml)
 uv run pytest
 
-# Start all microservices (each in its own tools/<name>/.venv)
-./tools/start_all.sh          # start all
-./tools/start_all.sh status   # check status
-./tools/start_all.sh stop     # stop all
-# Logs: tools/logs/<name>.log
-
-# Start microservices via Docker (GPU + CPU profiles, from tools/)
+# Start all microservices (Docker, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
 # Profiles: --profile gpu (CUDA services), --profile cpu (CPU-only services)
 # Mounts shared model cache (tools/models/) into containers
+# Logs: tools/logs/<name>.log (or: docker compose logs -f)
 
 # Run the pipeline (CURRENTLY BROKEN — raises NotImplementedError)
 python -m main                # or: uv run igem-silk

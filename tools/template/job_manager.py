@@ -90,6 +90,7 @@ class JobManager:
         return self._jobs.get(job_id)
 
     def list_jobs(self) -> list[dict]:
+        self._cleanup_expired()
         return [
             {
                 "job_id": j.job_id,
@@ -115,7 +116,12 @@ class JobManager:
             return
         self._persist_path.parent.mkdir(parents=True, exist_ok=True)
         data = {j.job_id: asdict(j) for j in self._jobs.values()}
-        self._persist_path.write_text(json.dumps(data, indent=2))
+        tmp = self._persist_path.with_suffix(".tmp")
+        try:
+            tmp.write_text(json.dumps(data, indent=2))
+            tmp.replace(self._persist_path)
+        except OSError:
+            pass
 
     def _load(self) -> None:
         try:
