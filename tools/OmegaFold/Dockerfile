@@ -17,21 +17,27 @@ LABEL org.opencontainers.image.title="OmegaFold API"
 LABEL org.opencontainers.image.description="OmegaFold 3D 结构预测 API — HeliXon"
 LABEL org.opencontainers.image.source="https://github.com/HeliXonProtein/OmegaFold"
 
+# python3.10 = Ubuntu 22.04 system default; OmegaFold only supports Python 3.8-3.10
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
+    python3.10 \
     python3-pip \
     build-essential \
     git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# OmegaFold 从 GitHub 安装，依赖 torch + biopython
-RUN python3.11 -m pip install --no-cache-dir \
-    torch --index-url https://download.pytorch.org/whl/cu121 \
-    biopython \
-    fastapi "uvicorn[standard]" pydantic \
-    && python3.11 -m pip install --no-cache-dir \
-    git+https://github.com/HeliXonProtein/OmegaFold.git
+# OmegaFold's setup.py forces torch 1.12.0+cu113 (ancient, no sm_89 support).
+# We install our own torch first, then install OmegaFold with --no-deps
+# to keep the modern torch.
+RUN python3.10 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3.10 -m pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cu121 && \
+    python3.10 -m pip install --no-cache-dir \
+    biopython && \
+    python3.10 -m pip install --no-cache-dir --no-deps \
+    git+https://github.com/HeliXonProtein/OmegaFold.git && \
+    python3.10 -m pip install --no-cache-dir \
+    fastapi "uvicorn[standard]" pydantic
 
 WORKDIR /app
 COPY tools/utils.py ./tools/utils.py
@@ -46,4 +52,4 @@ WORKDIR /app/tools/OmegaFold
 EXPOSE 8204
 ENV PORT=8204
 
-CMD ["python3.11", "service.py"]
+CMD ["python3.10", "service.py"]

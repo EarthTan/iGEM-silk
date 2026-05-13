@@ -29,9 +29,14 @@ uv run pytest
 
 # Start microservices via Docker (GPU + CPU profiles, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
+# Profiles: --profile gpu (CUDA services), --profile cpu (CPU-only services)
+# Mounts shared model cache (tools/models/) into containers
 
 # Run the pipeline (CURRENTLY BROKEN — raises NotImplementedError)
 python -m main                # or: uv run igem-silk
+
+# Test all microservices (health checks + prediction tests)
+cd tools && python test_all_services.py
 
 # Override any microservice host/port at runtime (no code changes needed)
 export ANOXPEPRED_HOST=192.168.1.100
@@ -75,17 +80,22 @@ POST /predict       → single prediction
 POST /predict/batch → batch prediction (up to 1000 sequences)
 ```
 
-Three service templates exist in `tools/template/`:
+Three service templates exist in `tools/template/` (along with shared utilities):
 
 | Template | Pattern | Concurrency | Used by |
 |----------|---------|-------------|---------|
 | `fasta_service.py` → `FastaToolService` | sequence → score | semaphore 10 | AnOxPePred, BepiPred-3.0, ToxinPred3, HemoPI2, MHCflurry, pLM4CPPs, TIPred, AlgPred2, GraphCPP, TemStaPro, SoDoPE |
-| `structure_service.py` → `StructureService` | sequence → PDB/mmCIF | semaphore 3 | AlphaFold3, PEP-FOLD4 |
+| `structure_service.py` → `StructureService` | sequence → PDB/mmCIF | semaphore 3 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold |
 | `pdb_service.py` → `PdbScoringService` | PDB → score | semaphore 10 | SASA, Aggrescan3D |
 
 To add a new microservice: subclass the appropriate template, implement `load_model()` and the prediction method (`predict_impl()` / `predict_structure()` / `score_pdb()`). The template handles HTTP, concurrency, and health checks.
 
 Each service directory also contains a `Dockerfile` and a `pyproject.toml` with optional dependency groups (`ml`, `service`, `all`).
+
+**Supporting template files:**
+- `tools/template/logger.py` — unified `get_logger(name)` with rotating file handler (10 MB, 5 backups) in `tools/logs/<name>.log` plus console output
+- `tools/template/job_manager.py` — `JobManager` for async structure prediction jobs (used via `create_app(..., enable_async=True)`); supports in-memory or JSON-file-persisted job tracking with 24h TTL cleanup
+- `tools/utils.py` — `detect_gpu()` and `detect_system()` for cross-service GPU detection (CUDA > MPS > CPU), called by each service's `load_model()`
 
 Full service catalog and I/O details: `main/docs/TOOLS-usage.md`
 Speed/resource reference: `main/docs/TOOLS-speed.md`
@@ -98,7 +108,7 @@ Microservices are grouped by pipeline role (defined in `main/config.py`):
 |-------|-----------|----------|---------------|
 | `score` | 8001–8012 | AnOxPePred, BepiPred-3.0, MHCflurry, pLM4CPPs, TIPred, GraphCPP, TemStaPro, SoDoPE | Peptide-level scoring/ranking |
 | `filter` | 8003–8008 | ToxinPred3, HemoPI2, AlgPred2 | Hard-filter (toxic/hemolytic/allergenic — absolute elimination) |
-| `structure` | 8201–8202 | AlphaFold3, PEP-FOLD4 | 3D structure generation (PDB/mmCIF) |
+| `structure` | 8201–8204 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold | 3D structure generation (PDB/mmCIF) |
 | `pdb_score` | 8101–8102 | SASA, Aggrescan3D | PDB-based residue-level scoring |
 
 Remote service override: set `{NAME}_HOST` (and optionally `{NAME}_PORT`) env vars to point any service at a different machine (see `main/config.py:service_url()`).

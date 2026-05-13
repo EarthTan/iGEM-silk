@@ -111,7 +111,9 @@ class ESMFoldService(StructureService):
             raise RuntimeError(self._ready_message)
 
         gpu_name = torch.cuda.get_device_name(0)
-        gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1 << 30)
+        props = torch.cuda.get_device_properties(0)
+        total_mem = getattr(props, 'total_memory', getattr(props, 'total_mem', 0))
+        gpu_mem = total_mem / (1 << 30)
         self.logger.info("GPU: %s (%.0f GB)", gpu_name, gpu_mem)
 
         import esm
