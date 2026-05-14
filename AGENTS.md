@@ -9,6 +9,8 @@
    
 
 
-# Agent 行为守则
+# Agent 须知
 
 1. Never use subagent, do it yourself, step by step.
+2. `.agents/learnings` 存储了学到的经验和教训，值得参考
+3. `.agents/skills` 是本项目常用的skill，其中就包括了 "GEP-creator"
