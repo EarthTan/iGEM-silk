@@ -16,3 +16,7 @@
 - [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
 - [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
 - [Waveflow 远程 API 代理微服务模式](gep-waveflow-remote-api-service.md) — GEP: Tamarind.bio REST API 包装为本地结构预测微服务；工具类型 URL 路由；ZIP 结果解压；API 响应格式适配
+- [流水线阶段编排与检查点恢复](gep-pipeline-stage-orchestration.md) — GEP: 独立脚本架构，JSON 检查点支持中断恢复，输出目录约定，STATUS.md 全局进度指针
+- [freesasa 2.2.1 selectArea API 不兼容](gep-freesasa-selectarea-api.md) — GEP: freesasa selectArea() 从 tuple 列表改为单字符串格式，TypeError: expected bytes 的排查与修复
+- [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
+- [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
