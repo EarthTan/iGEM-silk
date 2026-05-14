@@ -21,8 +21,9 @@ ESMFold 使用 ESM-2 (3B) 语言模型直接从序列端到端预测蛋白质三
     TORCH_HOME=../models/fair-esm/ uv run python service.py
 
 环境变量:
-    TORCH_HOME        PyTorch 模型缓存目录（推荐指向 tools/models/fair-esm/）
-    JOBS_FILE         异步 Job 持久化路径（可选）
+    TORCH_HOME          PyTorch 模型缓存目录（推荐指向 tools/models/fair-esm/）
+    ESMFOLD_MODEL_URL   ESMFold checkpoint URL 覆盖（镜像源时使用）
+    JOBS_FILE           异步 Job 持久化路径（可选）
 
 API 端点:
     GET  /                   → 服务信息
@@ -157,7 +158,10 @@ class ESMFoldService(StructureService):
                     mapping[key] = new_key
             return mapping
 
-        model_url = "https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt"
+        model_url = os.environ.get(
+            "ESMFOLD_MODEL_URL",
+            "https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt",
+        )
         model_data = torch.hub.load_state_dict_from_url(
             model_url, progress=False, map_location="cpu",
         )

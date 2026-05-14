@@ -10,6 +10,10 @@ Aggrescan3D PDB 聚集倾向分析微服务。
 Aggrescan3D 本体依赖 Python 2.7。本服务通过 conda 环境调用 aggrescan 命令，
 解析原始输出 `A3D.csv`。
 
+使用方式：推荐通过 Docker Compose 运行（--profile cpu）。
+  非 Docker 运行需要手动配置 conda Python 2.7 环境并安装 aggrescan3d。
+  参考: https://bitbucket.org/lcbio/aggrescan3d
+
 API 端点：
     GET  /              → 服务信息
     GET  /health        → 健康检查
@@ -18,7 +22,7 @@ API 端点：
     POST /predict/batch → 批量 PDB 评分
 
 环境变量：
-    AGGRESCAN_CONDA_ENV  Aggrescan3D conda 环境路径
+    AGGRESCAN_CONDA_ENV  Aggrescan3D conda 环境路径（非 Docker 时必须设置）
                           (默认: /home/lenovo/miniconda3/envs/aggrescan3d)
     A3D_KEEP_WORKSPACE   设为 1 保留临时工作目录便于调试
     A3D_WORKSPACE        workspace 根目录 (默认: /tmp/a3d_workspace)
@@ -273,8 +277,21 @@ class Aggrescan3DService(PdbScoringService):
         self.logger.info("  [%s] aggrescan: %s", status, msg_agg)
 
         if not ok_agg:
+            in_docker = os.path.exists("/.dockerenv")
             self._ready_message = (
-                "Aggrescan3D NOT available. " + msg_agg
+                "Aggrescan3D NOT available. " + msg_agg + "\n"
+                "此服务依赖 conda Python 2.7 环境中的 aggrescan 命令。\n"
+                + (
+                    "推荐方式：\n"
+                    "  docker compose --profile cpu up -d aggrescan3d\n"
+                    "非 Docker 方式：\n"
+                    "  1. 安装 miniconda2 并创建 Python 2.7 环境\n"
+                    "  2. conda install -c lcbio aggrescan3d\n"
+                    "  3. export AGGRESCAN_CONDA_ENV=/path/to/conda/envs/aggrescan3d\n"
+                    "  4. 重新启动本服务"
+                    if not in_docker else
+                    "Docker 内部 aggrescan 未安装，请检查 Dockerfile 构建是否成功。"
+                )
             )
             self.logger.warning("%s", self._ready_message)
             raise RuntimeError(self._ready_message)

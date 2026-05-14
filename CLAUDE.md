@@ -25,7 +25,8 @@ uv run pytest
 
 # Start all microservices (Docker, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
-# Profiles: --profile gpu (CUDA services), --profile cpu (CPU-only services)
+# Profiles: --profile gpu (CUDA-accelerated services; most also support CPU fallback)
+#           --profile cpu (CPU-only services, inc. Docker-in-Docker: AlphaFold3, PEP-FOLD4)
 # Mounts shared model cache (tools/models/) into containers
 # Logs: tools/logs/<name>.log (or: docker compose logs -f)
 
@@ -49,6 +50,37 @@ export ANOXPEPRED_PORT=8001
 # Single microservice test (from project root)
 python -c "from main.client import ServiceClient; import asyncio; print(asyncio.run(ServiceClient().check_health()))"
 ```
+
+## Portability: where do models come from?
+
+Startup classification for each microservice — what it needs to run on a fresh machine:
+
+| Needs | Services | What to do |
+|-------|----------|------------|
+| **Nothing (git-tracked)** | AnOxPePred, GraphCPP, SoDoPE, SASA, TIPred | `uv sync && python service.py` |
+| **Pip package (model in `.venv`)** | ToxinPred3, AlgPred2, HemoPI2, MHCflurry | `uv sync` — models come with the package |
+| **Auto-download (~1–8 GB)** | BepiPred-3.0, pLM4CPPs, ESMFold, OmegaFold, TemStaPro | First startup downloads from CDN; see mirror config below |
+| **Docker only** | AlphaFold3, PEP-FOLD4, Aggrescan3D | `docker compose --profile gpu --profile cpu up -d` |
+| **API key required** | Waveflow | Set `TAMARIND_API_KEY` |
+
+**Mirror configuration for model downloads** (needed in China or air-gapped networks):
+
+```bash
+# HuggingFace models (TemStaPro ProtT5-XL, HemoPI2 ESM-2)
+export HF_ENDPOINT=https://hf-mirror.com
+
+# Meta fair-esm / ESMFold models
+export ESMFOLD_MODEL_URL=https://internal-mirror.example.com/esmfold_3B_v1.pt
+export ESM2_URL=https://internal-mirror.example.com/esm2_t33_650M_UR50D.pt
+
+# OmegaFold weights
+export OMEGAFOLD_WEIGHTS_URL=https://internal-mirror.example.com/omegafold/release1.pt
+
+# Pre-download manually (alternative): see tools/README.md for paths
+```
+
+**GPU / CPU notes:** Several services tagged as `gpu` in docker-compose support CPU fallback:
+AnOxPePred, HemoPI2, MHCflurry, pLM4CPPs, GraphCPP, TemStaPro. Only ESMFold and AlphaFold3 strictly require GPU (CUDA).
 
 ## Architecture
 
