@@ -81,7 +81,7 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 
 ### 模型管理
 
-每个服务的模型文件通过以下四种方式之一获取：
+每个服务的模型文件通过以下五种方式之一获取：
 
 | 来源 | 标签 | 位置 | 示例 |
 |------|------|------|------|
@@ -97,9 +97,12 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 tools/models/
   fair-esm/                     ← ESM-2 checkpoints（torch.hub 缓存）
     hub/checkpoints/
-      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务
-      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务
-      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干）
+      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务（已 Git 跟踪 ~29 MB）
+      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务（首次自动下载 ~2.5 GB）
+      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干，首次自动下载 ~5.3 GB）
+      esmfold_3B_v1.pt          ← ESMFold 结构头（首次自动下载 ~2.6 GB）
+  omegafold/
+    model.pt                    ← OmegaFold 权重（首次自动下载 ~1.5 GB）
 ```
 
 BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
@@ -107,3 +110,49 @@ BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/
 共享池**仅存放被 ≥2 个服务使用的模型**或者**体积较大的模型**。独有且体积较小模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
 
 Docker 部署通过 volume 挂载 `tools/models/` 到容器内对应路径，模型不进入镜像。
+
+### 模型下载与镜像源配置
+
+以下模型在首次启动时从海外 CDN 自动下载，在中国大陆网络环境可能失败。
+可通过设置环境变量覆盖下载地址（指向镜像或本地路径）：
+
+| 服务 | 自动下载的模型 | 大小 | 默认源 | 覆盖环境变量 |
+|------|---------------|------|--------|-------------|
+| ESMFold | esmfold_3B_v1.pt | ~2.6 GB | `dl.fbaipublicfiles.com/fair-esm/` (Meta CDN) | `ESMFOLD_MODEL_URL` |
+| BepiPred-3.0 | esm2_t33_650M_UR50D.pt | ~2.5 GB | 同上 | `ESM2_URL` |
+| TemStaPro | ProtT5-XL | ~3 GB | HuggingFace `Rostlab/prot_t5_xl_half_uniref50-enc` | `HF_ENDPOINT=https://hf-mirror.com` |
+| OmegaFold | release1.pt | ~1.5 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
+| HemoPI2 | ESM-2 t6（通过 pip） | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
+
+镜像源配置示例：
+
+```bash
+# 使用 HuggingFace 镜像（适用于 ProtT5-XL、HemoPI2 的 ESM-2）
+export HF_ENDPOINT=https://hf-mirror.com
+
+# 使用自定义模型 URL（适用于 ESMFold、BepiPred-3.0 的 fair-esm 模型）
+export ESMFOLD_MODEL_URL=https://internal-mirror.example.com/models/esmfold_3B_v1.pt
+export ESM2_URL=https://internal-mirror.example.com/models/esm2_t33_650M_UR50D.pt
+
+# 使用自定义 OmegaFold 权重 URL
+export OMEGAFOLD_WEIGHTS_URL=https://internal-mirror.example.com/omegafold/release1.pt
+
+# 预下载方式：手动下载后放到共享缓存
+# wget -P tools/models/fair-esm/hub/checkpoints/ \
+#   https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt
+```
+
+### 运行环境说明
+
+**GPU vs CPU：** 以下服务在 docker-compose 中被标记为 `gpu` profile，但实际支持 CPU 降级运行：
+
+- AnOxPePred（TensorFlow 自动设备选择，缺模型时降级为规则）
+- HemoPI2 / MHCflurry / pLM4CPPs / GraphCPP / TemStaPro（PyTorch 自动设备选择）
+
+**仅 Docker 运行的服务：**
+- AlphaFold3 — 需要 NVIDIA Docker + Linux 宿主机，通过 Docker CLI 调用
+- PEP-FOLD4 — 通过 Docker CLI 调用，CPU 即可
+- Aggrescan3D — 依赖 conda Python 2.7 环境，推荐 Docker Compose
+
+**外部依赖服务：**
+- Waveflow — 需要 tamarind.bio API 密钥 (`TAMARIND_API_KEY`)，无需本地 GPU/模型
