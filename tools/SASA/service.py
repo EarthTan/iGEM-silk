@@ -194,8 +194,9 @@ class SASAService(PdbScoringService):
                 rid = res.id[1]
                 resname = res.resname.upper()
 
+                # freesasa 2.2.1+ API: ["name, selection"] 单字符串格式
                 sel = freesasa.selectArea(
-                    [("residue", f"resi {rid} and chain {chain}")],
+                    [f"residue, resi {rid} and chain {chain}"],
                     fs_struct, fs_result,
                 )
                 sasa_val = sel.get("residue", 0.0)
