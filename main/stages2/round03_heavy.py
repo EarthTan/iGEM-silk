@@ -281,12 +281,13 @@ async def run():
     # 检查 TemStaPro 是否可用
     temstapro_available = False
     try:
-        health = await client.check_health("temstapro")
-        if health.get("status") == "healthy" and health.get("model_loaded"):
+        health = await client.check_health(["temstapro"])
+        h = health.get("temstapro", {})
+        if h.get("status") == "healthy" and h.get("available", False):
             temstapro_available = True
             log(f"\nTemStaPro 可用 ✅ 将参与评分")
         else:
-            log(f"\nTemStaPro 不可用 (status={health.get('status')})，跳过")
+            log(f"\nTemStaPro 不可用 (status={h.get('status')})，跳过")
     except Exception as e:
         log(f"\nTemStaPro 不可用 ({e})，跳过")
 
