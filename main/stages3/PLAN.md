@@ -141,8 +141,8 @@ Stage 2 跑全量 7+ 个服务的分数
 
 | 服务 | 角色 | 策略 |
 |------|------|------|
-| ESMFold | 主力 | 所有 construct 优先使用 |
-| OmegaFold | 串联并行 | ESMFold 失败时的补充 |
+| ESMFold | 备选 |默认不使用 |
+| OmegaFold | 主力  | 所有 construct 优先使用|
 | AlphaFold3 / PEP-FOLD4 | 保留 | 当前轮次暂不启用 |
 
 **关键约束**: 单机单 GPU，128G 内存。ESMFold 和 OmegaFold 必须串行推理。预计每个 construct 约 2-6 分钟。
