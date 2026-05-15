@@ -2,7 +2,7 @@
 Round 3：重服务评分
 
 在 Top 10,000 条候选肽上运行 1-2 个追加重服务：
-  - BepiPred-3.0（B 细胞表位，权重 0.10，正向，~50 seq/s）
+  - BepiPred-3.0（B 细胞表位，权重 0.10，反向——高表位=免疫原性风险大，~50 seq/s）
   - TemStaPro（热稳定性，权重 0.05，正向，可选）
 
 合并 Round 1+2 的全部 5 个服务分数，用 6-7 服务权重重算最终综合分，
@@ -47,12 +47,13 @@ STAGE_DIR = OUTPUT_DIR / STAGE
 from main.client import ServiceClient
 
 LOG_FILE: Path | None = None
-MAX_BATCH_SIZE = 1000
-CONCURRENT_CHUNKS = 10
+MAX_BATCH_SIZE = 200          # 小批次避免单批挂死；BepiPred GPU ~50 seq/s，200条约4s
+CONCURRENT_CHUNKS = 2          # GPU 串行模型（ESM-2），并发高导致排队超时
+PER_BATCH_TIMEOUT = 300       # 每批超时秒数（BepiPred ESM-2 偶尔挂死）
 
 # ── Round 3 新增服务 ──
 NEW_SERVICES = [
-    ("bepipred3",   0.10, False, "B 细胞表位（正向）"),
+    ("bepipred3",   0.10, True, "B 细胞表位（反向——越高越易被免疫系统识别，风险越大）"),
 ]
 
 # TemStaPro 可选 —— 如果服务健康则追加
@@ -186,8 +187,19 @@ async def process_service(
     async def process_chunk(chunk: list[dict]) -> None:
         nonlocal errors
         async with sem:
-            result = await client.predict_batch(service_name, chunk)
-            if result.get("success") and result.get("results"):
+            try:
+                result = await asyncio.wait_for(
+                    client.predict_batch(service_name, chunk),
+                    timeout=PER_BATCH_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                result = None
+            if result is None:
+                errors += 1
+                for item in chunk:
+                    pid = item.get("peptide_id", "unknown")
+                    all_results[pid] = {"score": None, "label": "TIMEOUT"}
+            elif result.get("success") and result.get("results"):
                 for r in result["results"]:
                     pid = r.get("peptide_id", "unknown")
                     all_results[pid] = {
@@ -244,6 +256,17 @@ async def run():
 
     total = len(peptides)
     log(f"\n输入: {total:,} 条 (Round 2 Top 10K)")
+
+    # ── 抗氧化性门槛 ──
+    ANOX_THRESHOLD = 0.50
+    before = len(peptides)
+    peptides = [p for p in peptides if p.get("anoxpepred") is not None and p["anoxpepred"] > ANOX_THRESHOLD]
+    after = len(peptides)
+    log(f"抗氧化性门槛: anoxpepred > {ANOX_THRESHOLD} — {before:,} → {after:,} 条 (过滤 {before-after:,})")
+    total = after
+    if total == 0:
+        log("无肽通过抗氧化性门槛，终止")
+        return
 
     # ── 分块 ──
     chunks: list[list[dict]] = []
@@ -310,7 +333,7 @@ async def run():
     # ══════════════════════════════════════════════════════════════════
     log(f"\n重算最终综合分 ({len(all_services_list)} 服务)...")
 
-    reverse_services = {"toxinpred3", "algpred2", "hemopi2", "mhcflurry"}
+    reverse_services = {"toxinpred3", "algpred2", "hemopi2", "mhcflurry", "bepipred3"}
 
     scored_peptides: list[dict] = []
     for pep in peptides:
