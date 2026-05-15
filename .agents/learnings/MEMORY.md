@@ -20,3 +20,4 @@
 - [freesasa 2.2.1 selectArea API 不兼容](gep-freesasa-selectarea-api.md) — GEP: freesasa selectArea() 从 tuple 列表改为单字符串格式，TypeError: expected bytes 的排查与修复
 - [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
 - [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
+- [ToxinPred3 单线程并发限制](gep-toxinpred3-concurrency-limit.md) — GEP: sklearn ExtraTrees 挂死根因；`asyncio.wait_for` 不可靠 vs `requests` socket 超时；小批次+连续超时检测+服务重启策略
