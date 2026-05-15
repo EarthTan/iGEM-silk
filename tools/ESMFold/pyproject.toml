@@ -4,9 +4,10 @@ version = "1.0.0"
 description = "ESMFold 3D 结构预测微服务 — Meta FAIR"
 requires-python = ">=3.10"
 dependencies = [
-    "fair-esm>=3.0.0",
+    "fair-esm>=2.0.0",
     "torch>=2.0.0",
     "biotite>=0.39.0",
+    "omegaconf",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.0.0",
@@ -14,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-    "fair-esm>=3.0.0",
+    "fair-esm>=2.0.0",
     "torch>=2.0.0",
     "biotite>=0.39.0",
 ]
@@ -24,7 +25,7 @@ service = [
     "pydantic>=2.0.0",
 ]
 all = [
-    "fair-esm>=3.0.0",
+    "fair-esm>=2.0.0",
     "torch>=2.0.0",
     "biotite>=0.39.0",
     "fastapi>=0.115.0",
