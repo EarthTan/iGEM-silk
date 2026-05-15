@@ -21,3 +21,6 @@
 - [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
 - [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
 - [ToxinPred3 单线程并发限制](gep-toxinpred3-concurrency-limit.md) — GEP: sklearn ExtraTrees 挂死根因；`asyncio.wait_for` 不可靠 vs `requests` socket 超时；小批次+连续超时检测+服务重启策略
+- [OmegaFold 同步推理阻塞事件循环](gep-omegafold-sync-inference-blocking.md) — GEP: async def 中同步 PyTorch 推理阻塞 uvicorn 事件循环；客户端 Semaphore 串行化；服务端 run_in_executor 修复方案
+- [Docker 容器桥接 IP 直连](gep-docker-container-bridge-ip.md) — GEP: docker-proxy 在 httpx 长连接下的间歇性故障；docker inspect 获取 bridge IP 绕过代理；诊断方法（宿主机 vs 容器内 curl）
+- [asyncio.gather 异常传播陷阱](gep-asyncio-gather-exception-safety.md) — GEP: 单个 task 异常导致全部任务被取消；双层隔离策略（return_exceptions + 独立 try/except）
