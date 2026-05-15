@@ -38,7 +38,7 @@ from main.client import ServiceClient
 
 LOG_FILE: Path | None = None
 MAX_BATCH_SIZE = 1000
-CONCURRENT_CHUNKS = 10
+CONCURRENT_CHUNKS = 2  # ToxinPred3 sklearn 单线程，高并发导致 socket 堆积
 
 # ── 完整 5 服务权重 ──
 ALL_WEIGHTS = {
