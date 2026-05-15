@@ -11,7 +11,7 @@
     .venv/bin/python -m main.stages.stage04_enumerate
 
 输入：
-    output/stage02_score/final/top80.csv
+    output/round03_heavy/final/top80.csv
     data/silk.fasta
     data/linker.fasta
 
@@ -48,7 +48,7 @@ from main.data_loader import load_fasta
 LOG_FILE: Path | None = None
 
 # ── 配置 ──
-TOP_PEPTIDES = 20           # 枚举前 N 条肽
+TOP_PEPTIDES = 40           # 枚举前 N 条肽
 TOP_GROUPS = 30             # 选 Top K 组（每组 → 3 position → 90 construct）
 HIS_TAG = "LEHHHHHH"
 
@@ -63,8 +63,8 @@ POSITIONS = [
     ("Both", "两端"),
 ]
 
-WEIGHT_PEPTIDE = 0.60
-WEIGHT_SODOPE = 0.30
+WEIGHT_PEPTIDE = 0.65        # 肽综合分（AnOxPePred 主导，权重 0.65 → 0.65/(0.65+0.30)=68.4%）
+WEIGHT_SODOPE = 0.30         # SoDoPE 可溶性
 WEIGHT_TEMSTAPRO = 0.10
 
 
@@ -136,7 +136,7 @@ async def run():
     log(f"Linker: {len(selected_linkers)} 种")
 
     # ── 3. 优选肽 ──
-    stage2_path = OUTPUT_DIR / "stage02_score" / "final" / "top80.csv"
+    stage2_path = OUTPUT_DIR / "round03_heavy" / "final" / "top80.csv"
     if not stage2_path.exists():
         log(f"❌ 找不到阶段二输出")
         return
