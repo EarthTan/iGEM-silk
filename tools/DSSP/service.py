@@ -63,8 +63,8 @@ SS_NAME_MAP: dict[str, str] = {
     " ": "none",
 }
 
-DEFAULT_BETA_FRACTION_THRESHOLD = 0.30
-DEFAULT_CONSECUTIVE_BETA_THRESHOLD = 3
+DEFAULT_BETA_FRACTION_THRESHOLD = float(os.environ.get("DSSP_BETA_FRACTION_THRESHOLD", "0.30"))
+DEFAULT_CONSECUTIVE_BETA_THRESHOLD = int(os.environ.get("DSSP_CONSECUTIVE_BETA_THRESHOLD", "3"))
 
 
 class DSSPService(PdbScoringService):
@@ -345,8 +345,9 @@ class DSSPService(PdbScoringService):
                 "beta_fraction_threshold": summary["beta_fraction_threshold"],
                 "consecutive_beta_threshold": summary["consecutive_beta_threshold"],
                 "selected_residues": selected_residues,
-                "all_residues": residues,
             }
+            if sequence and selected_residues is not residues:
+                details["all_residues"] = residues
 
             return PdbScoreResult(
                 score=summary["score"],
