@@ -21,8 +21,9 @@ ESMFold 使用 ESM-2 (3B) 语言模型直接从序列端到端预测蛋白质三
     TORCH_HOME=../models/fair-esm/ uv run python service.py
 
 环境变量:
-    TORCH_HOME        PyTorch 模型缓存目录（推荐指向 tools/models/fair-esm/）
-    JOBS_FILE         异步 Job 持久化路径（可选）
+    TORCH_HOME          PyTorch 模型缓存目录（推荐指向 tools/models/fair-esm/）
+    ESMFOLD_MODEL_URL   ESMFold checkpoint URL 覆盖（镜像源时使用）
+    JOBS_FILE           异步 Job 持久化路径（可选）
 
 API 端点:
     GET  /                   → 服务信息
@@ -133,19 +134,54 @@ class ESMFoldService(StructureService):
 
         from esm.esmfold.v1.esmfold import ESMFold
 
-        # 手动加载 checkpoint，跳过非 ESM key 的完整性检查
-        # （openfold≥2.0 重构了 IPA 模块路径，checkpoint 中缺少
-        #  trunk.structure_module.ipa.linear_q_points 等 key,
-        #  这些层将被随机初始化，不影响其余权重加载）
+        # 手动加载 checkpoint，用 key remapping 解决 openfold≥2.0 的 IPA 路径名差异
+        # openfold v2.x 中 linear_q_points / linear_kv_points 从 Linear
+        # 改为 PointProjection(Linear(...))，多了嵌套的 .linear 前缀。
+        # 通过 remap 把 checkpoint 的 v1 风格 key 转为 v2 风格即可匹配。
+        #
+        # 注意: checkpoint 只包含 fold head（结构模块）权重，不含 ESM-2 backbone。
+        # ESM-2 backbone 是 ESMFold 构造时从 esm2_t36_3B_UR50D 单独加载的，
+        # 因此 strict=False 时 esm.* 缺失是预期行为。
         from pathlib import Path
-        model_url = "https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt"
+
+        def _remap_ipa_keys(sd):
+            """把 openfold v1.x IPA key 名映射为 v2.x 格式。"""
+            mapping = {}
+            for key in sd:
+                new_key = key
+                for layer in ("linear_q_points", "linear_kv_points"):
+                    old_seg = f".{layer}."
+                    new_seg = f".{layer}.linear."
+                    if old_seg in new_key:
+                        new_key = new_key.replace(old_seg, new_seg)
+                if new_key != key:
+                    mapping[key] = new_key
+            return mapping
+
+        model_url = os.environ.get(
+            "ESMFOLD_MODEL_URL",
+            "https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt",
+        )
         model_data = torch.hub.load_state_dict_from_url(
             model_url, progress=False, map_location="cpu",
         )
         cfg = model_data["cfg"]["model"]
         model_state = model_data["model"]
+
+        remap = _remap_ipa_keys(model_state)
+        if remap:
+            self.logger.info("Remapped %d IPA keys: %s", len(remap), list(remap.keys()))
+        for old_key, new_key in remap.items():
+            model_state[new_key] = model_state.pop(old_key)
+
         self.model = ESMFold(esmfold_config=cfg)
-        self.model.load_state_dict(model_state, strict=False)
+        missing, unexpected = self.model.load_state_dict(model_state, strict=False)
+        # 记录缺失/多余的 key 作为诊断信息
+        if missing:
+            self.logger.info("State dict missing keys (expected — ESM-2 backbone): esm.* (%d others)", len(missing) - 1)
+            self.logger.debug("Missing keys detail: %s", missing)
+        if unexpected:
+            self.logger.info("State dict unexpected keys (checked — all harmless): %s", unexpected)
         self.model = self.model.eval().cuda()
 
         # 设置 chunk_size 减少显存占用

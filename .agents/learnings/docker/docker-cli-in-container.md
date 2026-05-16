@@ -1,19 +1,21 @@
 ---
-name: 容器内 Docker CLI 安装
-description: 需要在容器内调用宿主机 Docker 时，挂载宿主机 /usr/bin/docker 二进制文件优于在容器内安装 Docker 包
+name: 容器内 Docker CLI 安装 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, docker-socket, dind, docker-cli, iGEM-silk]
 validated: true
 ---
 
-# 容器内 Docker CLI 安装
+# Gene Capsule: 容器内 Docker CLI 安装
 
 ## Experience
 
-- **问题类型**: 容器内需要 `docker` 命令行工具
-- **核心策略**: 优先挂载宿主机 `/usr/bin/docker`，避免在容器内安装任何 Docker 包
-- **关键参数**: docker.sock 挂载 + docker 二进制文件挂载
+**问题类型**: 容器内需要 `docker` 命令行工具来调用宿主机 Docker 守护进程。
+
+**核心策略**: 优先挂载宿主机 `/usr/bin/docker`，避免在容器内安装任何 Docker 包。
+
+**关键参数**: docker.sock 挂载 + docker 二进制挂载
 
 PEP-FOLD4、AlphaFold3、Aggrescan3D 需要在容器内运行 `docker` 命令访问宿主机 Docker 守护进程。
 

@@ -1,8 +1,26 @@
-- [Docker-outside-Docker 路径解析](docker-outside-docker-paths.md) — 通过 Docker socket 启动容器时，volume 源路径由宿主机 Docker 守护进程解析，而非 API 容器内部
-- [Docker 服务镜像构建](docker-services-build.md) — Docker Hub 在中国网络不可达时，预拉取镜像到缓存即可，无需修改 compose 配置
-- [GPU 显存争用](gpu-memory-contention.md) — 多个 GPU 微服务同时运行时，48GB 显存会被耗尽，需逐个测试并确认显存空闲
-- [Structure Service Patterns](structure-service-pattern.md) — Docker base, torch CUDA wheel, model cache, pLDDT normalization, pyproject naming
-- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — Worktree workflow, docker-compose merge fix pattern for parallel service PRs
-- [微服务网络绑定策略](microservice-host-binding.md) — 所有服务绑 0.0.0.0，不修改服务代码，由 Docker Compose 端口映射控制暴露范围
-- [依赖版本排错教训](dependency-version-troubleshooting.md) — ESMFold/openfold/fair-esm 版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
-- [ESMFold Docker 构建](esmfold-docker-build.md) — 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查
+- [GPU 显存争用](gpu-memory-contention.md) — GEP: 多个 GPU 微服务共享 48GB 显存的 OOM 排查与避免策略
+- [Structure Service Patterns](structure-service-pattern.md) — GEP: 结构预测微服务的 Docker 镜像/CUDA/模型缓存/包命名标准化模式
+- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — GEP: 多分支并行开发的 worktree 隔离与可预测的合并冲突解决
+- [微服务网络绑定策略](microservice-host-binding.md) — GEP: 所有服务绑 0.0.0.0，由 Docker Compose 端口映射控制暴露范围
+- [ESMFold 依赖版本矩阵](gep-esmfold-dependency-matrix.md) — GEP: ESMFold 依赖版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
+- [ESMFold Docker 三层构建模式](gep-esmfold-docker-build.md) — GEP: 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查
+- [多层依赖链排错方法论](gep-dependency-troubleshooting-methodology.md) — GEP: 完整栈追踪→排除法→双向尝试→连锁升级→运行时补丁，通用排错策略
+- [Docker-outside-Docker 路径解析](docker/docker-outside-docker-paths.md) — GEP: docker.sock 嵌套调用时 volume 宿主机路径与容器路径分离
+- [容器内 Docker CLI 安装](docker/docker-cli-in-container.md) — GEP: 挂载宿主机 docker 二进制而非在容器内安装
+- [Docker Compose 构建原子性缺陷](docker/compose-atomic-build.md) — GEP: 多服务构建一个失败全回滚，应分批构建
+- [slim 镜像缺少 C 扩展编译依赖](docker/slim-image-build-deps.md) — GEP: python:slim 需 gcc/python3-dev/pkg-config 编译原生扩展
+- [Dockerfile COPY 遗漏审计](docker/dockerfile-copy-audit.md) — GEP: 批量扫描 Dockerfile 确保共享文件（utils.py/template/）被 COPY
+- [docker-compose dockerfile 路径一致性](docker/dockerfile-path-compose.md) — GEP: dockerfile 路径相对于 build context，含批量校验脚本
+- [构建失败时的批量审计策略](docker/batch-failure-audit.md) — GEP: 全量审计替代逐轮 CI 修复，大幅缩短多服务调试周期
+- [Docker latest tag 版本不确定性](docker/latest-tag-pinning.md) — GEP: pin 具体版本避免 :latest 的 breaking change
+- [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
+- [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
+- [Waveflow 远程 API 代理微服务模式](gep-waveflow-remote-api-service.md) — GEP: Tamarind.bio REST API 包装为本地结构预测微服务；工具类型 URL 路由；ZIP 结果解压；API 响应格式适配
+- [流水线阶段编排与检查点恢复](gep-pipeline-stage-orchestration.md) — GEP: 独立脚本架构，JSON 检查点支持中断恢复，输出目录约定，STATUS.md 全局进度指针
+- [freesasa 2.2.1 selectArea API 不兼容](gep-freesasa-selectarea-api.md) — GEP: freesasa selectArea() 从 tuple 列表改为单字符串格式，TypeError: expected bytes 的排查与修复
+- [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
+- [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
+- [ToxinPred3 单线程并发限制](gep-toxinpred3-concurrency-limit.md) — GEP: sklearn ExtraTrees 挂死根因；`asyncio.wait_for` 不可靠 vs `requests` socket 超时；小批次+连续超时检测+服务重启策略
+- [OmegaFold 同步推理阻塞事件循环](gep-omegafold-sync-inference-blocking.md) — GEP: async def 中同步 PyTorch 推理阻塞 uvicorn 事件循环；客户端 Semaphore 串行化；服务端 run_in_executor 修复方案
+- [Docker 容器桥接 IP 直连](gep-docker-container-bridge-ip.md) — GEP: docker-proxy 在 httpx 长连接下的间歇性故障；docker inspect 获取 bridge IP 绕过代理；诊断方法（宿主机 vs 容器内 curl）
+- [asyncio.gather 异常传播陷阱](gep-asyncio-gather-exception-safety.md) — GEP: 单个 task 异常导致全部任务被取消；双层隔离策略（return_exceptions + 独立 try/except）

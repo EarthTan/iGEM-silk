@@ -1,19 +1,21 @@
 ---
-name: Docker-outside-Docker 路径解析
-description: 当容器通过挂载 docker.sock 调用宿主机 Docker 守护进程时，docker run --volume 的源路径由宿主机解析，而非容器内路径
+name: Docker-outside-Docker 路径解析 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, docker-socket, volume-mount, path-resolution, iGEM-silk]
 validated: true
 ---
 
-# Docker-outside-Docker 路径解析
+# Gene Capsule: Docker-outside-Docker 路径解析
 
 ## Experience
 
-- **问题类型**: Docker socket 嵌套调用时的路径解析错误
-- **核心策略**: 区分"容器内路径"（health check 用）和"宿主机路径"（Docker socket `--volume` 用），通过独立环境变量分别传递
-- **关键参数**: `AF3_MODEL_DIR`（容器内）、`AF3_MODEL_HOST_DIR`（宿主机绝对路径）
+**问题类型**: Docker socket 嵌套调用时的路径解析错误——`docker run --volume` 的源路径由宿主机 Docker 守护进程解析，而非 API 容器内部路径。
+
+**核心策略**: 区分"容器内路径"（health check 用）和"宿主机路径"（Docker socket `--volume` 用），通过独立环境变量分别传递。
+
+**关键参数**: `AF3_MODEL_DIR`（容器内）、`AF3_MODEL_HOST_DIR`（宿主机绝对路径）
 
 当 API 容器通过挂载 `/var/run/docker.sock` 调用宿主机 Docker 守护进程运行其他容器时，`docker run --volume` 的源路径由**宿主机 Docker 守护进程**解析，不是 API 容器内部路径。
 
@@ -52,7 +54,7 @@ cmd = ["docker", "run", "--volume", f"{self._model_host_dir}:/root/models", ...]
 
 - **任务域**: Docker 容器化部署
 - **输入特征**: 使用 `docker.sock` 挂载 + `docker run --volume` 的服务
-- **约束条件**: Docker-outside-of-Docker 架构（DinD 的反模式）
+- **约束条件**: Docker-outside-of-Docker 架构
 - **适用场景**:
   - `tools/AlphaFold3/` — 挂载模型参数和数据库目录
   - `tools/PEP-FOLD4/` — 挂载 workspace 目录

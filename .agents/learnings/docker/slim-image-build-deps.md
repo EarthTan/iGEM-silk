@@ -1,19 +1,21 @@
 ---
-name: slim 镜像缺少 C 扩展编译依赖
-description: python:slim 镜像不含 C 扩展编译所需的头文件和工具链，pip install 含原生扩展的包时失败
+name: slim 镜像缺少 C 扩展编译依赖 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, slim-image, build-deps, c-extensions, pip, iGEM-silk]
 validated: true
 ---
 
-# slim 镜像缺少 C 扩展编译依赖
+# Gene Capsule: slim 镜像缺少 C 扩展编译依赖
 
 ## Experience
 
-- **问题类型**: slim 基础镜像缺少编译工具链
-- **核心策略**: 所有 slim 镜像 Dockerfile 中如涉及 pip 安装原生扩展，标准配置应包括编译依赖
-- **关键参数**: `gcc`, `python3-dev`, `pkg-config`
+**问题类型**: slim 基础镜像缺少 C 扩展编译所需的头文件和工具链，pip install 安装含原生扩展的包时报错。
+
+**核心策略**: 所有 slim 镜像 Dockerfile 中如涉及 pip 安装原生扩展，标准配置应包括编译依赖：`gcc python3-dev pkg-config`。
+
+**关键参数**: `gcc`, `python3-dev`, `pkg-config`
 
 `python:3.11-slim` 不含 C 扩展编译所需的头文件和工具链。`pip install freesasa` 需要 `python3-dev` 和 `pkg-config`。
 

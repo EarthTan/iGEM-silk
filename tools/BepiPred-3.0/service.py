@@ -12,6 +12,7 @@ PyPI:   bp3==0.0.12.7
     python service.py
 
 注意：BepiPred-3.0 需要 ESM-2 模型编码，首次运行会下载模型（约 2.5GB）
+镜像源：设置环境变量 ESM2_URL 覆盖默认下载地址。
 """
 
 from __future__ import annotations
@@ -51,7 +52,10 @@ class BepiPred3Service(FastaToolService):
 
     _ESM_MODEL_NAME = "esm2_t33_650M_UR50D"
     _ESM_MODEL_SIZE = "~2.5 GB"
-    _ESM_DOWNLOAD_URL = "https://dl.fbaipublicfiles.com/fair-esm/models/esm2_t33_650M_UR50D.pt"
+    _ESM_DOWNLOAD_URL = os.environ.get(
+        "ESM2_URL",
+        "https://dl.fbaipublicfiles.com/fair-esm/models/esm2_t33_650M_UR50D.pt",
+    )
 
     async def load_model(self):
         """加载 BepiPred-3.0 模型并预下载 ESM-2 (~2.5 GB)。

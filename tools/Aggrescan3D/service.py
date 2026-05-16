@@ -7,9 +7,12 @@ Aggrescan3D PDB 聚集倾向分析微服务。
 原工具: Aggrescan3D standalone, Python 2.7, console entrypoint `aggrescan`
 论文: Kuriata et al. (2019), Aggrescan3D standalone package.
 
-Aggrescan3D 本体依赖 Python 2.7。为了不污染项目的 Python 3.11/uv 环境，
-本服务通过 Docker CLI 调用原作者镜像 `lcbio/a3d_server`，并解析原始输出
-`A3D.csv`。
+Aggrescan3D 本体依赖 Python 2.7。本服务通过 conda 环境调用 aggrescan 命令，
+解析原始输出 `A3D.csv`。
+
+使用方式：推荐通过 Docker Compose 运行（--profile cpu）。
+  非 Docker 运行需要手动配置 conda Python 2.7 环境并安装 aggrescan3d。
+  参考: https://bitbucket.org/lcbio/aggrescan3d
 
 API 端点：
     GET  /              → 服务信息
@@ -19,11 +22,12 @@ API 端点：
     POST /predict/batch → 批量 PDB 评分
 
 环境变量：
-    A3D_IMAGE          Aggrescan3D Docker 镜像名 (默认: lcbio/a3d_server)
-    A3D_KEEP_WORKSPACE  设为 1 保留临时工作目录便于调试
-    A3D_WORKSPACE      workspace 根目录 (默认: /tmp/a3d_workspace; Docker Compose 下需 volume mount)
-    A3D_TIMEOUT        单次预测超时秒数 (默认: 900)
-    A3D_DISTANCE       聚集距离阈值 (默认: 10)
+    AGGRESCAN_CONDA_ENV  Aggrescan3D conda 环境路径（非 Docker 时必须设置）
+                          (默认: /home/lenovo/miniconda3/envs/aggrescan3d)
+    A3D_KEEP_WORKSPACE   设为 1 保留临时工作目录便于调试
+    A3D_WORKSPACE        workspace 根目录 (默认: /tmp/a3d_workspace)
+    A3D_TIMEOUT          单次预测超时秒数 (默认: 900)
+    A3D_DISTANCE         聚集距离阈值 (默认: 10)
 """
 
 from __future__ import annotations
@@ -56,6 +60,7 @@ from tools.template.pdb_service import (
 
 DEFAULT_DISTANCE_CUTOFF = 10
 DEFAULT_TIMEOUT_SECONDS = 900
+DEFAULT_CONDA_ENV = "/home/lenovo/miniconda3/envs/aggrescan3d"
 
 
 @dataclass(frozen=True)
@@ -67,40 +72,25 @@ class A3DResidue:
     score: float
 
 
-def _check_docker() -> tuple[bool, str]:
-    """检查 Docker 守护进程是否可用。"""
+def _check_aggrescan(conda_env: str) -> tuple[bool, str]:
+    """检查 aggrescan 命令是否可用。"""
+    aggrescan_path = Path(conda_env) / "bin" / "aggrescan"
+    if not aggrescan_path.is_file():
+        return False, f"aggrescan not found at {aggrescan_path}"
     try:
         result = subprocess.run(
-            ["docker", "info", "--format", "{{.ServerVersion}}"],
+            [str(aggrescan_path), "--help"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
         )
         if result.returncode == 0:
-            return True, f"Docker {result.stdout.strip()}"
-        return False, f"Docker daemon not accessible: {result.stderr.strip()}"
-    except FileNotFoundError:
-        return False, "docker CLI not found"
+            return True, f"aggrescan found at {aggrescan_path}"
+        return False, f"aggrescan failed: {result.stderr.strip()}"
     except subprocess.TimeoutExpired:
-        return False, "docker info timed out"
+        return False, "aggrescan --help timed out"
     except Exception as exc:
-        return False, f"Docker check error: {exc}"
-
-
-def _check_a3d_image(image: str) -> tuple[bool, str]:
-    """检查 Aggrescan3D Docker 镜像是否存在。"""
-    try:
-        result = subprocess.run(
-            ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}", image],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return True, f"Image {image} found"
-        return False, f"Image '{image}' not found — run: docker pull {image}"
-    except Exception as exc:
-        return False, f"Image check error: {exc}"
+        return False, f"aggrescan check error: {exc}"
 
 
 def _parse_a3d_csv(path: Path) -> list[A3DResidue]:
@@ -261,7 +251,7 @@ class Aggrescan3DService(PdbScoringService):
     tool_name = "aggrescan3d"
     version = "1.0.2-wrapper"
     description = (
-        "Aggrescan3D 结构聚集倾向分析 — 原版 Python 2.7 CLI 经 Docker 封装，"
+        "Aggrescan3D 结构聚集倾向分析 — conda Python 2.7 环境，"
         "输入 PDB，输出逐残基 A3D score 和整体聚集风险。"
     )
     recommended_batch_size = 10
@@ -269,43 +259,49 @@ class Aggrescan3DService(PdbScoringService):
     def __init__(self):
         super().__init__()
         self._ready_message = "Not checked yet"
-        self._a3d_image = os.environ.get("A3D_IMAGE", "lcbio/a3d_server")
+        self._conda_env = os.environ.get(
+            "AGGRESCAN_CONDA_ENV", DEFAULT_CONDA_ENV
+        )
         self._keep_workspace = os.environ.get("A3D_KEEP_WORKSPACE", "") == "1"
         self._workspace_base = Path(os.environ.get("A3D_WORKSPACE", "/tmp/a3d_workspace"))
         self._timeout = int(os.environ.get("A3D_TIMEOUT", str(DEFAULT_TIMEOUT_SECONDS)))
         self._distance = int(os.environ.get("A3D_DISTANCE", str(DEFAULT_DISTANCE_CUTOFF)))
 
     async def load_model(self) -> None:
-        """验证 Docker 与 Aggrescan3D 镜像。"""
+        """验证 Aggrescan3D conda 环境。"""
         self.logger.info("Checking Aggrescan3D environment …")
 
-        checks: list[tuple[str, bool, str]] = []
-        ok_docker, msg_docker = _check_docker()
-        checks.append(("Docker", ok_docker, msg_docker))
+        ok_agg, msg_agg = _check_aggrescan(self._conda_env)
 
-        if ok_docker:
-            ok_img, msg_img = _check_a3d_image(self._a3d_image)
-            checks.append(("A3D image", ok_img, msg_img))
-        else:
-            checks.append(("A3D image", False, "Skipped (Docker not available)"))
+        status = "✓" if ok_agg else "✗"
+        self.logger.info("  [%s] aggrescan: %s", status, msg_agg)
 
-        failures: list[str] = []
-        for name, ok, msg in checks:
-            status = "✓" if ok else "✗"
-            self.logger.info("  [%s] %s: %s", status, name, msg)
-            if not ok:
-                failures.append(f"{name}: {msg}")
-
-        if failures:
+        if not ok_agg:
+            in_docker = os.path.exists("/.dockerenv")
             self._ready_message = (
-                "Aggrescan3D NOT available. Failed checks: "
-                + "; ".join(failures)
+                "Aggrescan3D NOT available. " + msg_agg + "\n"
+                "此服务依赖 conda Python 2.7 环境中的 aggrescan 命令。\n"
+                + (
+                    "推荐方式：\n"
+                    "  docker compose --profile cpu up -d aggrescan3d\n"
+                    "非 Docker 方式：\n"
+                    "  1. 安装 miniconda2 并创建 Python 2.7 环境\n"
+                    "  2. conda install -c lcbio aggrescan3d\n"
+                    "  3. export AGGRESCAN_CONDA_ENV=/path/to/conda/envs/aggrescan3d\n"
+                    "  4. 重新启动本服务"
+                    if not in_docker else
+                    "Docker 内部 aggrescan 未安装，请检查 Dockerfile 构建是否成功。"
+                )
             )
             self.logger.warning("%s", self._ready_message)
             raise RuntimeError(self._ready_message)
 
-        self._ready_message = "Aggrescan3D ready — Docker + image verified"
+        self._ready_message = f"Aggrescan3D ready — {self._aggrescan_path}"
         self.logger.info("%s", self._ready_message)
+
+    @property
+    def _aggrescan_path(self) -> str:
+        return str(Path(self._conda_env) / "bin" / "aggrescan")
 
     async def score_pdb(
         self,
@@ -334,17 +330,11 @@ class Aggrescan3DService(PdbScoringService):
         input_path.write_text(pdb_content, encoding="utf-8")
 
         cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--volume",
-            f"{workspace}:/work",
-            self._a3d_image,
-            "aggrescan",
+            self._aggrescan_path,
             "-i",
-            "/work/input.pdb",
+            str(input_path),
             "-w",
-            "/work/run",
+            str(output_dir),
             "-v",
             "2",
             "-D",
@@ -388,7 +378,8 @@ class Aggrescan3DService(PdbScoringService):
                     summary["output_pdb_path"] = str(output_pdb_path)
 
             summary["aggrescan3d"] = {
-                "image": self._a3d_image,
+                "conda_env": self._conda_env,
+                "aggrescan_path": self._aggrescan_path,
                 "distance_cutoff": self._distance,
                 "chain": chain_id or "all",
                 "chain_filter_mode": "postprocess",

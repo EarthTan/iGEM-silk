@@ -1,19 +1,21 @@
 ---
-name: Dockerfile COPY 遗漏审计
-description: 多个微服务 Dockerfile 容易遗漏共享文件（如 tools/utils.py）的 COPY 语句，运行时 import 失败；应用脚本批量扫描
+name: Dockerfile COPY 遗漏审计 v1.0
+author: Claude Code
 created: 2026-05-13
 version: 1.0.0
 tags: [docker, dockerfile, copy, import-error, audit, iGEM-silk]
 validated: true
 ---
 
-# Dockerfile COPY 遗漏审计
+# Gene Capsule: Dockerfile COPY 遗漏审计
 
 ## Experience
 
-- **问题类型**: Dockerfile 遗漏共享依赖文件的 COPY
-- **核心策略**: 用脚本批量扫描所有 Dockerfile 确保关键共享文件均被 COPY
-- **关键参数**: 共享文件列表（`tools/utils.py`, `tools/template/`）
+**问题类型**: Dockerfile 遗漏共享依赖文件的 COPY，构建通过但运行时 import 失败。
+
+**核心策略**: 用脚本批量扫描所有 Dockerfile 确保关键共享文件均被 COPY。
+
+**关键参数**: 共享文件列表（`tools/utils.py`, `tools/template/`）
 
 多个 Dockerfile 只 COPY 了 `tools/template/` 和 `tools/<service>/`，但漏了 `tools/utils.py`。运行时 `from tools.utils import detect_system` 失败——且构建阶段不报错。
 

@@ -6,11 +6,13 @@
 - **3D 结构生成** (`structure_service`)：输入 FASTA 序列，输出三维结构模型（PDB）
 - **PDB 评分服务** (`pdb_service`)：输入 PDB 结构，输出评分结果
 
-### 微服务设计原则
+### 服务设计原则
 
 1. **原作优先**。优先使用工具原作者的代码、设计思路、模型和实现方法，做到原汁原味。这代表了项目的学术背景，避免 AI 幻觉和搪塞工作。
 
-2. **环境兼容**。本项目主要开发环境为最新版 macOS，实际部署使用 Ubuntu + RTX5880。对可 CUDA 加速的工具：配置 Dockerfile 方便 GPU 环境部署；代码自动检测 GPU 可用性并 fallback 到 CPU；仅 GPU 可运行的服务在 CPU 环境下明确报错。在Ubuntu上实际生产部署的时候，使用`docker compose`一键启动所有微服务（推荐）；本地开发调试则用`./tools/start_all.sh`快速启动。
+2. **环境兼容**。本项目主要开发环境为最新版 macOS，实际部署使用 Ubuntu + RTX5880。
+- 为了开发机器上测试API方便：对可 CUDA 加速的工具：配置 Dockerfile 方便 GPU 环境部署；代码自动检测 GPU 可用性并 fallback 到 CPU；仅 GPU 可运行的服务在 CPU 环境下明确报错。
+- 在Ubuntu上实际生产部署的时候，**必须**使用`docker`启动所有微服务。
 
 3. **模型文件集中管理**。模型文件落在 `tools/<name>/models/`（服务专属）或 `tools/models/`（跨服务共享）。四种来源类型（Git 随仓库 / 首次下载 / pip 包 / 无需模型）详见下方「模型管理」章节。
 
@@ -77,10 +79,11 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 | PEP-FOLD4 | 8202 | 短肽 5~40 aa | 肽从头结构预测 | CPU（Docker） | [Docker] sOPEP 力场内置 |
 | ESMFold | 8203 | 短肽~蛋白质（无上限） | 快速 3D 结构预测（ESM-2 3B, ~60x AF2） | GPU 必需 | [下载][共享] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB |
 | OmegaFold | 8204 | 短肽~蛋白质（无上限） | PLM + 几何变换器结构预测 | GPU/CPU/MPS | [下载] OmegaFold ~1.5 GB（S3 自动下载） |
+| **Waveflow** | **8205** | **全范围** | **Tamarind.bio 云端代理：URL 指定工具类型（esmfold/omegafold/alphafold 等），无需本地 GPU/模型** | **CPU** | **[—] 纯远程 API，无需本地模型** |
 
 ### 模型管理
 
-每个服务的模型文件通过以下四种方式之一获取：
+每个服务的模型文件通过以下五种方式之一获取：
 
 | 来源 | 标签 | 位置 | 示例 |
 |------|------|------|------|
@@ -96,9 +99,12 @@ cd tools && docker compose --profile gpu --profile cpu up -d
 tools/models/
   fair-esm/                     ← ESM-2 checkpoints（torch.hub 缓存）
     hub/checkpoints/
-      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务
-      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务
-      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干）
+      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务（已 Git 跟踪 ~29 MB）
+      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务（首次自动下载 ~2.5 GB）
+      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干，首次自动下载 ~5.3 GB）
+      esmfold_3B_v1.pt          ← ESMFold 结构头（首次自动下载 ~2.6 GB）
+  omegafold/
+    model.pt                    ← OmegaFold 权重（首次自动下载 ~1.5 GB）
 ```
 
 BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
@@ -106,3 +112,49 @@ BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/
 共享池**仅存放被 ≥2 个服务使用的模型**或者**体积较大的模型**。独有且体积较小模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
 
 Docker 部署通过 volume 挂载 `tools/models/` 到容器内对应路径，模型不进入镜像。
+
+### 模型下载与镜像源配置
+
+以下模型在首次启动时从海外 CDN 自动下载，在中国大陆网络环境可能失败。
+可通过设置环境变量覆盖下载地址（指向镜像或本地路径）：
+
+| 服务 | 自动下载的模型 | 大小 | 默认源 | 覆盖环境变量 |
+|------|---------------|------|--------|-------------|
+| ESMFold | esmfold_3B_v1.pt | ~2.6 GB | `dl.fbaipublicfiles.com/fair-esm/` (Meta CDN) | `ESMFOLD_MODEL_URL` |
+| BepiPred-3.0 | esm2_t33_650M_UR50D.pt | ~2.5 GB | 同上 | `ESM2_URL` |
+| TemStaPro | ProtT5-XL | ~3 GB | HuggingFace `Rostlab/prot_t5_xl_half_uniref50-enc` | `HF_ENDPOINT=https://hf-mirror.com` |
+| OmegaFold | release1.pt | ~1.5 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
+| HemoPI2 | ESM-2 t6（通过 pip） | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
+
+镜像源配置示例：
+
+```bash
+# 使用 HuggingFace 镜像（适用于 ProtT5-XL、HemoPI2 的 ESM-2）
+export HF_ENDPOINT=https://hf-mirror.com
+
+# 使用自定义模型 URL（适用于 ESMFold、BepiPred-3.0 的 fair-esm 模型）
+export ESMFOLD_MODEL_URL=https://internal-mirror.example.com/models/esmfold_3B_v1.pt
+export ESM2_URL=https://internal-mirror.example.com/models/esm2_t33_650M_UR50D.pt
+
+# 使用自定义 OmegaFold 权重 URL
+export OMEGAFOLD_WEIGHTS_URL=https://internal-mirror.example.com/omegafold/release1.pt
+
+# 预下载方式：手动下载后放到共享缓存
+# wget -P tools/models/fair-esm/hub/checkpoints/ \
+#   https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt
+```
+
+### 运行环境说明
+
+**GPU vs CPU：** 以下服务在 docker-compose 中被标记为 `gpu` profile，但实际支持 CPU 降级运行：
+
+- AnOxPePred（TensorFlow 自动设备选择，缺模型时降级为规则）
+- HemoPI2 / MHCflurry / pLM4CPPs / GraphCPP / TemStaPro（PyTorch 自动设备选择）
+
+**仅 Docker 运行的服务：**
+- AlphaFold3 — 需要 NVIDIA Docker + Linux 宿主机，通过 Docker CLI 调用
+- PEP-FOLD4 — 通过 Docker CLI 调用，CPU 即可
+- Aggrescan3D — 依赖 conda Python 2.7 环境，推荐 Docker Compose
+
+**外部依赖服务：**
+- Waveflow — 需要 tamarind.bio API 密钥 (`TAMARIND_API_KEY`)，无需本地 GPU/模型
