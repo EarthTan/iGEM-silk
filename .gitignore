@@ -22,3 +22,8 @@ wheels/
 # Model files (large, downloaded at build/runtime)
 tools/models/fair-esm/**/*.pt
 tools/models/omegafold/
+
+
+# Output Fold
+output/*
+output3/*
