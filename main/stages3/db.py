@@ -37,6 +37,7 @@ class PipelineDB:
     def connect(self) -> duckdb.DuckDBPyConnection:
         """打开（或创建）数据库连接。"""
         if self._conn is None:
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
             self._conn = duckdb.connect(self.db_path)
             self._conn.execute("SET memory_limit = '32GB'")
         return self._conn
