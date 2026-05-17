@@ -1,0 +1,38 @@
+{
+  "stage": "round01_lightweight",
+  "timestamp": "2026-05-17T15:37:20.613488",
+  "elapsed_sec": 943.6,
+  "input": {
+    "n_peptides": 1055116
+  },
+  "services": {
+    "anoxpepred": {
+      "weight": 0.5,
+      "reverse": false,
+      "desc": "抗氧化活性",
+      "concurrency": 10
+    },
+    "algpred2": {
+      "weight": 0.1,
+      "reverse": true,
+      "desc": "致敏（反向，越低越好）",
+      "concurrency": 10
+    }
+  },
+  "scoring": {
+    "n_valid": 1055116,
+    "mean": 0.3768,
+    "top_n": 50000
+  },
+  "safety": {
+    "safe": 1022267,
+    "caution": 32472,
+    "danger": 377,
+    "missing_data": 0
+  },
+  "output": {
+    "top50k": "/home/lenovo/Projects/iGEM-silk/output2/round01_lightweight/final/top50k.csv",
+    "all_scored": "/home/lenovo/Projects/iGEM-silk/output2/round01_lightweight/final/all_scored.csv",
+    "danger_list": "/home/lenovo/Projects/iGEM-silk/output2/round01_lightweight/final/danger_list.csv"
+  }
+}

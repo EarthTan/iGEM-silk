@@ -3,8 +3,8 @@ Round 1：轻量评分
 
 在 105 万条候选肽上运行 3 个轻量微服务：
   - AnOxPePred（抗氧化核心，权重 0.50，并发 10）
-  - ToxinPred3（毒性反向，权重 0.15，并发 2——该服务吞吐低）
   - AlgPred2（致敏反向，权重 0.10，并发 10）
+  - ToxinPred3（毒性反向，权重 0.15）→ 在 top50k 上单独跑（全量 105 万太慢）
 
 输出 Top 50,000 条 + 安全标记 + 分布报告。
 
@@ -62,8 +62,8 @@ MAX_BATCH_SIZE = 1000
 # (service_name, weight, reverse, description, concurrency)
 SERVICES = [
     ("anoxpepred",  0.50, False, "抗氧化活性",                10),
-    ("toxinpred3",  0.15, True,  "毒性（反向，越低越好）",     2),
     ("algpred2",    0.10, True,  "致敏（反向，越低越好）",    10),
+    # ToxinPred3 在后续单独的批处理中运行（全量 105 万条太慢，只跑 Top 50K）
 ]
 
 # ── 安全标记阈值 ──
@@ -157,7 +157,7 @@ async def run():
 
     setup_stage(STAGE)
     log("=" * 60)
-    log("Round 1：轻量评分 — AnOxPePred + ToxinPred3 + AlgPred2")
+    log("Round 1：轻量评分 — AnOxPePred + AlgPred2 (ToxinPred3 在 Top 50K 上单独跑)")
     log("=" * 60)
 
     # ── 加载数据 ──
