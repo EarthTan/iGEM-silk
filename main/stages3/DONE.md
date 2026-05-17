@@ -1,6 +1,6 @@
 # Stages3 Pipeline — 完成记录
 
-> 最后更新: 2026-05-16
+> 最后更新: 2026-05-17
 
 ## 环境搭建 (2026-05-16)
 
@@ -102,3 +102,27 @@ uv run python -m main.stages3.stage00_preprocess --sample 10000
 - **总候选数**: 19.9M（低于规划的 30M-100M，但远高于 stages2 的 1M）
 - **扫描速度**: 批写入前 290k seq/s，DB 增长到 1GB 后降至 120k seq/s
 - **DB 大小**: 19.9M 条 / 2.6GB，约 7.6M 条/GB
+
+## Step 1 开发 (2026-05-17)
+
+### 新增/修改文件
+
+| 文件 | 说明 |
+|------|------|
+| `main/stages3/stage01_lightweight.py` | Step 1 主脚本 |
+| `main/stages3/db.py` | `insert_stage1_scores` 改为 VALUES 批处理（替代慢速 executemany） |
+
+### 设计概要
+
+Step 1 对 19.9M 候选肽运行两个轻量评分服务：
+- **AnOxPePred** (gpu profile, port 8001): 抗氧化活性预测，核心筛选信号
+- **AlgPred2** (cpu profile, port 8008): 过敏原预测，硬阈值 ≥0.30 淘汰
+
+### 技术决策
+
+1. **分批流式处理**：每次从 DuckDB 读取 100k 条，避免 19.9M 全量加载到内存
+2. **双服务并发**：两个服务通过 `asyncio.gather` 并行调用，互不阻塞
+3. **每服务 Semaphore(5)**：控制 GPU 服务并发负载，防止显存 OOM
+4. **断点续跑**：通过 `stage1_scores` 表的 `MAX(candidate_id)` 和 `checkpoint` 表支持
+5. **AlgPred2 硬过滤**：`score ≥ 0.30` 淘汰，score IS NULL 放行（服务故障宽容）
+6. **DB 写入优化**：弃用 `executemany`，改用 VALUES 批处理（预期 100x 加速）

@@ -9,9 +9,11 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 **Pipeline evolution**:
 - `main/stages/` — First attempt (1843 peptides, 7 stages, all written but not all run). See `main/PLAN.md`.
 - `main/stages2/` — **Production pipeline (completed)**. Rounds 0-7 executed, 1,055,116 → 90 candidates. Runs standalone via `python -m main.stages2.roundXX_*`. Output in `output/`.
-- `main/stages3/` — **Next-generation design (planned)**. Billion-scale expansion using CD-HIT, DuckDB, variance-aware weighting. 5 planning documents written. Output will be `output3/`.
+- `main/stages3/` — **Next-generation pipeline (in development)**. Billion-scale expansion using CD-HIT, DuckDB, variance-aware weighting. Now contains actual code: `stage00_preprocess.py`, `stage01_lightweight.py`, `cdhit_wrapper.py`, `db.py`, `docker_utils.py`, `analytics.py`. Output goes to `output3/`.
 
 **Who this is for**: synthetic biology researchers at the iGEM competition.
+
+**Critical companion file**: Read `AGENTS.md` for production safety rules before running git operations on this machine. It contains absolute prohibitions on `git clean`, `git checkout -- .`, and `git reset --hard` — violations have destroyed 6GB+ of models and irrecoverable output data.
 
 ## Production pipeline (stages2)
 
@@ -60,14 +62,30 @@ These are hard-won. Violating them caused failures in stages2.
 uv sync                      # root project
 cd tools/<name> && uv sync   # single microservice
 
-# Lint
-uv run ruff check .
+# Add a dependency
+uv add <package>             # root project
+cd tools/<name> && uv add <package>  # single microservice
+
+# Lint & format
+uv run ruff check .          # lint
+uv run ruff format . --check  # check formatting
+uv run ruff format .          # auto-format
 
 # Run tests (pytest configured in pyproject.toml)
 uv run pytest
+uv run pytest tests/test_file.py -v  # single test file
+
+# Type check
+uv run mypy .
 
 # Start all microservices (Docker, from tools/)
 cd tools && docker compose --profile gpu --profile cpu up -d
+
+# Rebuild and start a single service
+docker compose build <service_name> && docker compose up -d <service_name>
+
+# View service logs
+docker compose logs -f <service_name>
 
 # Start a single service locally (for development — NOT for production)
 cd tools/<name> && uv run python service.py
@@ -75,6 +93,10 @@ cd tools/<name> && uv run python service.py
 # Run a production pipeline stage
 uv run python -m main.stages2.round03_heavy       # stages2 round 3
 uv run python -m main.stages2.round05_3d           # stages2 round 5
+
+# Run stages3 pipeline stage
+uv run python -m main.stages3.stage00_preprocess
+uv run python -m main.stages3.stage01_lightweight
 
 # Run the old first-pipeline stage
 uv run python -m main.stages.stage01_filter        # first pipeline stage 1
@@ -88,6 +110,9 @@ export ANOXPEPRED_PORT=8001
 
 # Single microservice health check
 python -c "from main.client import ServiceClient; import asyncio; print(asyncio.run(ServiceClient().check_health()))"
+
+# Check service health via HTTP directly
+curl http://127.0.0.1:8001/health
 ```
 
 ## Architecture
@@ -107,10 +132,11 @@ python -c "from main.client import ServiceClient; import asyncio; print(asyncio.
 | `main/config.py` | `SERVICES` dict (16 microservice URLs, 4 groups: score/filter/structure/pdb_score) + `service_url()` helper with env var override |
 | `main/client.py` | Async httpx client. `predict_single()`, `predict_batch()`, `predict_pdb_single()`, `predict_pdb_batch()`, `evaluate_peptides()` for concurrent multi-service eval, `predict_structure_async()` for async job polling, `check_health()` |
 | `main/data_loader.py` | FASTA and CSV parsing functions (`load_scaffold()`, `load_linkers()`, `load_function_peptides()`) |
+| `main/__main__.py` | Entry point (currently raises NotImplementedError — use `python -m main.stages2.roundXX_*` instead) |
 
-### Microservices (`tools/`)
+### Service templates (`tools/template/`)
 
-16 FastAPI services, each with its own `.venv` and Dockerfile. Three templates in `tools/template/`:
+When adding a new microservice, start from one of three templates:
 
 | Template | Base class | Pattern | Used by |
 |----------|-----------|---------|---------|
@@ -120,7 +146,9 @@ python -c "from main.client import ServiceClient; import asyncio; print(asyncio.
 
 Supporting templates: `tools/template/logger.py` (rotating file logs to `tools/logs/`), `tools/template/job_manager.py` (async job persistence), `tools/utils.py` (GPU detection via `detect_gpu()`).
 
-### Service groups and port assignments
+A new microservice needs: a `tools/<name>/` directory with `pyproject.toml`, `service.py`, `Dockerfile`, `.dockerignore`, and a `.venv` (via `uv sync`). Then register it in `tools/docker-compose.yml` and `main/config.py`.
+
+### Pipeline state management
 
 | Group | Port range | Services |
 |-------|-----------|----------|
@@ -166,14 +194,19 @@ Five sourcing strategies: git-tracked (< 50MB), first-run auto-download (> 10MB)
 
 `data/` contains input files: `silk.fasta` (scaffold, ~346 aa), `linker.fasta` (10 linkers), `function.csv` (~25K entries), `function_3.csv` (subset).
 
-## Learning resources
+## Knowledge base
 
-- `.agents/learnings/` — GEP capsules (troubleshooting knowledge base). Indexed in `MEMORY.md`.
-- `main/stages3/TECH_REQUIREMENTS.md` — Technical mandates drawn from stages2 failures.
-- `main/docs/threshold.md` — Hard filter thresholds (ToxinPred3 ≥0.38, AlgPred2 ≥0.30, HemoPI2 ≥0.55).
-- `main/docs/penalty.md` — Scoring formula documentation.
-- `docs/HUMAN.md` — Human-operated analysis methods (Binding ddG, GROMACS MD).
-- `references/` — Academic papers.
+- **`AGENTS.md`** — Critical production safety rules. Read before any git operations. Absolute prohibitions on `git clean`, `git checkout -- .`, `git reset --hard` (real incident: 6GB+ models destroyed).
+- **`.agents/learnings/MEMORY.md`** — Indexed GEP capsules (troubleshooting knowledge base). Key entries: Docker bridge IP issues, OmegaFold blocking, asyncio.gather safety, ToxinPred3 concurrency, ESMFold build, GPU contention.
+- **`.agents/learnings/docker/`** — Docker-specific pitfalls (China mirror, slim image build deps, compose atomicity, namespace shadowing).
+- **`main/docs/threshold.md`** — Hard filter thresholds (ToxinPred3 ≥0.38, AlgPred2 ≥0.30, HemoPI2 ≥0.55).
+- **`main/docs/penalty.md`** — Scoring formula documentation.
+- **`docs/HUMAN.md`** — Human-operated analysis methods (Binding ddG, GROMACS MD).
+- **`references/`** — Academic papers.
+
+## Memory system
+
+This project has a persistent memory system at `/home/lenovo/.claude/projects/-home-lenovo-Projects-iGEM-silk/memory/`. Claude Code automatically learns from each session — preferences, user role, project context, feedback. To save or recall information across sessions, write to this directory. Index is in `MEMORY.md` within that directory.
 
 ## Python environment
 
