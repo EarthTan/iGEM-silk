@@ -4,11 +4,21 @@
 合并 function_1 / function_2 / function_3 全量抗氧化肽数据，
 去重、长度过滤 (3-30 aa)、标准氨基酸清洗。
 
+与原脚本差异：
+  - 输出目录改为 output2/
+  - 使用 common.py 共享工具函数（消除复制粘贴）
+  - 其余逻辑不变
+
 用法：
     uv run python -m main.stages2.step00_integrate
 
+输入：
+    data/function_1.csv
+    data/function_2.csv
+    data/function_3.csv
+
 输出：
-    output/step00_integrate/
+    output2/step00_integrate/
     ├── README.md              ← 数据统计报告（含分布直方图）
     ├── run.log
     ├── final/cleaned.csv      ← 清洗后的全量抗氧化肽
@@ -18,7 +28,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import re
 import sys
 import time
@@ -26,15 +35,16 @@ from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_ROOT / "data"
-OUTPUT_DIR = PROJECT_ROOT / "output"
-
 sys.path.insert(0, str(PROJECT_ROOT))
+
+DATA_DIR = PROJECT_ROOT / "data"
+
+from main.stages2.common import (
+    OUTPUT_DIR, describe, log, make_dir, read_json, setup_stage, write_json,
+)
 
 STAGE = "step00_integrate"
 STAGE_DIR = OUTPUT_DIR / STAGE
-
-LOG_FILE: Path | None = None
 
 # ── 标准氨基酸 ──
 STD_AA = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]+$", re.IGNORECASE)
@@ -43,91 +53,31 @@ LEN_MAX = 30
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# 工具函数
+# 加载函数
 # ═══════════════════════════════════════════════════════════════════════
 
-def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line)
-    if LOG_FILE:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+def load_function_csv(path: Path) -> list[dict]:
+    rows = []
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    log(f"  加载 {path.name}: {len(rows)} 行")
+    return rows
 
 
-def make_dir(name: str) -> Path:
-    d = STAGE_DIR / name
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+def is_antioxidant(row: dict) -> bool:
+    return row.get("is_antioxidant", "").strip() == "1"
 
 
-def write_json(path: Path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# 分布统计（每阶段通用）
-# ═══════════════════════════════════════════════════════════════════════
-
-def describe(name: str, values: list[float], bins: list[float] | None = None) -> str:
-    """生成统一格式的分布报告。
-
-    - name: 变量名（如 "综合分"、"AnOxPePred"）
-    - values: 数值列表
-    - bins: 分箱边界，如 [0, 0.1, 0.2, ..., 1.0]。None 则按数据范围自动分 8 箱
-    """
-    n = len(values)
-    if n == 0:
-        return f"{name}: 无有效数据"
-
-    sorted_v = sorted(values)
-    mean = sum(sorted_v) / n
-    median = sorted_v[n // 2] if n % 2 == 1 else (sorted_v[n // 2 - 1] + sorted_v[n // 2]) / 2
-    variance = sum((x - mean) ** 2 for x in sorted_v) / n
-    std = variance ** 0.5
-    p5 = sorted_v[int(n * 0.05)]
-    p25 = sorted_v[int(n * 0.25)]
-    p75 = sorted_v[int(n * 0.75)]
-    p95 = sorted_v[int(n * 0.95)]
-
-    lines = [
-        f"{name} 分布 (n={n}):",
-        f"  均值:   {mean:.4f}",
-        f"  中位数: {median:.4f}",
-        f"  标准差: {std:.4f}",
-        f"  最小值: {sorted_v[0]:.4f}",
-        f"  最大值: {sorted_v[-1]:.4f}",
-        f"  P5: {p5:.4f}  |  P25: {p25:.4f}  |  P75: {p75:.4f}  |  P95: {p95:.4f}",
-        "",
-        f"  分布直方图:",
-    ]
-
-    # 自动分箱
-    if bins is None:
-        vmin = sorted_v[0]
-        vmax = sorted_v[-1]
-        if vmax - vmin < 0.001:
-            lines.append(f"  所有值 ≈ {vmin:.4f}，无分布")
-            return "\n".join(lines)
-        raw_bins = 8
-        bin_width = (vmax - vmin) / raw_bins
-        bins = [vmin + bin_width * i for i in range(raw_bins + 1)]
-
-    bar_width = 14  # 字符宽度
-    for i in range(len(bins) - 1):
-        lo = bins[i]
-        hi = bins[i + 1]
-        count = sum(1 for v in values if lo <= v < hi)
-        pct = count / n * 100
-        filled = round(count / n * bar_width) if n > 0 else 0
-        bar = "█" * filled + "░" * (bar_width - filled)
-
-        marker = "← 均值" if lo <= mean < hi else ""
-        lines.append(f"  {lo:.4f}-{hi:.4f}: {bar}  ({count:,} 条, {pct:.1f}%) {marker}")
-
-    lines.append("")
-    return "\n".join(lines)
+def clean_sequence(seq: str) -> str | None:
+    """标准化并验证序列，返回大写标准序列或 None。"""
+    s = seq.upper().strip()
+    if not STD_AA.match(s):
+        return None
+    if not (LEN_MIN <= len(s) <= LEN_MAX):
+        return None
+    return s
 
 
 def histogram_counts(values: list[float], num_bins: int = 8) -> tuple[list[float], list[int]]:
@@ -143,39 +93,8 @@ def histogram_counts(values: list[float], num_bins: int = 8) -> tuple[list[float
         lo = edges[i]
         hi = edges[i + 1]
         counts.append(sum(1 for v in values if lo <= v < hi))
-    # 确保最大值被包含
     counts[-1] += sum(1 for v in values if v == edges[-1])
     return edges, counts
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# 加载函数
-# ═══════════════════════════════════════════════════════════════════════
-
-def load_function_csv(path: Path) -> list[dict]:
-    """加载一个 function CSV 文件，返回行字典列表。"""
-    rows = []
-    with open(path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows.append(row)
-    log(f"  加载 {path.name}: {len(rows)} 行")
-    return rows
-
-
-def is_antioxidant(row: dict) -> bool:
-    """检查行是否为抗氧化肽。"""
-    return row.get("is_antioxidant", "").strip() == "1"
-
-
-def clean_sequence(seq: str) -> str | None:
-    """标准化并验证序列，返回大写标准序列或 None。"""
-    s = seq.upper().strip()
-    if not STD_AA.match(s):
-        return None
-    if not (LEN_MIN <= len(s) <= LEN_MAX):
-        return None
-    return s
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -183,12 +102,10 @@ def clean_sequence(seq: str) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════
 
 def run():
-    global LOG_FILE
     start_time = time.time()
 
-    # ── 创建输出目录 ──
     STAGE_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_FILE = STAGE_DIR / "run.log"
+    setup_stage(STAGE)
     log("=" * 60)
     log("步骤零：数据整合")
     log("=" * 60)
@@ -196,7 +113,7 @@ def run():
     # ══════════════════════════════════════════════════════════════════
     # 1. 加载数据
     # ══════════════════════════════════════════════════════════════════
-    log("\n📦 加载原始数据...")
+    log("\n加载原始数据...")
 
     f1_path = DATA_DIR / "function_1.csv"
     f2_path = DATA_DIR / "function_2.csv"
@@ -216,7 +133,7 @@ def run():
     # ══════════════════════════════════════════════════════════════════
     # 2. 筛选抗氧化肽
     # ══════════════════════════════════════════════════════════════════
-    log("\n🔍 筛选抗氧化肽 (is_antioxidant=1)...")
+    log("\n筛选抗氧化肽 (is_antioxidant=1)...")
     aox1 = [r for r in raw1 if is_antioxidant(r)]
     aox2 = [r for r in raw2 if is_antioxidant(r)]
     aox3 = [r for r in raw3 if is_antioxidant(r)]
@@ -230,7 +147,7 @@ def run():
     # ══════════════════════════════════════════════════════════════════
     # 3. 合并、清洗、去重
     # ══════════════════════════════════════════════════════════════════
-    log("\n🧹 清洗 & 去重...")
+    log("\n清洗 & 去重...")
 
     length_stats: dict[str, int] = {"too_short": 0, "too_long": 0, "valid": 0}
     non_std_count = 0
@@ -256,7 +173,7 @@ def run():
             if seq not in seen_sequences:
                 seen_sequences.add(seq)
                 cleaned.append({
-                    "peptide_id": "",  # 稍后分配
+                    "peptide_id": "",
                     "sequence": seq,
                     "length": len(seq),
                     "source": source,
@@ -268,16 +185,14 @@ def run():
     log(f"  合法序列: {length_stats['valid']:,}")
     log(f"  去重后: {len(cleaned):,}")
 
-    # 分配 peptide_id
     for i, c in enumerate(cleaned):
         c["peptide_id"] = f"pep_{i:06d}"
 
     # ══════════════════════════════════════════════════════════════════
     # 4. 长度分布统计
     # ══════════════════════════════════════════════════════════════════
-    log("\n📊 长度分布:")
+    log("\n长度分布:")
     lengths = [c["length"] for c in cleaned]
-    edges, counts = histogram_counts(lengths, num_bins=8)
     len_report = describe("肽长度", lengths)
     for line in len_report.split("\n"):
         log(line)
@@ -285,7 +200,8 @@ def run():
     # ══════════════════════════════════════════════════════════════════
     # 5. 输出
     # ══════════════════════════════════════════════════════════════════
-    final_dir = make_dir("final")
+    final_dir = STAGE_DIR / "final"
+    final_dir.mkdir(parents=True, exist_ok=True)
     csv_path = final_dir / "cleaned.csv"
 
     fieldnames = ["peptide_id", "sequence", "length", "source"]
@@ -332,6 +248,7 @@ def run():
 
 **时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **耗时**: {elapsed:.1f} 秒
+**输出目录**: output2/
 
 ## 数据源
 
