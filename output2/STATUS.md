@@ -11,9 +11,9 @@
 | Round 2: 分选+安全评分 | ✅ 完成 | top25K+bottom25K, 5 服务完整, 3755s |
 | Round 3: 重服务评分 | ✅ 完成 | TemStaPro 50K + BepiPred3 15K, 7 服务, 3891s |
 | Round 4: 枚举+Construct | ✅ 完成 | 150 constructs (90 Top + 60 Bottom), 5 服务完整 |
-| Round 5: 3D 结构 | ⏳ 待运行 | ESMFold + OmegaFold |
-| Round 6: PDB 评估 | ⏳ 待运行 | SASA + Aggrescan3D |
-| Round 7: 最终输出 | ⏳ 待运行 | 双通道排名 |
+| Round 5: 3D 结构 | ✅ 完成 | OmegaFold 150/150, pLDDT avg=0.4105, 210min |
+| Round 6: PDB 评估 | ✅ 完成 | SASA+A3D 150/150, SASA(0.40)+Agg(0.40)+pLDDT(0.20) |
+| Round 7: 最终输出 | ✅ 完成 | 90 Top + 60 Bottom, 双通道排名, per-construct 文件夹 |
 
 ## Pipeline 变更记录
 

@@ -1,0 +1,3422 @@
+{
+  "construct_id": "con_0214",
+  "channel": "top",
+  "peptide_id": "pep_238278",
+  "peptide_sequence": "ERELPYYPGAHPMHPPK",
+  "position": "N",
+  "linker_id": "Flex_GGGGSx2",
+  "pipeline_scores": {
+    "peptide_composite": "0.6329",
+    "construct_composite": 0.5379,
+    "sodope": "0.685768034420952",
+    "temstapro_construct": "0.4183",
+    "construct_anoxpepred": "0.3956",
+    "construct_bepipred3": 0.1324844714936956,
+    "anox_change_ratio": null,
+    "round3_services": {
+      "anoxpepred": 0.5186,
+      "toxinpred3": 0.3,
+      "algpred2": 0.26,
+      "hemopi2": 0.18673008680343628,
+      "mhcflurry": 0.0,
+      "bepipred3": 0.2880943512215334,
+      "temstapro": 0.6736
+    }
+  },
+  "structure": {
+    "method": "omegafold",
+    "plddt": 0.404,
+    "esmfold_plddt": null
+  },
+  "pdb_evaluation": {
+    "sasa_score": 0.7941,
+    "sasa_label": "exposed",
+    "sasa_details": {
+      "chain": "A",
+      "probe_radius": 1.4,
+      "exposure_threshold": 0.25,
+      "peptide": {
+        "sequence": "ERELPYYPGAHPMHPPK",
+        "num_residues": 17,
+        "num_exposed": 17,
+        "total_sasa": 2631.249,
+        "mean_relative_sasa": 0.794,
+        "exposure_ratio": 1.0,
+        "residue_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "residues": [
+          {
+            "residue_id": 0,
+            "residue_name": "GLU",
+            "residue_code": "E",
+            "sasa": 225.271,
+            "relative_sasa": 1.0,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 1,
+            "residue_name": "ARG",
+            "residue_code": "R",
+            "sasa": 240.621,
+            "relative_sasa": 0.908,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 2,
+            "residue_name": "GLU",
+            "residue_code": "E",
+            "sasa": 167.639,
+            "relative_sasa": 0.783,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 3,
+            "residue_name": "LEU",
+            "residue_code": "L",
+            "sasa": 159.536,
+            "relative_sasa": 0.835,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 4,
+            "residue_name": "PRO",
+            "residue_code": "P",
+            "sasa": 109.179,
+            "relative_sasa": 0.709,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 5,
+            "residue_name": "TYR",
+            "residue_code": "Y",
+            "sasa": 206.174,
+            "relative_sasa": 0.809,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 6,
+            "residue_name": "TYR",
+            "residue_code": "Y",
+            "sasa": 193.803,
+            "relative_sasa": 0.76,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 7,
+            "residue_name": "PRO",
+            "residue_code": "P",
+            "sasa": 110.171,
+            "relative_sasa": 0.715,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 8,
+            "residue_name": "GLY",
+            "residue_code": "G",
+            "sasa": 69.482,
+            "relative_sasa": 0.716,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 9,
+            "residue_name": "ALA",
+            "residue_code": "A",
+            "sasa": 93.391,
+            "relative_sasa": 0.772,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 10,
+            "residue_name": "HIS",
+            "residue_code": "H",
+            "sasa": 182.288,
+            "relative_sasa": 0.844,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 11,
+            "residue_name": "PRO",
+            "residue_code": "P",
+            "sasa": 101.992,
+            "relative_sasa": 0.662,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 12,
+            "residue_name": "MET",
+            "residue_code": "M",
+            "sasa": 164.816,
+            "relative_sasa": 0.812,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 13,
+            "residue_name": "HIS",
+            "residue_code": "H",
+            "sasa": 175.249,
+            "relative_sasa": 0.811,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 14,
+            "residue_name": "PRO",
+            "residue_code": "P",
+            "sasa": 106.355,
+            "relative_sasa": 0.691,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 15,
+            "residue_name": "PRO",
+            "residue_code": "P",
+            "sasa": 120.27,
+            "relative_sasa": 0.781,
+            "is_exposed": true
+          },
+          {
+            "residue_id": 16,
+            "residue_name": "LYS",
+            "residue_code": "K",
+            "sasa": 205.012,
+            "relative_sasa": 0.891,
+            "is_exposed": true
+          }
+        ]
+      },
+      "all_residues": [
+        {
+          "residue_id": 0,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 225.271,
+          "relative_sasa": 1.0,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 1,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 240.621,
+          "relative_sasa": 0.908,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 2,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 167.639,
+          "relative_sasa": 0.783,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 3,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 159.536,
+          "relative_sasa": 0.835,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 4,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 109.179,
+          "relative_sasa": 0.709,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 5,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 206.174,
+          "relative_sasa": 0.809,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 6,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 193.803,
+          "relative_sasa": 0.76,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 7,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 110.171,
+          "relative_sasa": 0.715,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 8,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.482,
+          "relative_sasa": 0.716,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 9,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 93.391,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 10,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 182.288,
+          "relative_sasa": 0.844,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 11,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 101.992,
+          "relative_sasa": 0.662,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 12,
+          "residue_name": "MET",
+          "residue_code": "M",
+          "sasa": 164.816,
+          "relative_sasa": 0.812,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 13,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 175.249,
+          "relative_sasa": 0.811,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 14,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 106.355,
+          "relative_sasa": 0.691,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 15,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 120.27,
+          "relative_sasa": 0.781,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 16,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 205.012,
+          "relative_sasa": 0.891,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 17,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 79.142,
+          "relative_sasa": 0.816,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 18,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 78.552,
+          "relative_sasa": 0.81,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 19,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 80.545,
+          "relative_sasa": 0.83,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 20,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 76.108,
+          "relative_sasa": 0.785,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 21,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 129.933,
+          "relative_sasa": 0.909,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 22,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 68.494,
+          "relative_sasa": 0.706,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 23,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 88.148,
+          "relative_sasa": 0.909,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 24,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 70.543,
+          "relative_sasa": 0.727,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 25,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.656,
+          "relative_sasa": 0.77,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 26,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 112.809,
+          "relative_sasa": 0.789,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 27,
+          "residue_name": "MET",
+          "residue_code": "M",
+          "sasa": 191.812,
+          "relative_sasa": 0.945,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 28,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 60.205,
+          "relative_sasa": 0.621,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 29,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 173.503,
+          "relative_sasa": 0.908,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 30,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 103.013,
+          "relative_sasa": 0.669,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 31,
+          "residue_name": "THR",
+          "residue_code": "T",
+          "sasa": 135.84,
+          "relative_sasa": 0.833,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 32,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 78.609,
+          "relative_sasa": 0.65,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 33,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 169.568,
+          "relative_sasa": 0.888,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 34,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 126.038,
+          "relative_sasa": 0.764,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 35,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 131.891,
+          "relative_sasa": 0.705,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 36,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 206.559,
+          "relative_sasa": 0.906,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 37,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 129.498,
+          "relative_sasa": 0.785,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 38,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 108.302,
+          "relative_sasa": 0.579,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 39,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 144.166,
+          "relative_sasa": 0.874,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 40,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 124.661,
+          "relative_sasa": 0.667,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 41,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 152.22,
+          "relative_sasa": 0.711,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 42,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 92.532,
+          "relative_sasa": 0.765,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 43,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 218.422,
+          "relative_sasa": 0.824,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 44,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 126.714,
+          "relative_sasa": 0.823,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 45,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 106.273,
+          "relative_sasa": 0.644,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 46,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 159.584,
+          "relative_sasa": 0.818,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 47,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 99.437,
+          "relative_sasa": 0.532,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 48,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 149.72,
+          "relative_sasa": 0.801,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 49,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 47.515,
+          "relative_sasa": 0.49,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 50,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 98.907,
+          "relative_sasa": 0.462,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 51,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 147.276,
+          "relative_sasa": 0.771,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 52,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 71.437,
+          "relative_sasa": 0.433,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 53,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 22.995,
+          "relative_sasa": 0.161,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 54,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 165.838,
+          "relative_sasa": 0.626,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 55,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 43.748,
+          "relative_sasa": 0.362,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 56,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 33.85,
+          "relative_sasa": 0.177,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 57,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 51.684,
+          "relative_sasa": 0.265,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 58,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 70.667,
+          "relative_sasa": 0.378,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 59,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 106.71,
+          "relative_sasa": 0.464,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 60,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 17.771,
+          "relative_sasa": 0.108,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 61,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 49.771,
+          "relative_sasa": 0.218,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 62,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 101.629,
+          "relative_sasa": 0.475,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 63,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 63.446,
+          "relative_sasa": 0.332,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 64,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 15.479,
+          "relative_sasa": 0.079,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 65,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 130.63,
+          "relative_sasa": 0.699,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 66,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 70.382,
+          "relative_sasa": 0.726,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 67,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 13.671,
+          "relative_sasa": 0.113,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 68,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 140.716,
+          "relative_sasa": 0.752,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 69,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 15.272,
+          "relative_sasa": 0.078,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 70,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 65.06,
+          "relative_sasa": 0.422,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 71,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 132.332,
+          "relative_sasa": 0.693,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 72,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 164.086,
+          "relative_sasa": 0.643,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 73,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 19.276,
+          "relative_sasa": 0.159,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 74,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 72.043,
+          "relative_sasa": 0.337,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 75,
+          "residue_name": "MET",
+          "residue_code": "M",
+          "sasa": 127.559,
+          "relative_sasa": 0.628,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 76,
+          "residue_name": "MET",
+          "residue_code": "M",
+          "sasa": 83.208,
+          "relative_sasa": 0.41,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 77,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 33.773,
+          "relative_sasa": 0.173,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 78,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 102.02,
+          "relative_sasa": 0.477,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 79,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 59.751,
+          "relative_sasa": 0.418,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 80,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 11.285,
+          "relative_sasa": 0.068,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 81,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 32.98,
+          "relative_sasa": 0.176,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 82,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 79.726,
+          "relative_sasa": 0.426,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 83,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 75.995,
+          "relative_sasa": 0.355,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 84,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 24.174,
+          "relative_sasa": 0.2,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 85,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 121.906,
+          "relative_sasa": 0.652,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 86,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 67.17,
+          "relative_sasa": 0.47,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 87,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 62.185,
+          "relative_sasa": 0.641,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 88,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 76.565,
+          "relative_sasa": 0.409,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 89,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 26.371,
+          "relative_sasa": 0.218,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 90,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 72.355,
+          "relative_sasa": 0.598,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 91,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 36.295,
+          "relative_sasa": 0.254,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 92,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 42.877,
+          "relative_sasa": 0.2,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 93,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 4.344,
+          "relative_sasa": 0.036,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 94,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 50.112,
+          "relative_sasa": 0.35,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 95,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 0.0,
+          "relative_sasa": 0.0,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 96,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 28.174,
+          "relative_sasa": 0.171,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 97,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 15.683,
+          "relative_sasa": 0.095,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 98,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 92.799,
+          "relative_sasa": 0.486,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 99,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 16.953,
+          "relative_sasa": 0.14,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 100,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 12.968,
+          "relative_sasa": 0.067,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 101,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 44.778,
+          "relative_sasa": 0.239,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 102,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 17.529,
+          "relative_sasa": 0.145,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 103,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 29.824,
+          "relative_sasa": 0.153,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 104,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 0.672,
+          "relative_sasa": 0.006,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 105,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 141.458,
+          "relative_sasa": 0.661,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 106,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 101.472,
+          "relative_sasa": 0.531,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 107,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 11.624,
+          "relative_sasa": 0.096,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 108,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 135.79,
+          "relative_sasa": 0.726,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 109,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 62.495,
+          "relative_sasa": 0.644,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 110,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 48.053,
+          "relative_sasa": 0.246,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 111,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 97.573,
+          "relative_sasa": 0.634,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 112,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 22.027,
+          "relative_sasa": 0.227,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 113,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 83.917,
+          "relative_sasa": 0.449,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 114,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 54.78,
+          "relative_sasa": 0.453,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 115,
+          "residue_name": "CYS",
+          "residue_code": "C",
+          "sasa": 48.548,
+          "relative_sasa": 0.328,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 116,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 66.479,
+          "relative_sasa": 0.311,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 117,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 13.924,
+          "relative_sasa": 0.097,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 118,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 51.686,
+          "relative_sasa": 0.427,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 119,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 61.234,
+          "relative_sasa": 0.506,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 120,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 10.763,
+          "relative_sasa": 0.056,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 121,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 61.056,
+          "relative_sasa": 0.37,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 122,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 105.433,
+          "relative_sasa": 0.564,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 123,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 33.583,
+          "relative_sasa": 0.278,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 124,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 31.37,
+          "relative_sasa": 0.123,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 125,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 57.726,
+          "relative_sasa": 0.477,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 126,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 138.684,
+          "relative_sasa": 0.544,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 127,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 2.719,
+          "relative_sasa": 0.022,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 128,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 71.133,
+          "relative_sasa": 0.431,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 129,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 90.999,
+          "relative_sasa": 0.636,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 130,
+          "residue_name": "THR",
+          "residue_code": "T",
+          "sasa": 72.208,
+          "relative_sasa": 0.443,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 131,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 57.934,
+          "relative_sasa": 0.597,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 132,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 72.37,
+          "relative_sasa": 0.387,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 133,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 51.892,
+          "relative_sasa": 0.363,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 134,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 54.905,
+          "relative_sasa": 0.454,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 135,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 41.915,
+          "relative_sasa": 0.432,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 136,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 10.922,
+          "relative_sasa": 0.057,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 137,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 100.267,
+          "relative_sasa": 0.378,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 138,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 46.932,
+          "relative_sasa": 0.328,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 139,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 32.936,
+          "relative_sasa": 0.272,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 140,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 18.322,
+          "relative_sasa": 0.096,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 141,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 29.577,
+          "relative_sasa": 0.179,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 142,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 128.443,
+          "relative_sasa": 0.558,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 143,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 15.286,
+          "relative_sasa": 0.06,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 144,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 21.499,
+          "relative_sasa": 0.13,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 145,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 87.843,
+          "relative_sasa": 0.41,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 146,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 165.135,
+          "relative_sasa": 0.623,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 147,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 13.68,
+          "relative_sasa": 0.07,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 148,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 82.147,
+          "relative_sasa": 0.439,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 149,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 83.76,
+          "relative_sasa": 0.692,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 150,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 31.027,
+          "relative_sasa": 0.166,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 151,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 49.152,
+          "relative_sasa": 0.252,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 152,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 72.034,
+          "relative_sasa": 0.385,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 153,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 26.435,
+          "relative_sasa": 0.218,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 154,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 19.219,
+          "relative_sasa": 0.099,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 155,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 36.822,
+          "relative_sasa": 0.223,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 156,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 140.965,
+          "relative_sasa": 0.532,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 157,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 99.412,
+          "relative_sasa": 0.52,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 158,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 23.037,
+          "relative_sasa": 0.14,
+          "is_exposed": false
+        },
+        {
+          "residue_id": 159,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 95.695,
+          "relative_sasa": 0.512,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 160,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 56.1,
+          "relative_sasa": 0.392,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 161,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 111.105,
+          "relative_sasa": 0.721,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 162,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 104.61,
+          "relative_sasa": 0.548,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 163,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 165.165,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 164,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 167.768,
+          "relative_sasa": 0.736,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 165,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 113.368,
+          "relative_sasa": 0.793,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 166,
+          "residue_name": "THR",
+          "residue_code": "T",
+          "sasa": 129.162,
+          "relative_sasa": 0.792,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 167,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 107.235,
+          "relative_sasa": 0.75,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 168,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 96.955,
+          "relative_sasa": 0.801,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 169,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 100.873,
+          "relative_sasa": 0.834,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 170,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 151.741,
+          "relative_sasa": 0.92,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 171,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 68.125,
+          "relative_sasa": 0.702,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 172,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 113.588,
+          "relative_sasa": 0.939,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 173,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 72.967,
+          "relative_sasa": 0.752,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 174,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 107.949,
+          "relative_sasa": 0.892,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 175,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 71.472,
+          "relative_sasa": 0.737,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 176,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 118.931,
+          "relative_sasa": 0.832,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 177,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 84.49,
+          "relative_sasa": 0.871,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 178,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 96.645,
+          "relative_sasa": 0.799,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 179,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 107.398,
+          "relative_sasa": 0.888,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 180,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 107.076,
+          "relative_sasa": 0.749,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 181,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.606,
+          "relative_sasa": 0.769,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 182,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 106.03,
+          "relative_sasa": 0.876,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 183,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.031,
+          "relative_sasa": 0.763,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 184,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 112.119,
+          "relative_sasa": 0.927,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 185,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.87,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 186,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 127.241,
+          "relative_sasa": 0.89,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 187,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.401,
+          "relative_sasa": 0.757,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 188,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 117.363,
+          "relative_sasa": 0.97,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 189,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 62.657,
+          "relative_sasa": 0.646,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 190,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 104.5,
+          "relative_sasa": 0.864,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 191,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 63.442,
+          "relative_sasa": 0.654,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 192,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 118.033,
+          "relative_sasa": 0.825,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 193,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.039,
+          "relative_sasa": 0.753,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 194,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 109.435,
+          "relative_sasa": 0.904,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 195,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 76.291,
+          "relative_sasa": 0.787,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 196,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 111.836,
+          "relative_sasa": 0.924,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 197,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 70.687,
+          "relative_sasa": 0.729,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 198,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 123.619,
+          "relative_sasa": 0.864,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 199,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 72.322,
+          "relative_sasa": 0.746,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 200,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 110.805,
+          "relative_sasa": 0.916,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 201,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.402,
+          "relative_sasa": 0.715,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 202,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 113.43,
+          "relative_sasa": 0.937,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 203,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 67.179,
+          "relative_sasa": 0.693,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 204,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 119.664,
+          "relative_sasa": 0.837,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 205,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.055,
+          "relative_sasa": 0.753,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 206,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 112.033,
+          "relative_sasa": 0.926,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 207,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 76.834,
+          "relative_sasa": 0.792,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 208,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 115.445,
+          "relative_sasa": 0.954,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 209,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 76.688,
+          "relative_sasa": 0.791,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 210,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 125.504,
+          "relative_sasa": 0.878,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 211,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 80.644,
+          "relative_sasa": 0.831,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 212,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 116.604,
+          "relative_sasa": 0.964,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 213,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 79.533,
+          "relative_sasa": 0.82,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 214,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 117.513,
+          "relative_sasa": 0.971,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 215,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 78.446,
+          "relative_sasa": 0.809,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 216,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 126.174,
+          "relative_sasa": 0.882,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 217,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 83.327,
+          "relative_sasa": 0.859,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 218,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 116.821,
+          "relative_sasa": 0.965,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 219,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 81.038,
+          "relative_sasa": 0.835,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 220,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 115.694,
+          "relative_sasa": 0.956,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 221,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 81.929,
+          "relative_sasa": 0.845,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 222,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 128.158,
+          "relative_sasa": 0.896,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 223,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 77.651,
+          "relative_sasa": 0.801,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 224,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 117.332,
+          "relative_sasa": 0.97,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 225,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.038,
+          "relative_sasa": 0.753,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 226,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 110.122,
+          "relative_sasa": 0.91,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 227,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 72.92,
+          "relative_sasa": 0.752,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 228,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 122.705,
+          "relative_sasa": 0.858,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 229,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.208,
+          "relative_sasa": 0.755,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 230,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 106.921,
+          "relative_sasa": 0.884,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 231,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.151,
+          "relative_sasa": 0.713,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 232,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 109.981,
+          "relative_sasa": 0.909,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 233,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 66.799,
+          "relative_sasa": 0.689,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 234,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 122.254,
+          "relative_sasa": 0.855,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 235,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 62.71,
+          "relative_sasa": 0.646,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 236,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 104.782,
+          "relative_sasa": 0.866,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 237,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 67.319,
+          "relative_sasa": 0.694,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 238,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 104.831,
+          "relative_sasa": 0.866,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 239,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 72.63,
+          "relative_sasa": 0.749,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 240,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 118.661,
+          "relative_sasa": 0.83,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 241,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 84.162,
+          "relative_sasa": 0.868,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 242,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 109.409,
+          "relative_sasa": 0.904,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 243,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 80.031,
+          "relative_sasa": 0.825,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 244,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 110.985,
+          "relative_sasa": 0.917,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 245,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 63.675,
+          "relative_sasa": 0.656,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 246,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 234.214,
+          "relative_sasa": 0.918,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 247,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 67.658,
+          "relative_sasa": 0.698,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 248,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 105.075,
+          "relative_sasa": 0.868,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 249,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 68.401,
+          "relative_sasa": 0.705,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 250,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 150.526,
+          "relative_sasa": 0.912,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 251,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 60.536,
+          "relative_sasa": 0.624,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 252,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 68.785,
+          "relative_sasa": 0.568,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 253,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 70.247,
+          "relative_sasa": 0.724,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 254,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 181.96,
+          "relative_sasa": 0.714,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 255,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.497,
+          "relative_sasa": 0.716,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 256,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 82.218,
+          "relative_sasa": 0.679,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 257,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 66.966,
+          "relative_sasa": 0.69,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 258,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 199.863,
+          "relative_sasa": 0.784,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 259,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 68.03,
+          "relative_sasa": 0.701,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 260,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 106.112,
+          "relative_sasa": 0.877,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 261,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 64.838,
+          "relative_sasa": 0.668,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 262,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 75.244,
+          "relative_sasa": 0.622,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 263,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 78.464,
+          "relative_sasa": 0.809,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 264,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 178.958,
+          "relative_sasa": 0.702,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 265,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 71.844,
+          "relative_sasa": 0.741,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 266,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 188.77,
+          "relative_sasa": 0.828,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 267,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 60.406,
+          "relative_sasa": 0.623,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 268,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 127.103,
+          "relative_sasa": 0.825,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 269,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 220.98,
+          "relative_sasa": 0.867,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 270,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 128.95,
+          "relative_sasa": 0.782,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 271,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 78.45,
+          "relative_sasa": 0.648,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 272,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 154.059,
+          "relative_sasa": 0.824,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 273,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 78.736,
+          "relative_sasa": 0.812,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 274,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 60.493,
+          "relative_sasa": 0.624,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 275,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 215.666,
+          "relative_sasa": 0.846,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 276,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 104.892,
+          "relative_sasa": 0.734,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 277,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 233.655,
+          "relative_sasa": 0.882,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 278,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 233.48,
+          "relative_sasa": 0.881,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 279,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 175.338,
+          "relative_sasa": 0.819,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 280,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 55.028,
+          "relative_sasa": 0.567,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 281,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 190.251,
+          "relative_sasa": 0.746,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 282,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 159.912,
+          "relative_sasa": 0.747,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 283,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 190.943,
+          "relative_sasa": 0.749,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 284,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 73.508,
+          "relative_sasa": 0.608,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 285,
+          "residue_name": "TRP",
+          "residue_code": "W",
+          "sasa": 232.209,
+          "relative_sasa": 0.88,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 286,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 82.241,
+          "relative_sasa": 0.575,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 287,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 85.33,
+          "relative_sasa": 0.597,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 288,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 171.96,
+          "relative_sasa": 0.748,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 289,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 104.554,
+          "relative_sasa": 0.731,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 290,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 118.914,
+          "relative_sasa": 0.636,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 291,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 175.461,
+          "relative_sasa": 0.77,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 292,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 153.527,
+          "relative_sasa": 0.717,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 293,
+          "residue_name": "THR",
+          "residue_code": "T",
+          "sasa": 127.786,
+          "relative_sasa": 0.784,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 294,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 58.352,
+          "relative_sasa": 0.602,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 295,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 119.054,
+          "relative_sasa": 0.833,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 296,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 67.019,
+          "relative_sasa": 0.691,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 297,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 99.148,
+          "relative_sasa": 0.819,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 298,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 94.346,
+          "relative_sasa": 0.78,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 299,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 106.32,
+          "relative_sasa": 0.743,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 300,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 80.163,
+          "relative_sasa": 0.826,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 301,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 103.74,
+          "relative_sasa": 0.857,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 302,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.628,
+          "relative_sasa": 0.759,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 303,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 106.31,
+          "relative_sasa": 0.879,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 304,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.901,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 305,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 101.119,
+          "relative_sasa": 0.836,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 306,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 75.309,
+          "relative_sasa": 0.776,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 307,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 118.308,
+          "relative_sasa": 0.827,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 308,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.272,
+          "relative_sasa": 0.755,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 309,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 109.356,
+          "relative_sasa": 0.904,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 310,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 76.12,
+          "relative_sasa": 0.785,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 311,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 112.516,
+          "relative_sasa": 0.93,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 312,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 71.045,
+          "relative_sasa": 0.732,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 313,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 127.921,
+          "relative_sasa": 0.895,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 314,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.734,
+          "relative_sasa": 0.719,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 315,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 120.855,
+          "relative_sasa": 0.999,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 316,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 69.455,
+          "relative_sasa": 0.716,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 317,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 113.614,
+          "relative_sasa": 0.939,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 318,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 73.404,
+          "relative_sasa": 0.757,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 319,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 124.739,
+          "relative_sasa": 0.872,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 320,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 75.42,
+          "relative_sasa": 0.778,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 321,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 111.482,
+          "relative_sasa": 0.921,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 322,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 75.931,
+          "relative_sasa": 0.783,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 323,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 106.345,
+          "relative_sasa": 0.879,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 324,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 68.716,
+          "relative_sasa": 0.708,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 325,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 117.987,
+          "relative_sasa": 0.825,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 326,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 80.219,
+          "relative_sasa": 0.827,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 327,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 107.383,
+          "relative_sasa": 0.887,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 328,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 72.633,
+          "relative_sasa": 0.749,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 329,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 116.102,
+          "relative_sasa": 0.96,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 330,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 74.063,
+          "relative_sasa": 0.764,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 331,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 70.192,
+          "relative_sasa": 0.724,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 332,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 106.427,
+          "relative_sasa": 0.744,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 333,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 127.331,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 334,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 107.675,
+          "relative_sasa": 0.753,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 335,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 203.741,
+          "relative_sasa": 0.799,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 336,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 60.571,
+          "relative_sasa": 0.624,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 337,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 114.67,
+          "relative_sasa": 0.948,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 338,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 54.694,
+          "relative_sasa": 0.564,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 339,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 229.887,
+          "relative_sasa": 0.867,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 340,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 66.282,
+          "relative_sasa": 0.683,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 341,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 240.242,
+          "relative_sasa": 0.942,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 342,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 64.886,
+          "relative_sasa": 0.669,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 343,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 191.604,
+          "relative_sasa": 0.895,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 344,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 75.053,
+          "relative_sasa": 0.774,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 345,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 114.734,
+          "relative_sasa": 0.948,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 346,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 67.214,
+          "relative_sasa": 0.693,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 347,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 116.527,
+          "relative_sasa": 0.815,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 348,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 104.352,
+          "relative_sasa": 0.862,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 349,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 96.449,
+          "relative_sasa": 0.797,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 350,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 112.696,
+          "relative_sasa": 0.788,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 351,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 98.747,
+          "relative_sasa": 0.691,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 352,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 137.766,
+          "relative_sasa": 0.835,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 353,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 101.396,
+          "relative_sasa": 0.709,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 354,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 103.23,
+          "relative_sasa": 0.722,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 355,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 99.971,
+          "relative_sasa": 0.826,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 356,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 92.721,
+          "relative_sasa": 0.648,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 357,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 110.334,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 358,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 211.608,
+          "relative_sasa": 0.799,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 359,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 115.949,
+          "relative_sasa": 0.811,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 360,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 207.639,
+          "relative_sasa": 0.814,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 361,
+          "residue_name": "ASP",
+          "residue_code": "D",
+          "sasa": 139.754,
+          "relative_sasa": 0.747,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 362,
+          "residue_name": "TYR",
+          "residue_code": "Y",
+          "sasa": 224.662,
+          "relative_sasa": 0.881,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 363,
+          "residue_name": "SER",
+          "residue_code": "S",
+          "sasa": 88.748,
+          "relative_sasa": 0.621,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 364,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 236.753,
+          "relative_sasa": 0.893,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 365,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 212.969,
+          "relative_sasa": 0.804,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 366,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 126.92,
+          "relative_sasa": 0.679,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 367,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 148.826,
+          "relative_sasa": 0.902,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 368,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 215.028,
+          "relative_sasa": 0.811,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 369,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 183.534,
+          "relative_sasa": 0.798,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 370,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 125.972,
+          "relative_sasa": 0.674,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 371,
+          "residue_name": "CYS",
+          "residue_code": "C",
+          "sasa": 100.907,
+          "relative_sasa": 0.682,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 372,
+          "residue_name": "GLY",
+          "residue_code": "G",
+          "sasa": 59.047,
+          "relative_sasa": 0.609,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 373,
+          "residue_name": "ILE",
+          "residue_code": "I",
+          "sasa": 92.442,
+          "relative_sasa": 0.474,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 374,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 91.296,
+          "relative_sasa": 0.593,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 375,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 231.634,
+          "relative_sasa": 0.874,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 376,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 187.312,
+          "relative_sasa": 0.707,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 377,
+          "residue_name": "GLN",
+          "residue_code": "Q",
+          "sasa": 149.496,
+          "relative_sasa": 0.699,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 378,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 111.361,
+          "relative_sasa": 0.583,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 379,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 90.068,
+          "relative_sasa": 0.546,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 380,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 71.424,
+          "relative_sasa": 0.433,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 381,
+          "residue_name": "LYS",
+          "residue_code": "K",
+          "sasa": 170.323,
+          "relative_sasa": 0.741,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 382,
+          "residue_name": "PHE",
+          "residue_code": "F",
+          "sasa": 169.332,
+          "relative_sasa": 0.743,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 383,
+          "residue_name": "ARG",
+          "residue_code": "R",
+          "sasa": 219.627,
+          "relative_sasa": 0.829,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 384,
+          "residue_name": "ALA",
+          "residue_code": "A",
+          "sasa": 78.24,
+          "relative_sasa": 0.647,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 385,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 150.124,
+          "relative_sasa": 0.786,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 386,
+          "residue_name": "PRO",
+          "residue_code": "P",
+          "sasa": 110.096,
+          "relative_sasa": 0.715,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 387,
+          "residue_name": "CYS",
+          "residue_code": "C",
+          "sasa": 77.424,
+          "relative_sasa": 0.523,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 388,
+          "residue_name": "VAL",
+          "residue_code": "V",
+          "sasa": 147.268,
+          "relative_sasa": 0.893,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 389,
+          "residue_name": "ASN",
+          "residue_code": "N",
+          "sasa": 120.498,
+          "relative_sasa": 0.644,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 390,
+          "residue_name": "CYS",
+          "residue_code": "C",
+          "sasa": 80.978,
+          "relative_sasa": 0.547,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 391,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 170.37,
+          "relative_sasa": 0.892,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 392,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 144.406,
+          "relative_sasa": 0.675,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 393,
+          "residue_name": "LEU",
+          "residue_code": "L",
+          "sasa": 140.358,
+          "relative_sasa": 0.735,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 394,
+          "residue_name": "GLU",
+          "residue_code": "E",
+          "sasa": 165.261,
+          "relative_sasa": 0.772,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 395,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 170.984,
+          "relative_sasa": 0.792,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 396,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 144.937,
+          "relative_sasa": 0.671,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 397,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 169.525,
+          "relative_sasa": 0.785,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 398,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 170.494,
+          "relative_sasa": 0.789,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 399,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 194.653,
+          "relative_sasa": 0.901,
+          "is_exposed": true
+        },
+        {
+          "residue_id": 400,
+          "residue_name": "HIS",
+          "residue_code": "H",
+          "sasa": 214.19,
+          "relative_sasa": 0.992,
+          "is_exposed": true
+        }
+      ]
+    },
+    "aggrescan3d_score": 0.337,
+    "aggrescan3d_label": "moderate_aggregation_risk"
+  },
+  "ranking": {
+    "criteria": "round6_score",
+    "rank": 46,
+    "channel": "top"
+  }
+}

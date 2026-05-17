@@ -119,7 +119,37 @@
     "con_0275",
     "con_0292",
     "con_0289",
-    "con_0283"
+    "con_0283",
+    "con_0258",
+    "con_0284",
+    "con_0288",
+    "con_0287",
+    "con_0255",
+    "con_0270",
+    "con_0286",
+    "con_0245",
+    "con_0267",
+    "con_0242",
+    "con_0276",
+    "con_0273",
+    "con_0256",
+    "con_0247",
+    "con_0250",
+    "con_0253",
+    "con_0268",
+    "con_0265",
+    "con_0271",
+    "con_0274",
+    "con_0246",
+    "con_0260",
+    "con_0243",
+    "con_0263",
+    "con_0241",
+    "con_0244",
+    "con_0264",
+    "con_0259",
+    "con_0261",
+    "con_0262"
   ],
   "results": [
     {
@@ -1321,7 +1351,307 @@
       "omegafold_success": true,
       "omegafold_plddt": 0.4255,
       "total_elapsed": 75.3
+    },
+    {
+      "construct_id": "con_0258",
+      "channel": "bottom",
+      "peptide_id": "pep_889620",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4294,
+      "total_elapsed": 120.5
+    },
+    {
+      "construct_id": "con_0284",
+      "channel": "bottom",
+      "peptide_id": "pep_078551",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.3923,
+      "total_elapsed": 75.3
+    },
+    {
+      "construct_id": "con_0288",
+      "channel": "bottom",
+      "peptide_id": "pep_078551",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4325,
+      "total_elapsed": 85.7
+    },
+    {
+      "construct_id": "con_0287",
+      "channel": "bottom",
+      "peptide_id": "pep_078551",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4341,
+      "total_elapsed": 76.3
+    },
+    {
+      "construct_id": "con_0255",
+      "channel": "bottom",
+      "peptide_id": "pep_889620",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.421,
+      "total_elapsed": 89.1
+    },
+    {
+      "construct_id": "con_0270",
+      "channel": "bottom",
+      "peptide_id": "pep_608130",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4177,
+      "total_elapsed": 120.4
+    },
+    {
+      "construct_id": "con_0286",
+      "channel": "bottom",
+      "peptide_id": "pep_078551",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4343,
+      "total_elapsed": 75.3
+    },
+    {
+      "construct_id": "con_0245",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4159,
+      "total_elapsed": 83.6
+    },
+    {
+      "construct_id": "con_0267",
+      "channel": "bottom",
+      "peptide_id": "pep_608130",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4134,
+      "total_elapsed": 89.3
+    },
+    {
+      "construct_id": "con_0242",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4246,
+      "total_elapsed": 80.0
+    },
+    {
+      "construct_id": "con_0276",
+      "channel": "bottom",
+      "peptide_id": "pep_1043856",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.3799,
+      "total_elapsed": 120.3
+    },
+    {
+      "construct_id": "con_0273",
+      "channel": "bottom",
+      "peptide_id": "pep_1043856",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4,
+      "total_elapsed": 90.2
+    },
+    {
+      "construct_id": "con_0256",
+      "channel": "bottom",
+      "peptide_id": "pep_889620",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4334,
+      "total_elapsed": 76.2
+    },
+    {
+      "construct_id": "con_0247",
+      "channel": "bottom",
+      "peptide_id": "pep_895244",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4526,
+      "total_elapsed": 76.9
+    },
+    {
+      "construct_id": "con_0250",
+      "channel": "bottom",
+      "peptide_id": "pep_895244",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4288,
+      "total_elapsed": 80.5
+    },
+    {
+      "construct_id": "con_0253",
+      "channel": "bottom",
+      "peptide_id": "pep_889620",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4148,
+      "total_elapsed": 75.3
+    },
+    {
+      "construct_id": "con_0268",
+      "channel": "bottom",
+      "peptide_id": "pep_608130",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4324,
+      "total_elapsed": 76.0
+    },
+    {
+      "construct_id": "con_0265",
+      "channel": "bottom",
+      "peptide_id": "pep_608130",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4237,
+      "total_elapsed": 75.2
+    },
+    {
+      "construct_id": "con_0271",
+      "channel": "bottom",
+      "peptide_id": "pep_1043856",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4138,
+      "total_elapsed": 75.4
+    },
+    {
+      "construct_id": "con_0274",
+      "channel": "bottom",
+      "peptide_id": "pep_1043856",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4401,
+      "total_elapsed": 76.7
+    },
+    {
+      "construct_id": "con_0246",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.3853,
+      "total_elapsed": 120.4
+    },
+    {
+      "construct_id": "con_0260",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4083,
+      "total_elapsed": 79.3
+    },
+    {
+      "construct_id": "con_0243",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.3904,
+      "total_elapsed": 120.5
+    },
+    {
+      "construct_id": "con_0263",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "C",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4166,
+      "total_elapsed": 83.2
+    },
+    {
+      "construct_id": "con_0241",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4136,
+      "total_elapsed": 78.0
+    },
+    {
+      "construct_id": "con_0244",
+      "channel": "bottom",
+      "peptide_id": "pep_002974",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4177,
+      "total_elapsed": 80.2
+    },
+    {
+      "construct_id": "con_0264",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4048,
+      "total_elapsed": 120.4
+    },
+    {
+      "construct_id": "con_0259",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4547,
+      "total_elapsed": 75.7
+    },
+    {
+      "construct_id": "con_0261",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "Both",
+      "linker_id": "Flex_GGGGSx1",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4205,
+      "total_elapsed": 120.4
+    },
+    {
+      "construct_id": "con_0262",
+      "channel": "bottom",
+      "peptide_id": "pep_206019",
+      "position": "N",
+      "linker_id": "Flex_GGGGSx2",
+      "omegafold_success": true,
+      "omegafold_plddt": 0.4141,
+      "total_elapsed": 79.2
     }
   ],
-  "timestamp": "2026-05-18T00:17:27.972391"
+  "timestamp": "2026-05-18T01:02:03.419929"
 }

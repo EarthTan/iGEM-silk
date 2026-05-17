@@ -51,10 +51,9 @@ FINAL_DIR = STAGE_DIR / "final"
 RAW_DIR = STAGE_DIR / "raw"
 
 # ── 评分权重 ──
-W_CONSTRUCT = 0.50
-W_pLDDT = 0.15
-W_SASA = 0.20
-W_AGG = 0.15
+W_pLDDT = 0.20
+W_SASA = 0.40
+W_AGG = 0.40
 
 # ── 并发 ──
 SASA_CONCURRENCY = 10
@@ -234,9 +233,8 @@ def compute_scores(constructs: list[dict]) -> list[dict]:
         plddt_norm = (c["omegafold_plddt"] - plddt_min) / plddt_range if c["omegafold_plddt"] is not None else 0.5
         sasa = c["sasa_score"] if c["sasa_score"] is not None else 0.0
         agg_inv = 1.0 - (c["aggrisk_score"] if c["aggrisk_score"] is not None else 0.5)
-        cc = c["construct_composite"] if c["construct_composite"] is not None else 0.0
 
-        round6 = W_CONSTRUCT * cc + W_pLDDT * plddt_norm + W_SASA * sasa + W_AGG * agg_inv
+        round6 = W_SASA * sasa + W_AGG * agg_inv + W_pLDDT * plddt_norm
 
         c["plddt_norm"] = round(plddt_norm, 4)
         c["agg_inv"] = round(agg_inv, 4)
@@ -257,11 +255,10 @@ def compute_scores(constructs: list[dict]) -> list[dict]:
 CSV_FIELDS = [
     "round6_rank", "channel", "construct_id", "peptide_id", "peptide_sequence",
     "position", "linker_id",
-    "round6_score", "construct_composite", "construct_anoxpepred", "construct_bepipred3",
-    "sodope_score", "temstapro_score", "anox_change_ratio",
+    "round6_score", "sasa_score", "sasa_label", "aggrisk_score", "aggrisk_label", "agg_inv",
     "omegafold_plddt", "plddt_norm",
-    "sasa_score", "sasa_label",
-    "aggrisk_score", "aggrisk_label", "agg_inv",
+    "construct_composite", "construct_anoxpepred", "construct_bepipred3",
+    "sodope_score", "temstapro_score", "anox_change_ratio",
 ]
 
 
@@ -280,8 +277,8 @@ def save_csv(scored: list[dict], path: Path):
 async def main():
     t0 = time.time()
     setup_stage(STAGE)
-    make_dir(FINAL_DIR)
-    make_dir(RAW_DIR)
+    make_dir(STAGE_DIR, "final")
+    make_dir(STAGE_DIR, "raw")
 
     log("=" * 60)
     log("Round 6：PDB 评估 — SASA + Aggrescan3D")
@@ -323,19 +320,17 @@ async def main():
     log(f"\n✅ sasa_ranking.csv 已保存: {csv_path}")
 
     # 7. Top/Bottom 展示
-    log(f"\n🏆 Top 5:")
+    log(f"\nTop 5:")
     for c in scored[:5]:
         log(f"  {c['round6_rank']}. {c['construct_id']:12s} | "
-            f"cc={c['construct_composite']:.4f} sasa={c['sasa_score']:.4f} "
-            f"agg={c['aggrisk_score']:.4f} plddt={c['omegafold_plddt']:.4f} | "
-            f"round6={c['round6_score']:.4f}")
+            f"sasa={c['sasa_score']:.4f} agg={c['aggrisk_score']:.4f} "
+            f"plddt={c['omegafold_plddt']:.4f} | round6={c['round6_score']:.4f}")
 
-    log(f"\n📉 Bottom 5:")
+    log(f"\nBottom 5:")
     for c in scored[-5:]:
         log(f"  {c['round6_rank']}. {c['construct_id']:12s} | "
-            f"cc={c['construct_composite']:.4f} sasa={c['sasa_score']:.4f} "
-            f"agg={c['aggrisk_score']:.4f} plddt={c['omegafold_plddt']:.4f} | "
-            f"round6={c['round6_score']:.4f}")
+            f"sasa={c['sasa_score']:.4f} agg={c['aggrisk_score']:.4f} "
+            f"plddt={c['omegafold_plddt']:.4f} | round6={c['round6_score']:.4f}")
 
     # 8. README
     elapsed = time.time() - t0
@@ -367,10 +362,9 @@ def _write_readme(scored, dist, elapsed):
 ## 评分公式
 
 ```
-round6_score = {W_CONSTRUCT} * construct_composite
-             + {W_pLDDT} * pLDDT_norm
-             + {W_SASA} * SASA_exposure
+round6_score = {W_SASA} * SASA_exposure
              + {W_AGG} * (1 - aggrisk)
+             + {W_pLDDT} * pLDDT_norm
 ```
 
 ## 分数分布

@@ -267,7 +267,7 @@ def _build_readme(all_rows, top_rows, bottom_rows, dist):
 **生成日期**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **Construct 总数**: {len(all_rows)}（Top: {len(top_rows)}, Bottom: {len(bottom_rows)}）
 **骨架**: 丝素蛋白 (~346 aa) + His6 标签
-**排名标准**: Round 6 综合评分（construct_composite × 0.50 + pLDDT_norm × 0.15 + SASA × 0.20 + (1-aggrisk) × 0.15）
+**排名标准**: Round 6 综合评分（SASA × 0.40 + (1-aggrisk) × 0.40 + pLDDT_norm × 0.20）
 
 ---
 
