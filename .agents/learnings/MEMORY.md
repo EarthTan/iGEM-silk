@@ -15,14 +15,20 @@
 - [Docker latest tag 版本不确定性](docker/latest-tag-pinning.md) — GEP: pin 具体版本避免 :latest 的 breaking change
 - [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
 - [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
+- [PyTorch CUDA cache 残留阻塞](gep-pytorch-cuda-cache-gpu-memory-leak.md) — GEP: 进程退出后 CUDA context 占用 34GB 不释放；docker stop 无效；kill -9 唯一解；按需启动 GPU 服务
+- [Python 2.7 遗留服务 Docker 化](gep-python2.7-docker-micromamba.md) — GEP: micromamba 静态二进制创建 Python 2.7 conda 环境；GHCR 可访问；miniconda2/python:2.7-slim 均已失效
 - [Waveflow 远程 API 代理微服务模式](gep-waveflow-remote-api-service.md) — GEP: Tamarind.bio REST API 包装为本地结构预测微服务；工具类型 URL 路由；ZIP 结果解压；API 响应格式适配
+- [权重迭代与数据驱动决策](gep-weight-iteration-data-driven.md) — GEP: construct_composite 在 Top90 中 spread 仅 0.011；先跑数据再看分布后定权重；EDA 替换假设
 - [流水线阶段编排与检查点恢复](gep-pipeline-stage-orchestration.md) — GEP: 独立脚本架构，JSON 检查点支持中断恢复，输出目录约定，STATUS.md 全局进度指针
 - [freesasa 2.2.1 selectArea API 不兼容](gep-freesasa-selectarea-api.md) — GEP: freesasa selectArea() 从 tuple 列表改为单字符串格式，TypeError: expected bytes 的排查与修复
 - [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
 - [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
 - [ToxinPred3 单线程并发限制](gep-toxinpred3-concurrency-limit.md) — GEP: sklearn ExtraTrees 挂死根因；`asyncio.wait_for` 不可靠 vs `requests` socket 超时；小批次+连续超时检测+服务重启策略
+- [TemStaPro 预筛减少 GPU 瓶颈](gep-temstapro-prescreen-gpu-bottleneck.md) — GEP: CPU 服务预筛取 Top30% 喂 GPU；50K→15K 节省 70% GPU 时间；BepiPred3 46h→9.5h
 - [OmegaFold 同步推理阻塞事件循环](gep-omegafold-sync-inference-blocking.md) — GEP: async def 中同步 PyTorch 推理阻塞 uvicorn 事件循环；客户端 Semaphore 串行化；服务端 run_in_executor 修复方案
 - [Docker 容器桥接 IP 直连](gep-docker-container-bridge-ip.md) — GEP: docker-proxy 在 httpx 长连接下的间歇性故障；docker inspect 获取 bridge IP 绕过代理；诊断方法（宿主机 vs 容器内 curl）
+- [双通道 Top/Bottom 排选设计](gep-dual-channel-top-bottom-pipeline.md) — GEP: Top/Bottom 双通道贯穿全流程；分选依据单一维度；各自独立排名；阴性对照设计
+- [BepiPred3 GPU 超时系统调优](gep-bepipred3-gpu-timeout-tuning.md) — GEP: Semaphore/timeout/batch 三维联动调优；GPU 串行推理 Semaphore=1 最优；17%→100%
 - [asyncio.gather 异常传播陷阱](gep-asyncio-gather-exception-safety.md) — GEP: 单个 task 异常导致全部任务被取消；双层隔离策略（return_exceptions + 独立 try/except）
 - [MHCflurry 模型下载失败处理](gep-mhcflurry-model-download.md) — GEP: 国内 GitHub 不可达时通过 ghproxy 下载 156MB 模型；`--release` 参数缺失修复；COPY 替代在线下载
 - [流水线脚本静默挂起诊断](gep-silent-progress-hang-diagnosis.md) — GEP: 脚本存活+容器正常工作但无进度日志的 7 步诊断法；docker-proxy 连接挂死对长耗时服务的选择性影响；`{SERVICE}_HOST` 桥接 IP 修复
