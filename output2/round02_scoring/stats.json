@@ -1,0 +1,32 @@
+{
+  "stage": "round02_scoring",
+  "timestamp": "2026-05-17T17:15:48.679244",
+  "elapsed_sec": 3754.7,
+  "selection": {
+    "source": "/home/lenovo/Projects/iGEM-silk/output2/round01_lightweight/final/all_scored.csv",
+    "criterion": "anoxpepred (pure antioxidant, descending)",
+    "top_n": 25000,
+    "bottom_n": 25000,
+    "top_anoxpepred_range": "0.4291 ~ 0.6046",
+    "bottom_anoxpepred_range": "0.1576 ~ 0.2485"
+  },
+  "services": {
+    "toxinpred3": {
+      "desc": "毒性（反向，越低越好）",
+      "concurrency": 2
+    },
+    "hemopi2": {
+      "desc": "溶血（反向，越低越好）",
+      "concurrency": 10
+    },
+    "mhcflurry": {
+      "desc": "MHC-I 结合（反向，越低越好）",
+      "concurrency": 10
+    }
+  },
+  "output": {
+    "all_50k": "/home/lenovo/Projects/iGEM-silk/output2/round02_scoring/final/all_50k.csv",
+    "top25k": "/home/lenovo/Projects/iGEM-silk/output2/round02_scoring/final/top25k.csv",
+    "bottom25k": "/home/lenovo/Projects/iGEM-silk/output2/round02_scoring/final/bottom25k.csv"
+  }
+}

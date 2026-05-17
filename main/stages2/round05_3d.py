@@ -1,11 +1,11 @@
 """
-Round 5：3D 结构预测 — ESMFold + OmegaFold
+Round 5：3D 结构预测 — OmegaFold
 
-对 Round 4 的全部 construct（Top + Bottom）同时运行 ESMFold 和 OmegaFold，
+对 Round 4 的全部 construct（Top + Bottom）运行 OmegaFold 结构预测，
 每个 construct 一个独立文件夹。与原脚本的核心差异：
+  - 仅运行 OmegaFold（ESMFold 对 silk 融合蛋白的 pLDDT 普遍 <0.30）
   - 输出到 output2/
   - 使用 common.py 共享工具
-  - 移除 stop_other_services()（原脚本杀死非结构服务自身的 bug）
   - 保留 OmegaFold Docker 桥接 IP 检测（已验证有效）
   - 所有 construct（top + bottom）统一处理
 
@@ -21,7 +21,6 @@ Round 5：3D 结构预测 — ESMFold + OmegaFold
 输出：
     output2/round05_3d/
     ├── constructs/con_XXXX/   ← 每个 construct 独立文件夹
-    │   ├── con_XXXX_esmfold.pdb
     │   ├── con_XXXX_omegafold.pdb
     │   ├── scores.json
     │   └── metadata.json
@@ -58,10 +57,8 @@ CONSTRUCTS_DIR = STAGE_DIR / "constructs"
 FINAL_DIR = STAGE_DIR / "final"
 
 # ── 并发控制 ──
-CONCURRENCY = 2                # 同时处理几个 construct
-ESMFOLD_TIMEOUT = 7200         # ESMFold 单任务超时（2h）
-OMEGAFOLD_TIMEOUT = 14400      # OmegaFold 单任务超时（4h）
-OMEGAFOLD_CONCURRENCY = 1      # OmegaFold 全局并发（服务端阻塞事件循环）
+CONCURRENCY = 1                 # OmegaFold 服务端阻塞事件循环，只能串行
+PREDICT_TIMEOUT = 14400         # OmegaFold 单任务超时（4h）
 POLL_INTERVAL = 30.0
 CHECKPOINT_INTERVAL = 3
 CHECKPOINT_PATH = STAGE_DIR / "checkpoint.json"
@@ -216,27 +213,15 @@ def _fix_omegafold_docker_network():
 
 
 async def ensure_structure_services(client: ServiceClient) -> bool:
-    """检查 ESMFold 和 OmegaFold 是否就绪。"""
-    log("\n🔍 检查结构预测服务...")
-    health = await client.check_health(["esmfold", "omegafold"])
-    esm_ok = health.get("esmfold", {}).get("available", False)
+    """检查 OmegaFold 是否就绪。"""
+    log("\n 检查结构预测服务...")
+    health = await client.check_health(["omegafold"])
     ome_ok = health.get("omegafold", {}).get("available", False)
 
-    if esm_ok:
-        log(f"  ESMFold ✅ 已就绪")
-    else:
-        log(f"  ESMFold ❌ 不可达 — 请启动服务")
     if ome_ok:
-        log(f"  OmegaFold ✅ 已就绪")
+        log(f"  OmegaFold: ready")
     else:
-        log(f"  OmegaFold ❌ 不可达 — 请启动服务")
-
-    if not esm_ok or not ome_ok:
-        log("\n⚠️  请先启动结构预测服务:")
-        if not esm_ok:
-            log("   ESMFold:   cd tools/ESMFold && nohup .venv/bin/python service.py --port 8203 &")
-        if not ome_ok:
-            log("   OmegaFold: cd tools/OmegaFold && nohup .venv/bin/python service.py --port 8204 &")
+        log(f"  OmegaFold: unreachable -- start service")
         return False
 
     _fix_omegafold_docker_network()
@@ -253,9 +238,8 @@ async def predict_one(
     sequence: str,
     peptide_info: dict[str, Any] | None,
     original_meta: dict[str, Any] | None,
-    omegafold_sem: asyncio.Semaphore | None = None,
 ) -> dict[str, Any]:
-    """对一个 construct 同时运行 ESMFold + OmegaFold，写文件夹。"""
+    """对一个 construct 运行 OmegaFold 预测，写文件夹。"""
     cid = construct["construct_id"]
     pid = construct["peptide_id"]
     pep_seq = peptide_info.get("sequence", "") if peptide_info else ""
@@ -263,67 +247,28 @@ async def predict_one(
     con_dir = CONSTRUCTS_DIR / cid
     con_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"  ▶ {cid} | {pid} | {construct.get('position', '?')} | {len(sequence)}aa | {construct.get('channel', '?')}")
-
-    async def timed_predict(service: str, seq: str, cid: str, timeout: float) -> dict:
-        t0 = time.time()
-        if service == "omegafold" and omegafold_sem is not None:
-            async with omegafold_sem:
-                result = await client.predict_structure_async(
-                    service, seq, peptide_id=cid,
-                    poll_interval=POLL_INTERVAL, timeout=timeout,
-                )
-        else:
-            result = await client.predict_structure_async(
-                service, seq, peptide_id=cid,
-                poll_interval=POLL_INTERVAL, timeout=timeout,
-            )
-        result["_elapsed"] = time.time() - t0
-        return result
-
-    esmfold_task = asyncio.create_task(
-        timed_predict("esmfold", sequence, cid, ESMFOLD_TIMEOUT)
-    )
-    omegafold_task = asyncio.create_task(
-        timed_predict("omegafold", sequence, cid, OMEGAFOLD_TIMEOUT)
-    )
+    log(f"  {cid} | {pid} | {construct.get('position', '?')} | {len(sequence)}aa | {construct.get('channel', '?')}")
 
     t0 = time.time()
-    esmfold_result, omegafold_result = await asyncio.gather(
-        esmfold_task, omegafold_task, return_exceptions=True,
-    )
-    elapsed = time.time() - t0
-
-    if isinstance(esmfold_result, Exception):
-        esmfold_result = {
+    try:
+        result = await client.predict_structure_async(
+            "omegafold", sequence, peptide_id=cid,
+            poll_interval=POLL_INTERVAL, timeout=PREDICT_TIMEOUT,
+        )
+    except Exception as e:
+        result = {
             "success": False, "peptide_id": cid,
-            "error": f"ESMFold exception: {esmfold_result}",
-            "confidence": None, "pdb_content": "", "_elapsed": 0,
+            "error": f"OmegaFold exception: {e}",
+            "confidence": None, "pdb_content": "",
         }
-    if isinstance(omegafold_result, Exception):
-        omegafold_result = {
-            "success": False, "peptide_id": cid,
-            "error": f"OmegaFold exception: {omegafold_result}",
-            "confidence": None, "pdb_content": "", "_elapsed": 0,
-        }
+    result["_elapsed"] = time.time() - t0
 
     # PDB
-    esmfold_pdb = esmfold_result.get("pdb_content", "")
-    omegafold_pdb = omegafold_result.get("pdb_content", "")
-    if esmfold_pdb:
-        (con_dir / f"{cid}_esmfold.pdb").write_text(esmfold_pdb)
-    if omegafold_pdb:
-        (con_dir / f"{cid}_omegafold.pdb").write_text(omegafold_pdb)
+    pdb_content = result.get("pdb_content", "")
+    if pdb_content:
+        (con_dir / f"{cid}_omegafold.pdb").write_text(pdb_content)
 
-    # pLDDT
-    esm_plddt = esmfold_result.get("confidence")
-    ome_plddt = omegafold_result.get("confidence")
-    best_plddt = None
-    best_method = None
-    for method, plddt in [("esmfold", esm_plddt), ("omegafold", ome_plddt)]:
-        if plddt is not None and (best_plddt is None or plddt > best_plddt):
-            best_plddt = plddt
-            best_method = method
+    plddt = result.get("confidence")
 
     # scores.json
     scores = {
@@ -345,23 +290,13 @@ async def predict_one(
         },
         "safety_flag": peptide_info.get("safety_flag") if peptide_info else None,
         "structure": {
-            "esmfold": {
-                "success": esmfold_result.get("success", False),
-                "plddt": round(esm_plddt, 4) if esm_plddt is not None else None,
-                "elapsed": round(esmfold_result.get("_elapsed", 0), 1),
-                "error": esmfold_result.get("error") if not esmfold_result.get("success") else None,
-                "pdb_file": f"{cid}_esmfold.pdb" if esmfold_pdb else None,
-            },
             "omegafold": {
-                "success": omegafold_result.get("success", False),
-                "plddt": round(ome_plddt, 4) if ome_plddt is not None else None,
-                "elapsed": round(omegafold_result.get("_elapsed", 0), 1),
-                "error": omegafold_result.get("error") if not omegafold_result.get("success") else None,
-                "pdb_file": f"{cid}_omegafold.pdb" if omegafold_pdb else None,
+                "success": result.get("success", False),
+                "plddt": round(plddt, 4) if plddt is not None else None,
+                "elapsed": round(result.get("_elapsed", 0), 1),
+                "error": result.get("error") if not result.get("success") else None,
+                "pdb_file": f"{cid}_omegafold.pdb" if pdb_content else None,
             },
-            "best_plddt": round(best_plddt, 4) if best_plddt is not None else None,
-            "best_method": best_method,
-            "total_elapsed": round(elapsed, 1),
         },
     }
     write_json(con_dir / "scores.json", scores)
@@ -380,12 +315,9 @@ async def predict_one(
     }
     write_json(con_dir / "metadata.json", metadata)
 
-    emoji_esm = "✅" if esmfold_result.get("success") else "❌"
-    emoji_ome = "✅" if omegafold_result.get("success") else "❌"
-    plddt_str_esm = f"pLDDT={esm_plddt:.4f}" if esm_plddt is not None else "pLDDT=N/A"
-    plddt_str_ome = f"pLDDT={ome_plddt:.4f}" if ome_plddt is not None else "pLDDT=N/A"
-    log(f"  {emoji_esm} ESMFold   {plddt_str_esm}   ({esmfold_result.get('_elapsed', 0):.0f}s)")
-    log(f"  {emoji_ome} OmegaFold {plddt_str_ome}   ({omegafold_result.get('_elapsed', 0):.0f}s)")
+    emoji = "OK" if result.get("success") else "FAIL"
+    plddt_str = f"pLDDT={plddt:.4f}" if plddt is not None else "pLDDT=N/A"
+    log(f"  {emoji} OmegaFold {plddt_str} ({result.get('_elapsed', 0):.0f}s)")
 
     return {
         "construct_id": cid,
@@ -393,13 +325,9 @@ async def predict_one(
         "peptide_id": pid,
         "position": construct.get("position"),
         "linker_id": construct.get("linker_id"),
-        "esmfold_success": esmfold_result.get("success", False),
-        "esmfold_plddt": round(esm_plddt, 4) if esm_plddt is not None else None,
-        "omegafold_success": omegafold_result.get("success", False),
-        "omegafold_plddt": round(ome_plddt, 4) if ome_plddt is not None else None,
-        "best_plddt": round(best_plddt, 4) if best_plddt is not None else None,
-        "best_method": best_method,
-        "total_elapsed": round(elapsed, 1),
+        "omegafold_success": result.get("success", False),
+        "omegafold_plddt": round(plddt, 4) if plddt is not None else None,
+        "total_elapsed": round(result.get("_elapsed", 0), 1),
     }
 
 
@@ -439,7 +367,7 @@ async def run():
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
 
     log("=" * 60)
-    log("Round 5：3D 结构预测 — ESMFold + OmegaFold")
+    log("Round 5：3D 结构预测 — OmegaFold")
     log("=" * 60)
 
     # ── 加载数据 ──
@@ -475,7 +403,6 @@ async def run():
     # 主循环
     # ══════════════════════════════════════════════════════════════════
     sem = asyncio.Semaphore(CONCURRENCY)
-    omegafold_sem = asyncio.Semaphore(OMEGAFOLD_CONCURRENCY)
     results_lock = asyncio.Lock()
     checkpoint_counter = 0
 
@@ -486,12 +413,12 @@ async def run():
         async with sem:
             seq = sequences.get(cid, "")
             if not seq:
-                log(f"  ⚠ {cid} 无序列，跳过")
+                log(f"  {cid} 无序列，跳过")
                 return None
             pinfo = peptide_scores.get(pid)
             pep_seq = pinfo.get("sequence", "") if pinfo else ""
             ometa = original_metadata.get(pep_seq) if pep_seq else None
-            result = await predict_one(client, construct, seq, pinfo, ometa, omegafold_sem)
+            result = await predict_one(client, construct, seq, pinfo, ometa)
             async with results_lock:
                 all_results.append(result)
                 completed_ids.add(cid)
@@ -525,23 +452,16 @@ async def run():
     log("\n" + "=" * 60)
     log("📊 Round 5 汇总")
 
-    n_esm_ok = sum(1 for r in all_results if r["esmfold_success"])
     n_ome_ok = sum(1 for r in all_results if r["omegafold_success"])
-    n_both_ok = sum(1 for r in all_results if r["esmfold_success"] and r["omegafold_success"])
-    esm_plddts = [r["esmfold_plddt"] for r in all_results if r["esmfold_plddt"] is not None]
     ome_plddts = [r["omegafold_plddt"] for r in all_results if r["omegafold_plddt"] is not None]
 
-    log(f"  ESMFold:   {n_esm_ok}/{n_total} 成功")
-    if esm_plddts:
-        log(f"    pLDDT: min={min(esm_plddts):.4f}, max={max(esm_plddts):.4f}, mean={sum(esm_plddts)/len(esm_plddts):.4f}")
     log(f"  OmegaFold: {n_ome_ok}/{n_total} 成功")
     if ome_plddts:
         log(f"    pLDDT: min={min(ome_plddts):.4f}, max={max(ome_plddts):.4f}, mean={sum(ome_plddts)/len(ome_plddts):.4f}")
-    log(f"  双服务均成功: {n_both_ok}/{n_total}")
     log(f"  耗时: {total_elapsed:.0f}s ({total_elapsed/60:.1f}min)")
 
     # 汇总 CSV
-    results_sorted = sorted(all_results, key=lambda r: r.get("best_plddt") or 0, reverse=True)
+    results_sorted = sorted(all_results, key=lambda r: r.get("omegafold_plddt") or 0, reverse=True)
     for i, r in enumerate(results_sorted, 1):
         r["rank"] = i
     import csv
@@ -557,15 +477,13 @@ async def run():
     log(f"\n  Top 5 by pLDDT:")
     for r in results_sorted[:5]:
         log(f"    #{r['rank']:2d} {r['construct_id']:12s} | {r['peptide_id']:12s} | "
-            f"ESM={r['esmfold_plddt']:.4f} OME={r['omegafold_plddt']:.4f} "
-            f"BEST={r['best_plddt']:.4f} ({r['best_method']})" if r['best_plddt'] else "N/A")
+            f"OME={r['omegafold_plddt']:.4f}" if r['omegafold_plddt'] is not None else "N/A")
 
     # Round 6 输入（含 channel）
     round6_input = {
         "source_stage": STAGE,
         "timestamp": datetime.now().isoformat(),
         "n_constructs": n_total,
-        "n_esmfold_success": n_esm_ok,
         "n_omegafold_success": n_ome_ok,
         "results": results_sorted,
     }
@@ -573,11 +491,11 @@ async def run():
     log(f"  Round 6 输入: {FINAL_DIR / 'round6_input.json'}")
 
     # README
-    _write_readme(n_total, n_esm_ok, n_ome_ok, n_both_ok, esm_plddts, ome_plddts, results_sorted, total_elapsed)
+    _write_readme(n_total, n_ome_ok, ome_plddts, results_sorted, total_elapsed)
     log(f"\n✅ Round 5 完成！耗时: {total_elapsed:.0f}s")
 
 
-def _write_readme(n_total, n_esm_ok, n_ome_ok, n_both_ok, esm_plddts, ome_plddts, results, elapsed):
+def _write_readme(n_total, n_ome_ok, ome_plddts, results, elapsed):
     def plddt_stats(values, name):
         if not values:
             return f"**{name}**: 无有效数据"
@@ -591,8 +509,7 @@ def _write_readme(n_total, n_esm_ok, n_ome_ok, n_both_ok, esm_plddts, ome_plddts
     top5_lines = "\n".join(
         f"| {r['rank']} | {r['construct_id']} | {r['peptide_id']} | "
         f"{r['linker_id']} | {r['position']} | "
-        f"{r['esmfold_plddt']:.4f} | {r['omegafold_plddt']:.4f} | "
-        f"{r['best_plddt']:.4f} ({r['best_method']}) |" for r in top5
+        f"{r['omegafold_plddt']:.4f} |" for r in top5
     )
 
     readme = f"""# Round 5：3D 结构预测 — 报告
@@ -605,20 +522,16 @@ def _write_readme(n_total, n_esm_ok, n_ome_ok, n_both_ok, esm_plddts, ome_plddts
 | 指标 | 值 |
 |------|-----|
 | 总数 | {n_total} |
-| ESMFold 成功 | {n_esm_ok}/{n_total} |
 | OmegaFold 成功 | {n_ome_ok}/{n_total} |
-| 双服务均成功 | {n_both_ok}/{n_total} |
 
 ### pLDDT 分布
-
-{plddt_stats(esm_plddts, "ESMFold")}
 
 {plddt_stats(ome_plddts, "OmegaFold")}
 
 ## Top 5 by pLDDT
 
-| 排名 | Construct | 肽 | Linker | 位置 | ESMFold | OmegaFold | 最佳 |
-|------|-----------|-----|--------|------|---------|-----------|------|
+| 排名 | Construct | 肽 | Linker | 位置 | OmegaFold |
+|------|-----------|-----|--------|------|-----------|
 {top5_lines}
 
 ## 输出
@@ -626,7 +539,6 @@ def _write_readme(n_total, n_esm_ok, n_ome_ok, n_both_ok, esm_plddts, ome_plddts
 ```
 output2/round05_3d/
 ├── constructs/con_XXXX/   ← 每个 construct 独立文件夹
-│   ├── con_XXXX_esmfold.pdb
 │   ├── con_XXXX_omegafold.pdb
 │   ├── metadata.json
 │   └── scores.json

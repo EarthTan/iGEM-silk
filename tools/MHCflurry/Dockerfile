@@ -26,11 +26,12 @@ RUN pip install --no-cache-dir \
     httpx
 
 # 预下载 MHCflurry 模型权重到项目目录 (避免首次请求延迟)
-RUN mkdir -p /app/tools/MHCflurry/models && \
-    MHCFLURRY_DOWNLOADS_DIR=/app/tools/MHCflurry/models \
-    mhcflurry-downloads fetch models_class1_pan 2>&1 && \
-    echo "[MHCflurry] Models downloaded successfully" || \
-    (echo "[MHCflurry] WARNING: Model download failed (may succeed at runtime)" && exit 0)
+# 注意：GitHub 在国内可能无法直接访问，使用 COPY 替代在线下载
+# 如需在线下载，取消注释下行并注释掉 COPY 行：
+# RUN mkdir -p /app/tools/MHCflurry/models && \
+#     MHCFLURRY_DOWNLOADS_DIR=/app/tools/MHCflurry/models \
+#     mhcflurry-downloads fetch models_class1_pan --release 2.2.0 2>&1
+COPY models/ /app/tools/MHCflurry/models/
 
 # 复制项目骨架
 WORKDIR /app

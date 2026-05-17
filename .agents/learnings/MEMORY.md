@@ -24,3 +24,5 @@
 - [OmegaFold 同步推理阻塞事件循环](gep-omegafold-sync-inference-blocking.md) — GEP: async def 中同步 PyTorch 推理阻塞 uvicorn 事件循环；客户端 Semaphore 串行化；服务端 run_in_executor 修复方案
 - [Docker 容器桥接 IP 直连](gep-docker-container-bridge-ip.md) — GEP: docker-proxy 在 httpx 长连接下的间歇性故障；docker inspect 获取 bridge IP 绕过代理；诊断方法（宿主机 vs 容器内 curl）
 - [asyncio.gather 异常传播陷阱](gep-asyncio-gather-exception-safety.md) — GEP: 单个 task 异常导致全部任务被取消；双层隔离策略（return_exceptions + 独立 try/except）
+- [MHCflurry 模型下载失败处理](gep-mhcflurry-model-download.md) — GEP: 国内 GitHub 不可达时通过 ghproxy 下载 156MB 模型；`--release` 参数缺失修复；COPY 替代在线下载
+- [流水线脚本静默挂起诊断](gep-silent-progress-hang-diagnosis.md) — GEP: 脚本存活+容器正常工作但无进度日志的 7 步诊断法；docker-proxy 连接挂死对长耗时服务的选择性影响；`{SERVICE}_HOST` 桥接 IP 修复

@@ -173,6 +173,8 @@ services:
       - "8010:8010"
     environment:
       - PORT=8010
+      - PROTTRANS_MODEL_DIR=/app/models/prot_t5_xl
+      - TEMSTAPRO_MODELS_DIR=/app/models
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./TemStaPro/models:/app/models

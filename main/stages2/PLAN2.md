@@ -1,32 +1,29 @@
-# Stages2 Recovery Plan (PLAN2)
+# Stages2 Pipeline Plan (PLAN2) — v2 修订版
 
-> **目标**: 重新运行 stages2 完整 pipeline，输出到 `output2/`，修复原脚本中的错误，新增 Bottom-N 安全肽输出。
+> **目标**: 重新运行 stages2 完整 pipeline，输出到 `output2/`，修复原脚本错误，新增 Bottom-N。
 >
-> **背景**: stages2 第一轮运行的所有输出已丢失。脚本和设计文档仍在，但脚本中存在多处 bug 和设计偏差。本轮
->   重新运行不仅要恢复输出，还要修复已知问题并增加新功能。
->
-> **重要**: Stages3（第三轮 pipeline）正在 `output3/` 上独立运行中。本计划使用 `output2/` 完全隔离，不
->   影响 stages3 的进行。
->
-> **策略**: 先全部脚本写好，再逐步执行（走一步看一步，不连续执行）。
+> **关键变更 (v2)**: 
+> 1. Round 1 **不跑 ToxinPred3**（105 万条太慢，~22h），改为在 Round 2 对 50K 补跑
+> 2. Round 2 **按纯抗氧化性分选** top25K + bottom25K，再跑 3 个安全服务
+> 3. Round 3 **在 50K 上跑 heavy 服务**（原 10K → 扩展为 50K 双通道）
+> 4. 加权综合分公式固定记录，供下游统一使用
 
 ---
 
 ## 与原脚本的核心差异
 
-| 维度 | 原 stages2 脚本 | PLAN2 修复版 |
-|------|----------------|-------------|
-| **输出目录** | `output/` | **`output2/`**（不覆盖原有残留文件） |
+| 维度 | 原 stages2 脚本 | PLAN2 修复版 (v2) |
+|------|----------------|-------------------|
+| **输出目录** | `output/` | **`output2/`** |
 | **工具函数** | 每个脚本复制粘贴 8 次 | `common.py` 统一管理 |
-| **Round 1→2 衔接** | round01 输出 `top50k.csv`，但 round02 读 `top100k.csv`（bug） | 统一为 `top50k.csv` |
-| **Round 2 服务** | 重复跑 ToxinPred3（已在 Round 1 跑过） | 只追加 HemoPI2 + MHCflurry，复用 Round 1 分数 |
-| **Round 4 评分** | 只有 SoDoPE，缺少 construct 级 re-score | 追加 AnOxPePred + BepiPred3 全长评分 |
-| **Round 6→7 衔接** | round07 读 `final_ranked_sasa.csv` 但 round06 输出 `all_ranked.csv`（bug） | 修复文件名一致 |
-| **断点续跑** | 无 | 每轮写入 checkpoint.json，重启跳过已完成批次 |
-| **并发控制** | 所有服务共用 `CONCURRENT_CHUNKS=10` | 按服务吞吐量调整并发（ToxinPred3=2，其他=10） |
-| **异常安全** | 部分 `asyncio.gather` 缺 `return_exceptions=True` | 统一使用双层异常隔离 |
-| **Bottom-N 输出** | 无 | 新增：安全维度正常但抗氧化最差的肽 |
-| **Docker 编排** | 手动启动/停止服务 | 从 stages3 引入 `docker_utils.py` |
+| **分选策略** | 按加权综合分排序（混合抗氧化+安全） | **按纯 AnOxPePred 分选**，取 top25K + bottom25K |
+| **ToxinPred3** | Round 1 硬跑 105 万条（~22h） | **Round 2 对 50K 补跑**（~48min，可接受） |
+| **Round 3 输入** | 10K 条 | **50K 条**（top25K + bottom25K 双通道） |
+| **Round 4 评分** | 只有 SoDoPE | 追加 AnOxPePred + BepiPred3 全长评分 |
+| **断点续跑** | 无 | checkpoint.json |
+| **并发控制** | 所有 `CONCURRENT_CHUNKS=10` | 按服务调整（ToxinPred3=2，其他=10） |
+| **异常安全** | 部分缺 `return_exceptions=True` | 统一双层异常隔离 |
+| **Docker 编排** | 手动 | 从 stages3 引入 `docker_utils.py` |
 
 ---
 
@@ -38,26 +35,28 @@
                     function_3 (1,117 条)
                            │
                     ┌──────┴──────┐
-                    │  Step 0     │  ← 合并、去重、长度过滤 (3-30aa)、标准氨基酸清洗
+                    │  Step 0     │  ← 合并、去重、长度过滤 (3-30aa)
                     └──────┬──────┘
-                           │ ~105 万条抗氧化肽
+                           │ ~105 万条
                            ▼
-               ╔═══════════════════════╗
-               ║  Round 1: 轻量评分   ║  ← AnOxPePred + ToxinPred3 + AlgPred2
-               ║  ~15 min, Top 50K    ║     并发 3 服务，加检查点
-               ╚═══════════════════════╝
+               ╔══════════════════════════╗
+               ║  Round 1: 轻量评分      ║  ← AnOxPePred + AlgPred2（无 ToxinPred3）
+               ║  105 万条 → 全量评分     ║     按纯 anoxpepred 排序准备分选
+               ╚══════════════════════════╝
                            │
                            ▼
-               ╔═══════════════════════╗
-               ║  Round 2: 追加评分   ║  ← HemoPI2 + MHCflurry（不重复跑 ToxinPred3）
-               ║  ~10 min, Top 10K    ║     复用 Round 1 数据，5 服务重排名
-               ╚═══════════════════════╝
-                           │
+               ╔═══════════════════════════════════╗
+               ║  Round 2: 分选 + 安全评分        ║
+               ║  ① 按 anoxpepred 取 top25K+bottom25K  ║
+               ║  ② 跑 ToxinPred3 + HemoPI2 + MHCflurry ║
+               ╚═══════════════════════════════════════╝
+                           │ 50K 条（含双通道标签）
                            ▼
-               ╔════════════════════════════╗
-               ║  Round 3: 重服务评分      ║  ← +BepiPred-3.0 (+可选 TemStaPro)
-               ║  ~5 min, Top 80 + Bottom  ║     最终排名 + 安全维度正常的抗氧化最差肽
-               ╚════════════════════════════╝
+               ╔══════════════════════════════╗
+               ║  Round 3: 重服务评分        ║
+               ║  BepiPred3 + TemStaPro      ║
+               ║  50K → top N + bottom M     ║
+               ╚══════════════════════════════╝
                           ╱╲
                          ╱  ╲
                         ╱    ╲
@@ -68,20 +67,19 @@
            ╚══════════════╝  ╚══════════════════╝
                        ▼      ▼
                ╔═══════════════════════╗
-               ║  Round 5: 3D 结构    ║  ← ESMFold + OmegaFold 双模型
-               ║  双模型并发           ║     全部 constructs 无差别处理
+               ║  Round 5: 3D 结构    ║  ← ESMFold + OmegaFold
+               ║  双模型并发           ║     全部 constructs 无差别
                ╚═══════════════════════╝
                            │
                            ▼
                ╔═══════════════════════╗
                ║  Round 6: PDB 评估   ║  ← SASA + Aggrescan3D
-               ║  ~3 min              ║
                ╚═══════════════════════╝
                            │
                            ▼
                ╔════════════════════════╗
-               ║  Round 7: 最终输出    ║  ← Top 排名 + Bottom 排名 + 完整报告
-               ║  两份排名              ║     各自独立排序输出
+               ║  Round 7: 最终输出    ║  ← Top + Bottom 双排名
+               ║  两份排名 + 完整报告   ║
                ╚════════════════════════╝
 ```
 
@@ -93,22 +91,32 @@
 output2/
 ├── STATUS.md                        ← 最新进度指针
 │
-├── step00_integrate/                ← Step 0 输出
-├── round01_lightweight/             ← Round 1 输出
-├── round02_scoring/                 ← Round 2 输出
-├── round03_heavy/                   ← Round 3 输出（含 top 和 bottom）
-├── round04_enumerate/               ← Round 4 输出（枚举 + construct 级评分）
-├── round05_3d/                      ← Round 5 输出（3D 结构）
-├── round06_pdb_eval/               ← Round 6 输出（PDB 评估）
+├── step00_integrate/                ← Step 0: 数据整合（cleaned.csv, 105 万条）
+├── round01_lightweight/             ← Round 1: AnOxPePred + AlgPred2（全量评分）
+│   └── final/
+│       ├── all_scored.csv           ← 全部 105 万条（含单项分）
+│       └── top50k.csv              ← 按加权分排序（仅参考）
+├── round02_scoring/                 ← Round 2: 分选 + ToxinPred3/HemoPI2/MHCflurry
+│   └── final/
+│       ├── all_50k.csv             ← 全部 50K（top25K+bottom25K+5 服务分+channel）
+│       ├── top25k.csv
+│       └── bottom25k.csv
+├── round03_heavy/                   ← Round 3: BepiPred3 + TemStaPro 重服务
+│   └── final/
+│       ├── top80.csv               ← Top 通道选出的 construct 候选
+│       └── bottom10.csv            ← Bottom 通道选出的阴性对照
+├── round04_enumerate/               ← Round 4: 枚举 + construct 级评分
+├── round05_3d/                      ← Round 5: ESMFold + OmegaFold 3D
+├── round06_pdb_eval/               ← Round 6: SASA + Aggrescan3D
 │
-└── round07_final/                   ← Round 7 最终输出
+└── round07_final/                   ← Round 7: 最终双通道输出
     ├── README.md                    ← 全流程报告
-    ├── top_ranking.csv              ← Top 90 construct（按综合分→SASA 排名）
-    ├── top10_summary.csv            ← Top 10 精简表
-    ├── bottom_ranking.csv           ← Bottom construct（抗氧化最差但其他安全）
-    ├── bottom10_summary.csv         ← Bottom 10 精简表
-    ├── score_distribution.json      ← 各分数维度分布
-    └── constructs/                  ← 每个 construct 独立文件夹（同原格式）
+    ├── top_ranking.csv              ← Top constructs（综合分→SASA 排名）
+    ├── top10_summary.csv
+    ├── bottom_ranking.csv           ← Bottom constructs
+    ├── bottom10_summary.csv
+    ├── score_distribution.json
+    └── constructs/                  ← 每个 construct 独立文件夹
 ```
 
 ---
@@ -187,59 +195,70 @@ Bottom 10 肽与 Top 80 肽走完全相同的后续流程：
 
 ### Round 1：轻量评分（`round01_lightweight.py`）
 
-**与原始脚本的差异**：
+**与原脚本的差异**：
 - 输出到 `output2/`
 - 使用 `common.py`
-- **新增：检查点** — 每 50 批保存 checkpoint，重启时跳过已完成批次
-- **按服务调整并发** — AnOxPePred=10, ToxinPred3=2, AlgPred2=10
-- **统一 `asyncio.gather` 异常安全** — `return_exceptions=True` + 每任务 try/except
-- 明确输出 `top50k.csv`（与 PLAN.md 一致，修复原 round02 读 `top100k.csv` 的 bug）
+- **不跑 ToxinPred3** — 105 万条用 sklearn ExtraTreesClassifier 需 ~22 小时，改为在 Round 2 对 50K 补跑
+- 按服务调整并发：AnOxPePred=10, AlgPred2=10
+- 统一 `asyncio.gather` 异常安全
+- 输出 `all_scored.csv`（全量评分）供 Round 2 分选
 
-**服务**：AnOxPePred(0.50) + ToxinPred3(0.15) + AlgPred2(0.10)
+**服务**：AnOxPePred(0.50) + AlgPred2(0.10)
 **输入**：`output2/step00_integrate/final/cleaned.csv`（~105 万条）
-**输出**：`output2/round01_lightweight/final/top50k.csv`
+**输出**：
+- `final/all_scored.csv` — 全部 105 万条评分明细
+- `final/top50k.csv` — 按加权综合分排序 Top 50K（仅作参考，Round 2 不用此排序）
 **依赖**：Step 0
 **预计耗时**：~15 min
 
 ---
 
-### Round 2：追加评分（`round02_scoring.py`）
+### Round 2：分选 + 安全评分（`round02_scoring.py`）
 
-**与原始脚本的关键差异**：
-- 输出到 `output2/`
-- **不再重复跑 ToxinPred3！** — 原脚本在 Round 2 重新跑了 ToxinPred3（浪费 ~2.3 小时），
-  本版直接复用 Round 1 的 ToxinPred3 分数
-- 只追加 HemoPI2 + MHCflurry 两个新服务
-- 新增检查点
-- 使用 `common.py`
+**v2 变更（与原 PLAN2 完全不同！）**：
+- **按纯抗氧化性分选**：读 `all_scored.csv`，按 `anoxpepred` 原始分降序排列
+  - Top 25K：抗氧化活性最好的 25,000 条
+  - Bottom 25K：抗氧化活性最差的 25,000 条（阴性对照）
+  - 丢弃 Round 1 的加权综合分排序
+- **补跑 ToxinPred3**：因 Round 1 跳过全量，在此对 50K 单独跑（并发 2）
+- **追加 HemoPI2 + MHCflurry**（并发 10 各）
+- **保留 AlgPred2 分数**（来自 Round 1）
+- **计算并记录综合分**：5 服务权重固定记录在脚本中
+```
+weighted_score = Σ(normalized_i × weight_i) / Σ(weight_i)
+  正向: anoxpepred (0.50)
+  反向: toxinpred3 (0.15) + algpred2 (0.10) + hemopi2 (0.10) + mhcflurry (0.05)
+```
+- **输出含 channel 标签**（top/bottom），贯穿后续所有 round
 
-**服务**：追加 HemoPI2(0.10) + MHCflurry(0.05)，复用 Round 1 的 3 服务分数
-**权重**：AnOxPePred(0.50) + ToxinPred3(0.15) + AlgPred2(0.10) + HemoPI2(0.10) + MHCflurry(0.05)
-**输入**：`output2/round01_lightweight/final/top50k.csv`
-**输出**：`output2/round02_scoring/final/top10k.csv`
+**输入**：`output2/round01_lightweight/final/all_scored.csv`（105 万条全量评分）
+**输出**：
+- `final/all_50k.csv` — 全部 50K（top25K + bottom25K + 5 服务分 + 综合分 + 安全标记 + channel 标签）
+- `final/top25k.csv` — Top 25K
+- `final/bottom25k.csv` — Bottom 25K
 **依赖**：Round 1
-**预计耗时**：~10 min（节省 ~2.3h vs 原脚本）
+**预计耗时**：~50 min（ToxinPred3 是瓶颈）
 
 ---
 
 ### Round 3：重服务评分（`round03_heavy.py`）
 
-**与原始脚本的差异**：
-- 输出到 `output2/`
-- 使用 `common.py`
-- 新增检查点
-- 修复 `asyncio.wait_for` 不能中断 C 扩展的问题（改用 socket 级别超时）
-- **新增 Bottom-N 输出** — 筛选安全维度正常的抗氧化最差肽
+**v2 变更**：
+- **输入从 10K 扩展为 50K**（top25K + bottom25K 双通道）
+- **按 channel 分别选择 top N 和 bottom M**：
+  - Top 通道：在 top25K 中按综合分取前 N 条
+  - Bottom 通道：在 bottom25K 中按安全过滤 → 取抗氧化最差 M 条
+- 追加 BepiPred-3.0(0.07) + TemStaPro(0.05)
+- `asyncio.wait_for` 不能中断 C 扩展 → 改用 socket 级别超时
 
-**服务**：追加 BepiPred-3.0(0.07) + TemStaPro(可选，0.05)
-**输入**：`output2/round02_scoring/final/top10k.csv`
+**服务**：追加 BepiPred-3.0(0.07) + TemStaPro(0.05)
+**输入**：`output2/round02_scoring/final/all_50k.csv`
 **输出**：
-- `output2/round03_heavy/final/top80.csv` — 按综合分 Top 80
-- `output2/round03_heavy/final/bottom10.csv` — 安全但抗氧化最差 10 条
-- `output2/round03_heavy/final/all_scored.csv` — 全部 10K 评分明细
-- `output2/round03_heavy/final/trajectory.csv` — 跨轮排名轨迹
+- `output2/round03_heavy/final/top80.csv` — Top 通道按综合分 Top 80
+- `output2/round03_heavy/final/bottom10.csv` — Bottom 通道安全过滤后取抗氧化最差 10 条
+- `output2/round03_heavy/final/all_scored.csv` — 全部 50K 评分明细
 **依赖**：Round 2
-**预计耗时**：~5 min（不含 TemStaPro），~10 min（含）
+**预计耗时**：取决于服务并发性能
 
 ---
 
@@ -382,52 +401,57 @@ output2/round07_final/
 
 ## 执行计划
 
-### 阶段 1：编写全部脚本（不执行）
+### 阶段 1：编写全部脚本 ✅
 
-依次编写 `common.py` → 各 round 脚本（step00 → round01 → ... → round07），全部编写完成后再进入阶段 2。
+全部脚本已编写完成（step00 → round01 → round07）。
 
-### 阶段 2：逐步执行
+### 阶段 2：逐步执行（进行中）
 
 每步执行后检查输出，确认无误后再进入下一步：
 
 ```bash
-# Step 0：数据整合（~30 秒）
+# Step 0：数据整合（~30 秒）✅ 已完成
 uv run python -m main.stages2.step00_integrate
-# → 检查 output2/step00_integrate/README.md
+# → 1,055,116 条清洗完成
 
-# Round 1：轻量评分（~15 分钟）
+# Round 1：轻量评分（~15 分钟）✅ 已完成
 uv run python -m main.stages2.round01_lightweight
-# → 检查 output2/round01_lightweight/README.md，确认 top50k.csv 存在
+# → AnOxPePred + AlgPred2 全量评分完成
+# → all_scored.csv + top50k.csv 已输出
 
-# Round 2：追加评分（~10 分钟）
+# Round 2：分选 + 安全评分（~50 分钟）🔄 进行中
 uv run python -m main.stages2.round02_scoring
-# → 检查 output2/round02_scoring/README.md，分布统计合理
+# → HemoPI2 ✅ 50K/380s
+# → MHCflurry ❌ 模型未下载（需 fix Dockerfile --release 参数）
+# → ToxinPred3 ⏳ 运行中（并发 2，预计 ~48 分钟）
+# → 输出: all_50k.csv（含 channel 标签 + 5 服务分 + 综合分 + 安全标记）
 
-# Round 3：重服务评分（~5 分钟）
+# Round 3：重服务评分
 uv run python -m main.stages2.round03_heavy
-# → 检查 top80.csv 和 bottom10.csv 均存在，轨迹合理
+# → 在 50K 上跑 BepiPred3 + TemStaPro
+# → 输出 top80 + bottom10
 
-# Round 4：枚举 + Construct 评分（~5 分钟）
+# Round 4：枚举 + Construct 评分
 uv run python -m main.stages2.round04_enumerate
-# → 检查 all_constructs.fasta，确认 context_effect.csv
+# → 双通道枚举 + construct 级 re-score
 
 # Round 5：3D 结构预测（~2 小时）
 uv run python -m main.stages2.round05_3d
-# → 检查 pLDDT 分布，确认 PDB 文件生成
+# → ESMFold + OmegaFold
 
 # Round 6：PDB 评估（~3 分钟）
 uv run python -m main.stages2.round06_pdb_eval
-# → 检查 sasa_ranking.csv，SASA 分布
+# → SASA + Aggrescan3D
 
 # Round 7：最终输出（~1 秒）
 uv run python -m main.stages2.round07_final
-# → 确认两份 ranking + constructs 文件夹
+# → Top + Bottom 双排名
 ```
 
 ### 阶段 3：验证
 
-- 对比 top_ranking.csv 与 bottom_ranking.csv 的 AnOxPePred 分布差异
-- 检查 bottom_ranking.csv 中各安全维度分数是否均在阈值以下
+- 对比 top/bottom 的 AnOxPePred 分布差异
+- 检查 bottom 中各安全维度分数是否均在阈值以下
 - 确认所有 PDB 文件可正常加载
 
 ---

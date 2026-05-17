@@ -30,3 +30,7 @@ tools/models/omegafold/
 # output3/*
 output3/*.wal
 output3/*.db
+
+
+# log files
+*.log

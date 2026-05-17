@@ -17,24 +17,29 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 
 ## Production pipeline (stages2)
 
-The completed production pipeline in `main/stages2/` processes 1M+ antioxidant peptides through 8 rounds:
+The `main/stages2/` pipeline (v2, in progress) processes 1M+ antioxidant peptides through 8 rounds:
 
 | Round | Script | Purpose | Input→Output | Time |
 |-------|--------|---------|-------------|------|
-| 0 | `step00_integrate.py` | Data cleaning, 3-30aa filter, dedup, is_antioxidant=1 | 1,081,772→1,055,116 | ~30s |
-| 1 | `round01_lightweight.py` | AnOxPePred(w=0.50)+AlgPred2(w=0.10), TOP_N=50000→100K | 1,055,116→100,000 | ~347s |
-| 2 | `round02_scoring.py` | Add ToxinPred3(0.15)+HemoPI2(0.10)+MHCflurry(0.05) | 100,000→10,000 | ~75s |
-| 3 | `round03_heavy.py` | Add BepiPred3(0.07)+TemStaPro(0.09), anoxpepred>0.5 filter | 10,000→80 | ~5min |
-| 4 | `round04_enumerate.py` | 40 peptides×2 linkers×3 positions=240, SoDoPE+TemStaPro sort | 80→90 constructs | ~1s |
-| 5 | `round05_3d.py` | ESMFold+OmegaFold 3D prediction, OMEGAFOLD_CONCURRENCY=1 | 90→90 PDBs | ~18min |
-| 6 | `round06_pdb_eval.py` | SASA+Aggrescan3D evaluation, composite scoring | 90→90 scored | ~199s |
-| 7 | `round07_final.py` | Final output package, SASA ranking, per-construct folders | 90→final report | ~1s |
+| 0 | `step00_integrate.py` | Data cleaning, 3-30aa filter, dedup | 1,081,772→1,055,116 | ~30s |
+| 1 | `round01_lightweight.py` | **AnOxPePred(0.50)+AlgPred2(0.10) only** (无 ToxinPred3) | 1,055,116→全量评分 | ~15min |
+| 2 | `round02_scoring.py` | **按纯 anoxpepred 分选 top25K+bottom25K** + ToxinPred3/HemoPI2/MHCflurry | 50K 含双通道标签 | ~63min |
+| 3 | `round03_heavy.py` | BepiPred3+TemStaPro on **50K 双通道** | 50K→top N + bottom M | — |
+| 4 | `round04_enumerate.py` | 双通道枚举 + construct 级 re-score | 肽→constructs | — |
+| 5 | `round05_3d.py` | ESMFold+OmegaFold 3D prediction | constructs→PDBs | — |
+| 6 | `round06_pdb_eval.py` | SASA+Aggrescan3D evaluation | PDB→scores | — |
+| 7 | `round07_final.py` | Final dual-channel output, two rankings | →top+bottom reports | — |
 
-**Key scoring weights used in stages2**:
-- Round 1: AnOxPePred(0.50), AlgPred2(0.10)
-- Round 2: AnOxPePred(0.50), AlgPred2(0.10), ToxinPred3(0.15), HemoPI2(0.10), MHCflurry(0.05)
-- Round 3: AnOxPePred(0.50), BepiPred3(0.07), TemStaPro(0.09), AlgPred2(0.07), ToxinPred3(0.11), HemoPI2(0.07), MHCflurry(0.04)
-- Round 4 composite: 0.65×peptide_score + 0.30×SoDoPE + 0.10×TemStaPro
+**Key differences from v1 (original stages2)**:
+- Round 1: 不跑 ToxinPred3（105 万条太慢），只跑 AnOxPePred+AlgPred2
+- Round 2: **按纯 anoxpepred 分选** top25K+bottom25K，补跑 ToxinPred3+安全服务
+- Round 3: 输入从 10K 扩展为 **50K 双通道**（top25K+bottom25K）
+- All downstream rounds: channel 标签贯穿，双通道各自输出
+
+**Key scoring weights used in stages2 (v2)**:
+- Round 1: AnOxPePred(0.50), AlgPred2(0.10) — 仅评分，不分选
+- Round 2 onward composite: **AnOxPePred(0.50) + ToxinPred3(0.15) + AlgPred2(0.10) + HemoPI2(0.10) + MHCflurry(0.05)**
+- Round 4 composite: 0.40×peptide_score + 0.25×SoDoPE + 0.20×construct_AnOxPePred + 0.10×construct_BepiPred + 0.05×TemStaPro
 - Round 6 composite: 0.50×construct_score + 0.15×pLDDT_norm + 0.20×SASA + 0.15×Aggrescan3D
 
 ## Critical technical lessons (from stages2 production)
@@ -157,18 +162,21 @@ A new microservice needs: a `tools/<name>/` directory with `pyproject.toml`, `se
 | `structure` | 8201–8205 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold, Waveflow |
 | `pdb_score` | 8101–8102 | SASA, Aggrescan3D |
 
-### Pipeline state management (output/ directory)
+### Pipeline state management (output/ and output2/ directories)
 
 ```
-output/
-├── STATUS.md              ← Always-current progress pointer
-├── REVIEW.md              ← Comprehensive post-mortem of stages2 production run
-├── round01_lightweight/   ← Per-round output from stages2
+output2/                          ← Active v2 pipeline (in progress)
+├── STATUS.md                     ← Current progress pointer
+├── round01_lightweight/
 ├── round02_scoring/
+└── ...                           ← v2 pipeline output
+
+output/                           ← Completed v1 pipeline (archived)
+├── STATUS.md
+├── REVIEW.md                     ← Post-mortem of stages2 v1
+├── round01_lightweight/
 ├── ...
-├── round07_final/         ← Final deliverable: 90 constructs, rankings, README
-└── stage01_filter/        ← First pipeline (stages/) output
-```
+└── round07_final/                ← v1 final output
 
 Each round directory has: `README.md` (report), `run.log`, `final/` (passed/top candidates). The round07_final directory has the complete output package.
 
