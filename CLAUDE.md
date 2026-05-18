@@ -8,49 +8,88 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 
 **Pipeline evolution**:
 - `main/stages/` — First attempt (1843 peptides, 7 stages, all written but not all run). See `main/PLAN.md`.
-- `main/stages2/` — **Production pipeline (completed)**. Rounds 0-7 executed, 1,055,116 → 90 candidates. Runs standalone via `python -m main.stages2.roundXX_*`. Output in `output/`.
-- `main/stages3/` — **Next-generation pipeline (in development)**. Billion-scale expansion using CD-HIT, DuckDB, variance-aware weighting. Now contains actual code: `stage00_preprocess.py`, `stage01_lightweight.py`, `cdhit_wrapper.py`, `db.py`, `docker_utils.py`, `analytics.py`. Output goes to `output3/`.
+- `main/stages2/` — **Production pipeline (completed)**. Full 8-round v2 run completed, 1,081,772 → 90 candidates. Output in `output2/`. REVIEW.md has full post-mortem.
+- `main/stages3/` — **Next-generation pipeline (in development)**. Billion-scale expansion using DuckDB, variance-aware weighting, 19.9M candidates processed in Stage 0. Output goes to `output3/`.
 
 **Who this is for**: synthetic biology researchers at the iGEM competition.
 
 **Critical companion file**: Read `AGENTS.md` for production safety rules before running git operations on this machine. It contains absolute prohibitions on `git clean`, `git checkout -- .`, and `git reset --hard` — violations have destroyed 6GB+ of models and irrecoverable output data.
 
-## Production pipeline (stages2)
+## Production pipeline (stages2) — v2 completed
 
-The `main/stages2/` pipeline (v2, in progress) processes 1M+ antioxidant peptides through 8 rounds:
+The `main/stages2/` pipeline (v2) processed 1M+ antioxidant peptides through 8 rounds. All rounds completed with real results in `output2/`. See `output2/REVIEW.md` for the full post-mortem.
 
 | Round | Script | Purpose | Input→Output | Time |
 |-------|--------|---------|-------------|------|
 | 0 | `step00_integrate.py` | Data cleaning, 3-30aa filter, dedup | 1,081,772→1,055,116 | ~30s |
-| 1 | `round01_lightweight.py` | **AnOxPePred(0.50)+AlgPred2(0.10) only** (无 ToxinPred3) | 1,055,116→全量评分 | ~15min |
-| 2 | `round02_scoring.py` | **按纯 anoxpepred 分选 top25K+bottom25K** + ToxinPred3/HemoPI2/MHCflurry | 50K 含双通道标签 | ~63min |
-| 3 | `round03_heavy.py` | BepiPred3+TemStaPro on **50K 双通道** | 50K→top N + bottom M | — |
-| 4 | `round04_enumerate.py` | 双通道枚举 + construct 级 re-score | 肽→constructs | — |
-| 5 | `round05_3d.py` | ESMFold+OmegaFold 3D prediction | constructs→PDBs | — |
-| 6 | `round06_pdb_eval.py` | SASA+Aggrescan3D evaluation | PDB→scores | — |
-| 7 | `round07_final.py` | Final dual-channel output, two rankings | →top+bottom reports | — |
+| 1 | `round01_lightweight.py` | AnOxPePred(0.50)+AlgPred2(0.10) only (no ToxinPred3) | 1,055,116→full scores | ~15min |
+| 2 | `round02_scoring.py` | Sort by pure AnOxPePred top25K+bottom25K + ToxinPred3/HemoPI2/MHCflurry | 50K with dual-channel labels | ~63min |
+| 3 | `round03_heavy.py` | BepiPred3+TemStaPro on 50K dual-channel | 50K→Top 80 + Bottom 10 peptides | ~65min |
+| 4 | `round04_enumerate.py` | Dual-channel enumeration + construct-level re-score | peptides→150 constructs | ~13min |
+| 5 | `round05_3d.py` | OmegaFold 3D prediction only | constructs→150 PDBs | ~210min |
+| 6 | `round06_pdb_eval.py` | SASA+Aggrescan3D evaluation | PDB→scores | ~6min |
+| 7 | `round07_final.py` | Final dual-channel output, two rankings | →90 Top + 60 Bottom reports | ~1min |
 
-**Key differences from v1 (original stages2)**:
-- Round 1: 不跑 ToxinPred3（105 万条太慢），只跑 AnOxPePred+AlgPred2
-- Round 2: **按纯 anoxpepred 分选** top25K+bottom25K，补跑 ToxinPred3+安全服务
-- Round 3: 输入从 10K 扩展为 **50K 双通道**（top25K+bottom25K）
-- All downstream rounds: channel 标签贯穿，双通道各自输出
+**Total**: ~6.5h, 1,081,772 → 150 candidates, 99.986%淘汰率.
 
-**Key scoring weights used in stages2 (v2)**:
-- Round 1: AnOxPePred(0.50), AlgPred2(0.10) — 仅评分，不分选
-- Round 2 onward composite: **AnOxPePred(0.50) + ToxinPred3(0.15) + AlgPred2(0.10) + HemoPI2(0.10) + MHCflurry(0.05)**
-- Round 4 composite: 0.40×peptide_score + 0.25×SoDoPE + 0.20×construct_AnOxPePred + 0.10×construct_BepiPred + 0.05×TemStaPro
-- Round 6 composite: 0.50×construct_score + 0.15×pLDDT_norm + 0.20×SASA + 0.15×Aggrescan3D
+**Key v2 design decisions**:
+- Round 1 skips ToxinPred3 (1M sequences would take ~22h), deferred to Round 2 on 50K subset
+- Round 2 sorts by **pure AnOxPePred score** (not weighted composite) for dual-channel split
+- Round 3 runs on full 50K with channel labels preserved
+- Round 5 uses **OmegaFold only** (ESMFold pLDDT < 0.30 on silk repeats was unreliable)
+- Entire flow dual-channel (Top/Bottom) with independent final rankings
 
-## Critical technical lessons (from stages2 production)
+**Actual scoring weights used in v2 (from REVIEW.md)**:
+- Round 1: AnOxPePred(0.50), AlgPred2(0.10)
+- Round 2-3 composite: **AnOxPePred(0.45) + ToxinPred3(0.13) + AlgPred2(0.09) + HemoPI2(0.09) + MHCflurry(0.05) + BepiPred3(0.10) + TemStaPro(0.09)**
+- Round 4 construct composite: 0.40×peptide_weighted + 0.25×SoDoPE + 0.20×construct_AnOxPePred + 0.10×construct_BepiPred3 + 0.05×TemStaPro
+- Round 6 final: **SASA(0.40) + (1-Aggrescan3D)(0.40) + pLDDT_norm(0.20)** — construct_composite was removed because its spread was only 0.011 in Top 90, diluting 3D signal
 
-These are hard-won. Violating them caused failures in stages2.
+### Additional scripts in stages2/
 
-**Docker mandatory**: All microservices MUST run in Docker for production. Running `python service.py` on the host causes environment drift, missing models, and wasted debugging. Documented in `main/stages3/TECH_REQUIREMENTS.md`.
+| Script | Purpose |
+|--------|---------|
+| `round02_toxinpred3_serial.py`, `round02_toxinpred3_sync.py`, `round02_toxinpred3_robust.py` | ToxinPred3 concurrency experiments (single-threaded sklearn workaround) |
+| `round02_recover_toxinpred3.py` | Recovery script for interrupted ToxinPred3 runs |
+| `round04_fix_bepipred3.py` | BepiPred3 GPU timeout fix (Semaphore=1, timeout=600s) |
+| `docker_utils.py` | Docker service management shared across rounds |
+| `common.py` | Shared utility functions (safe_gather, ServiceClient pooling, etc.) |
 
-**按需启动原则（stages3）**: 每个 stage 只启动该阶段实际依赖的微服务，不提前启动不需要的服务。Docker Compose 的 `--profile` 机制天然支持这种模式。例如 Stage 1 只需 `--profile cpu`（anoxpepred + algpred2），Stage 4 才需 `--profile gpu`（omegafold）。不要一次性启动全部 16 个服务，避免 GPU 显存竞争和资源浪费。在启动任何 stage 前先执行 health check 确认依赖服务就绪。
+## stages3 pipeline (in development)
 
-**OmegaFold blocks the event loop**: OmegaFold's `self.model(input_data)` is a synchronous PyTorch CUDA call (90-120s) inside an `async def`. This blocks uvicorn's event loop. Client-side fix: `asyncio.Semaphore(1)` to serialize requests. Server-side fix pending: move inference to `run_in_executor`. See `.agents/learnings/gep-omegafold-sync-inference-blocking.md`.
+Next-generation pipeline at `main/stages3/`. Uses DuckDB for state, variance-aware weighting, and Docker-on-demand service startup. Output in `output3/`.
+
+**Current status**: Stage 0 complete (19.9M candidates), Stage 1 code written (AnOxPePred+AlgPred2 on 19.9M). Full details in `main/stages3/DONE.md` and `main/stages3/ARCHITECTURE_AS_BUILT.md`.
+
+| File | Purpose |
+|------|---------|
+| `db.py` | DuckDB interface — schema, batch INSERT (20k/s via VALUES, NOT executemany), checkpoint/resume, distribution stats |
+| `docker_utils.py` | On-demand Docker startup — per-step service launch, bridge IP detection, health check polling, idempotent cache |
+| `service_map.py` | Service dependency map per step (step0-step6), actual docker-compose profiles |
+| `analytics.py` | Variance-aware weighting engine — winsorized stddev → data-driven weights, full audit trail |
+| `stage00_preprocess.py` | Stage 0: FASTA stream → 3-30aa filter → AA filter → DuckDB. Ran on UniProt (225M) + MGnify (624M) |
+| `stage01_lightweight.py` | Stage 1: batch read 100k from DB → concurrent AnOxPePred+AlgPred2 → write scores → AlgPred2 hard filter |
+| `fasta_parser.py` | Streaming FASTA reader for 100GB+ files |
+| `cdhit_wrapper.py` | CD-HIT CLI wrapper (tested, then skipped — short peptides are too diverse for clustering) |
+| `sample_fasta.py` | Reservoir sampling from FASTA |
+
+**Key findings from Stage 0**:
+- CD-HIT skipped: at -c 0.90, only 0.2-5% clustering rate on short peptides
+- DuckDB executemany was 200 rows/s; raw INSERT VALUES batches achieve 20k rows/s (100x)
+- Total candidates: 19,890,021 (UniProt 0.33% pass, MGnify 3.07% pass)
+- DB size: 2.6 GB for 19.9M rows (~7.6M rows/GB)
+
+**Design docs** in `plan/`: PLAN.md (roadmap), ARCHITECTURE.md (three-layer), DB_SCHEMA.md (15 tables), DATA_PREP.md, TECH_REQUIREMENTS.md.
+
+## Critical technical lessons
+
+These are hard-won from stages2 production.
+
+**Docker mandatory**: All microservices MUST run in Docker for production. Running `python service.py` on the host causes environment drift, missing models, and wasted debugging. See `main/stages3/TECH_REQUIREMENTS.md`.
+
+**按需启动原则（stages3）**: 每个 stage 只启动该阶段实际依赖的微服务，不提前启动不需要的服务。Docker Compose 的 `--profile` 机制天然支持这种模式。不要一次性启动全部 16 个服务，避免 GPU 显存竞争和资源浪费。在启动任何 stage 前先执行 health check 确认依赖服务就绪。
+
+**OmegaFold blocks the event loop**: OmegaFold's `self.model(input_data)` is a synchronous PyTorch CUDA call (90-120s) inside an `async def`. This blocks uvicorn's event loop. Client-side fix: `asyncio.Semaphore(1)` to serialize requests. See `.agents/learnings/gep-omegafold-sync-inference-blocking.md`.
 
 **Docker bridge IP, not 127.0.0.1**: Accessing containers via `127.0.0.1:PORT` (docker-proxy) causes intermittent httpx keep-alive hangs. Use `docker inspect` to get bridge IP and connect directly. Implemented in round05_3d.py `_fix_omegafold_docker_network()`. See `.agents/learnings/gep-docker-container-bridge-ip.md`.
 
@@ -59,6 +98,12 @@ These are hard-won. Violating them caused failures in stages2.
 **ToxinPred3 single-threaded**: sklearn ExtraTreesClassifier hangs under concurrent requests. Use `batch_size <= 10` and socket-level timeout (not `asyncio.wait_for` which can't interrupt C extensions). See `.agents/learnings/gep-toxinpred3-concurrency-limit.md`.
 
 **SASA batch API format**: Batch endpoint returns `score` at the top level of each result item, NOT nested under `result.score`. Single API has `result.score`. Watch for this inconsistency.
+
+**BepiPred3 GPU timeout**: GPU service ~115s per 50-seq batch with Semaphore=5 caused queued requests to exceed 300s timeout. Fix: Semaphore=1, timeout=600s. See `.agents/learnings/gep-bepipred3-gpu-timeout-tuning.md`.
+
+**ESMFold on silk repeats**: ESMFold pLDDT < 0.30 on silk fusion proteins — unreliable for downstream SASA/A3D. OmegaFold pLDDT ~0.41 is usable. See `.agents/learnings/gep-pipeline-confidence-cascade.md`.
+
+**PyTorch CUDA cache persistence**: Process exit leaves 34GB CUDA context allocated. `docker stop` doesn't release GPU memory. Only `kill -9` or full container teardown works. Justification for on-demand GPU service startup. See `.agents/learnings/gep-pytorch-cuda-cache-gpu-memory-leak.md`.
 
 ## Commands
 
@@ -127,8 +172,8 @@ curl http://127.0.0.1:8001/health
 | Directory | Status | Description |
 |-----------|--------|-------------|
 | `main/stages/` | **First pipeline** | 7 stages written, 1843 peptide input. `PLAN.md` has the original funnel philosophy. |
-| `main/stages2/` | **Production pipeline (DONE)** | 8 rounds (0-7), 1M peptide input. All rounds completed with real results in `output/`. |
-| `main/stages3/` | **Next-gen pipeline (PLANNED)** | Billion-scale expansion. 5 planning documents: `PLAN.md`, `TECH_REQUIREMENTS.md`, `DATA_PREP.md`, `DB_SCHEMA.md`, `ARCHITECTURE.md`. |
+| `main/stages2/` | **Production pipeline (DONE)** | 8 rounds (0-7), 1M peptide input. All rounds completed with results in `output2/`. `output2/REVIEW.md` has full analysis. |
+| `main/stages3/` | **Next-gen pipeline (BUILDING)** | Stage 0 complete (19.9M candidates). Stage 1 code ready. 5 planning docs + as-built doc. |
 
 ### Core modules (shared across all pipelines)
 
@@ -153,7 +198,7 @@ Supporting templates: `tools/template/logger.py` (rotating file logs to `tools/l
 
 A new microservice needs: a `tools/<name>/` directory with `pyproject.toml`, `service.py`, `Dockerfile`, `.dockerignore`, and a `.venv` (via `uv sync`). Then register it in `tools/docker-compose.yml` and `main/config.py`.
 
-### Pipeline state management
+### Service ports and groups
 
 | Group | Port range | Services |
 |-------|-----------|----------|
@@ -162,35 +207,35 @@ A new microservice needs: a `tools/<name>/` directory with `pyproject.toml`, `se
 | `structure` | 8201–8205 | AlphaFold3, PEP-FOLD4, ESMFold, OmegaFold, Waveflow |
 | `pdb_score` | 8101–8102 | SASA, Aggrescan3D |
 
+**Reality check**: Most "score" services are actually GPU profile in docker-compose.yml. Only toxinpred3/sodope/tipred/algpred2 are CPU. Plan service startup accordingly.
+
 ### Pipeline state management (output/ and output2/ directories)
 
 ```
-output2/                          ← Active v2 pipeline (in progress)
-├── STATUS.md                     ← Current progress pointer
+output2/                          ← Completed v2 pipeline
+├── STATUS.md                     ← Progress pointer
+├── REVIEW.md                     ← Full post-mortem and analysis
+├── step00_integrate/
 ├── round01_lightweight/
 ├── round02_scoring/
-└── ...                           ← v2 pipeline output
+├── round03_heavy/
+├── round04_enumerate/
+├── round05_3d/
+├── round06_pdb_eval/
+└── round07_final/                ← v2 final output (90 Top + 60 Bottom)
 
 output/                           ← Completed v1 pipeline (archived)
 ├── STATUS.md
-├── REVIEW.md                     ← Post-mortem of stages2 v1
+├── REVIEW.md
 ├── round01_lightweight/
-├── ...
 └── round07_final/                ← v1 final output
 
-Each round directory has: `README.md` (report), `run.log`, `final/` (passed/top candidates). The round07_final directory has the complete output package.
+Each round directory has: README.md (report), run.log, final/ (passed/top candidates).
+```
 
-### New pipeline (stages3) design docs
+### Output directories
 
-Five planning documents in `main/stages3/`:
-
-| Document | Covers |
-|----------|--------|
-| `PLAN.md` | Overall roadmap, variance-aware weighting philosophy, 6-stage funnel, timeline |
-| `TECH_REQUIREMENTS.md` | Docker mandatory enforcement, 5 microservice bugs to fix, concurrency specs, network stability, storage |
-| `DATA_PREP.md` | CD-HIT clustering strategy for 8.5B sequences, 3-30aa filter, parallel FASTA processing |
-| `DB_SCHEMA.md` | DuckDB design: 15 tables, checkpoint/resume, distribution statistics for variance weights |
-| `ARCHITECTURE.md` | Three-layer architecture (orchestration/execution/service), error isolation, memory management |
+`output3/` — stages3 pipeline output. Currently: `pipeline.db` (2.6GB DuckDB with 19.9M candidates), `reports/`, `pdb/`, `logs/`, `final/`.
 
 ### Model file management
 
@@ -205,8 +250,8 @@ Five sourcing strategies: git-tracked (< 50MB), first-run auto-download (> 10MB)
 ## Knowledge base
 
 - **`AGENTS.md`** — Critical production safety rules. Read before any git operations. Absolute prohibitions on `git clean`, `git checkout -- .`, `git reset --hard` (real incident: 6GB+ models destroyed).
-- **`.agents/learnings/MEMORY.md`** — Indexed GEP capsules (troubleshooting knowledge base). Key entries: Docker bridge IP issues, OmegaFold blocking, asyncio.gather safety, ToxinPred3 concurrency, ESMFold build, GPU contention.
-- **`.agents/learnings/docker/`** — Docker-specific pitfalls (China mirror, slim image build deps, compose atomicity, namespace shadowing).
+- **`.agents/learnings/MEMORY.md`** — Indexed GEP capsules (troubleshooting knowledge base). 30+ entries covering Docker, GPU contention, asyncio patterns, pipeline orchestration, etc.
+- **`.agents/learnings/docker/`** — Docker-specific pitfalls (China mirror, slim image build deps, compose atomicity, namespace shadowing, COPY auditing, Dockerfile paths, version pinning).
 - **`main/docs/threshold.md`** — Hard filter thresholds (ToxinPred3 ≥0.38, AlgPred2 ≥0.30, HemoPI2 ≥0.55).
 - **`main/docs/penalty.md`** — Scoring formula documentation.
 - **`docs/HUMAN.md`** — Human-operated analysis methods (Binding ddG, GROMACS MD).
