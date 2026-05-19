@@ -139,7 +139,7 @@ class PipelineDB:
             )
         """)
 
-        # Round 3: 深度服务评分
+        # Round 3: 深度服务评分（含 ToxinPred3）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS round3_scores (
                 candidate_id        BIGINT PRIMARY KEY REFERENCES candidates(candidate_id),
@@ -153,9 +153,17 @@ class PipelineDB:
                 plm4cpps_success    BOOLEAN,
                 graphcpp_score      FLOAT,
                 graphcpp_success    BOOLEAN,
+                toxinpred3_score    FLOAT,
+                toxinpred3_success  BOOLEAN,
                 scored_at           TIMESTAMP DEFAULT now()
             )
         """)
+        # 兼容已有数据库（表已存在时补加 ToxinPred3 列）
+        for col in ["toxinpred3_score FLOAT", "toxinpred3_success BOOLEAN"]:
+            try:
+                conn.execute(f"ALTER TABLE round3_scores ADD COLUMN {col}")
+            except Exception:
+                pass  # 列已存在
 
         # Round 3: SD 加权排名
         conn.execute("""
@@ -585,11 +593,36 @@ class PipelineDB:
         }
 
     # ────────────────────────────────────────────────────────────────
+    # Round 3 ToxinPred3 过滤
+    # ────────────────────────────────────────────────────────────────
+
+    def apply_toxin_threshold(self, threshold: float = 0.38) -> dict:
+        """
+        从 round3_scores 中排除 ToxinPred3 ≥ threshold 的候选。
+
+        round3_scores 是工作表，删除有毒候选不影响后续重跑（checkpoint 保障）。
+        Returns: {"excluded": N, "remaining": N}
+        """
+        conn = self.connect()
+        excluded = conn.execute("""
+            SELECT COUNT(*) FROM round3_scores
+            WHERE toxinpred3_score IS NOT NULL AND toxinpred3_score >= ?
+        """, [threshold]).fetchone()[0]
+
+        conn.execute("""
+            DELETE FROM round3_scores
+            WHERE toxinpred3_score IS NOT NULL AND toxinpred3_score >= ?
+        """, [threshold])
+
+        remaining = conn.execute("SELECT COUNT(*) FROM round3_scores").fetchone()[0]
+        return {"excluded": excluded, "remaining": remaining}
+
+    # ────────────────────────────────────────────────────────────────
     # Round 3: 深度评分写入
     # ────────────────────────────────────────────────────────────────
 
     def insert_round3_scores(self, records: list[dict]) -> int:
-        """批量写入 Round 3 深度评分结果。"""
+        """批量写入 Round 3 深度评分结果（含 ToxinPred3）。"""
         if not records:
             return 0
         conn = self.connect()
@@ -615,7 +648,9 @@ class PipelineDB:
                 f"{_null(r.get('plm4cpps_score'))},"
                 f"{_bool(r.get('plm4cpps_success', False))},"
                 f"{_null(r.get('graphcpp_score'))},"
-                f"{_bool(r.get('graphcpp_success', False))})"
+                f"{_bool(r.get('graphcpp_success', False))},"
+                f"{_null(r.get('toxinpred3_score'))},"
+                f"{_bool(r.get('toxinpred3_success', False))})"
                 for r in batch
             )
             conn.execute(f"""
@@ -624,7 +659,8 @@ class PipelineDB:
                      temstapro_score, temstapro_success,
                      sodope_score, sodope_success,
                      plm4cpps_score, plm4cpps_success,
-                     graphcpp_score, graphcpp_success)
+                     graphcpp_score, graphcpp_success,
+                     toxinpred3_score, toxinpred3_success)
                 VALUES {values}
                 ON CONFLICT (candidate_id) DO UPDATE SET
                     bepipred3_score   = EXCLUDED.bepipred3_score,
@@ -636,7 +672,9 @@ class PipelineDB:
                     plm4cpps_score    = EXCLUDED.plm4cpps_score,
                     plm4cpps_success  = EXCLUDED.plm4cpps_success,
                     graphcpp_score    = EXCLUDED.graphcpp_score,
-                    graphcpp_success  = EXCLUDED.graphcpp_success
+                    graphcpp_success  = EXCLUDED.graphcpp_success,
+                    toxinpred3_score   = EXCLUDED.toxinpred3_score,
+                    toxinpred3_success = EXCLUDED.toxinpred3_success
             """)
             written += len(batch)
         return written

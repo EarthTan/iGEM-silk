@@ -25,9 +25,10 @@ ROUND_SERVICES: dict[str, dict[str, Any]] = {
         "desc": "安全筛检 — ToxinPred3(毒性) + HemoPI2(溶血) + MHCflurry(免疫)",
     },
     "round3": {
-        "services": ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp"],
-        "profiles": ["gpu", "gpu", "cpu", "gpu", "gpu"],
-        "desc": "深度评分 — BepiPred3 + TemStaPro + SoDoPE + pLM4CPPs + GraphCPP",
+        "services": ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp",
+                     "toxinpred3", "toxinpred3-2", "toxinpred3-3"],
+        "profiles": ["gpu", "gpu", "cpu", "gpu", "gpu", "cpu", "cpu", "cpu"],
+        "desc": "深度评分 + ToxinPred3 — BepiPred3 + TemStaPro + SoDoPE + pLM4CPPs + GraphCPP + ToxinPred3×3",
     },
     "round4": {
         "services": ["sodope", "temstapro"],

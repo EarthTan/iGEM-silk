@@ -1,19 +1,21 @@
 """
-Round 3: 深度评分 + 方差加权（全流程唯一加权位置）。
+Round 3: 深度评分 + 方差加权（全流程唯一加权位置）+ ToxinPred3 阈值。
 
-对安全通过的候选运行深度评分服务:
+对安全通过的候选运行 6 个并行服务:
   - BepiPred3: B 细胞表位预测 (GPU)
   - TemStaPro: 热稳定性预测 (GPU)
   - SoDoPE: 溶解度预测 (CPU)
   - pLM4CPPs: 细胞穿透预测 (GPU)
   - GraphCPP: 细胞穿透 GNN (GPU)
+  - ToxinPred3: 毒性预测 (CPU, ≥0.38 淘汰)
 
-然后使用方差感知权重（SD 驱动 + 手动调节）计算综合分并排名。
+ToxinPred3 分数写入 round3_scores 表，打分后应用硬阈值淘汰，
+不参与 SD 加权排名。
 
 用法:
     uv run python -m main.stages4.s4_round03_deep_scoring
     uv run python -m main.stages4.s4_round03_deep_scoring \
-        --top-pct 5 --anoxpepred-coeff 1.0
+        --max-top 150000 --max-bottom 50000 --top-pct 5
 """
 
 from __future__ import annotations
@@ -38,6 +40,11 @@ from main.stages4.s4_analytics import compute_variance_weights, apply_weights_an
 BATCH_SIZE = 1_000
 CONCURRENCY = 5
 PROGRESS_INTERVAL = 5
+TOXIN_THRESHOLD = 0.38
+
+# 参与打分的全部服务（含 ToxinPred3，CPU 无 GPU 竞争）
+ALL_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp", "toxinpred3"]
+# 参与 SD 加权排名的服务（ToxinPred3 是硬阈值，不参与加权）
 DEEP_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp"]
 
 
@@ -46,22 +53,27 @@ def log(msg: str):
     print(f"[{ts}] {msg}")
 
 
-def get_passed_round2(db: PipelineDB) -> list[dict]:
-    """获取 Round 2 安全通过的候选（含通道信息）。"""
+def get_passed_round2(db: PipelineDB, max_top: int = 150000, max_bottom: int = 50000) -> list[dict]:
+    """获取 Round 2 安全通过的候选（各通道按 rank_in_channel 限流）。"""
     conn = db.connect()
     rows = conn.execute("""
         SELECT p.candidate_id, c.sequence, c.length, p.channel
         FROM round2_passed p
         JOIN candidates c ON c.candidate_id = p.candidate_id
-        ORDER BY p.channel, p.candidate_id
-    """).fetchall()
+        JOIN round1_channels ch ON ch.candidate_id = p.candidate_id
+        WHERE (p.channel = 'top' AND ch.rank_in_channel <= ?)
+           OR (p.channel = 'bottom' AND ch.rank_in_channel <= ?)
+        ORDER BY p.channel, ch.rank_in_channel
+    """, [max_top, max_bottom]).fetchall()
     return [
         {"candidate_id": int(r[0]), "sequence": r[1], "length": r[2], "channel": r[3]}
         for r in rows
     ]
 
 
-async def run(top_pct: float, manual_coeffs: dict[str, float]):
+async def run(top_pct: float, manual_coeffs: dict[str, float],
+              max_top: int = 150000, max_bottom: int = 50000,
+              toxin_threshold: float = 0.38):
     start_time = time.time()
 
     # ── 1. 连接数据库 ──
@@ -69,97 +81,69 @@ async def run(top_pct: float, manual_coeffs: dict[str, float]):
     conn = db.connect()
     db.init_schema()
 
-    passed = get_passed_round2(db)
-    log(f"安全通过的候选: {len(passed):,} 条")
+    passed = get_passed_round2(db, max_top=max_top, max_bottom=max_bottom)
+    log(f"候选输入（Top ≤{max_top:,} + Bottom ≤{max_bottom:,}）: {len(passed):,} 条")
 
     if not passed:
         log("❌ 无候选可处理，请先运行 Round 2")
         return
 
-    # ── 2. 检查预打分数据（来自 s4_round03_precompute.py）──
-    conn = db.connect()
-    complete = conn.execute("""
-        SELECT COUNT(*) FROM round2_passed p
-        JOIN round3_scores s ON p.candidate_id = s.candidate_id
-        WHERE s.bepipred3_score IS NOT NULL
-          AND s.temstapro_score IS NOT NULL
-          AND s.sodope_score IS NOT NULL
-          AND s.plm4cpps_score IS NOT NULL
-          AND s.graphcpp_score IS NOT NULL
-    """).fetchone()[0]
-    total_passed = len(passed)
+    # ── 2. 评分阶段：6 服务并行（含 ToxinPred3）──
+    client = ServiceClient(timeout=300.0)
+    sem = asyncio.Semaphore(CONCURRENCY)
 
-    if complete >= total_passed:
-        log(f"✅ 预打分数据完整 ({complete:,}/{total_passed:,})，跳过评分阶段")
-        to_score: list[dict] = []
-    else:
-        log(f"预打分: {complete:,}/{total_passed:,} 条完整")
-        missing_rows = conn.execute("""
-            SELECT p.candidate_id
-            FROM round2_passed p
-            LEFT JOIN round3_scores s ON p.candidate_id = s.candidate_id
-            WHERE s.candidate_id IS NULL
-               OR s.bepipred3_score IS NULL
-               OR s.temstapro_score IS NULL
-               OR s.sodope_score IS NULL
-               OR s.plm4cpps_score IS NULL
-               OR s.graphcpp_score IS NULL
-        """).fetchall()
-        missing_ids = {int(r[0]) for r in missing_rows}
-        to_score = [c for c in passed if c["candidate_id"] in missing_ids]
-        log(f"待评分: {len(to_score):,} 条\n")
+    chunks = [passed[i:i + BATCH_SIZE] for i in range(0, len(passed), BATCH_SIZE)]
 
-    if to_score:
-        client = ServiceClient(timeout=300.0)
-        sem = asyncio.Semaphore(CONCURRENCY)
+    async def score_one(chunk: list[dict], svc: str) -> list[dict]:
+        async with sem:
+            items = [
+                {"peptide_id": str(c["candidate_id"]), "sequence": c["sequence"]}
+                for c in chunk
+            ]
+            result = await client.predict_batch(svc, items)
+            if result.get("success") and result.get("results"):
+                return result["results"]
+            return [{"peptide_id": item["peptide_id"], "score": None} for item in items]
 
-        chunks = [to_score[i:i + BATCH_SIZE] for i in range(0, len(to_score), BATCH_SIZE)]
-        total_chunks = len(chunks)
+    async def score_service(svc: str) -> dict[str, float | None]:
+        tasks = [score_one(chunk, svc) for chunk in chunks]
+        results = await asyncio.gather(*tasks)
+        flat: dict[str, float | None] = {}
+        for batch_res in results:
+            for r in batch_res:
+                flat[r["peptide_id"]] = r.get("score")
+        return flat
 
-        async def score_one(chunk: list[dict], svc: str) -> list[dict]:
-            async with sem:
-                items = [
-                    {"peptide_id": str(c["candidate_id"]), "sequence": c["sequence"]}
-                    for c in chunk
-                ]
-                result = await client.predict_batch(svc, items)
-                if result.get("success") and result.get("results"):
-                    return result["results"]
-                return [{"peptide_id": item["peptide_id"], "score": None} for item in items]
+    # 并发所有 6 个服务（ToxinPred3 是 CPU，与 GPU 服务无竞争）
+    log(f"并发评分 {len(ALL_SERVICES)} 个服务（含 ToxinPred3）...")
+    svc_tasks = [score_service(svc) for svc in ALL_SERVICES]
+    svc_results = await asyncio.gather(*svc_tasks)
 
-        async def score_service(svc: str) -> dict[str, float]:
-            tasks = [score_one(chunk, svc) for chunk in chunks]
-            results = await asyncio.gather(*tasks)
-            flat: dict[str, float] = {}
-            for batch_res in results:
-                for r in batch_res:
-                    flat[r["peptide_id"]] = r.get("score")
-            return flat
+    # 写入评分（含 ToxinPred3 列）
+    for chunk_start in range(0, len(passed), BATCH_SIZE):
+        batch = passed[chunk_start:chunk_start + BATCH_SIZE]
+        records = []
+        for c in batch:
+            cid_str = str(c["candidate_id"])
+            record = {"candidate_id": c["candidate_id"]}
+            for svc_name, svc_map in zip(ALL_SERVICES, svc_results):
+                score = svc_map.get(cid_str)
+                record[f"{svc_name}_score"] = score
+                record[f"{svc_name}_success"] = score is not None
+            records.append(record)
+        db.insert_round3_scores(records)
+        log(f"  评分写入: {min(chunk_start + BATCH_SIZE, len(passed)):,}/{len(passed):,}")
 
-        # 并发所有深度服务
-        log(f"并发评分 {len(DEEP_SERVICES)} 个服务...")
-        svc_tasks = [score_service(svc) for svc in DEEP_SERVICES]
-        svc_results = await asyncio.gather(*svc_tasks)
+    await client.close()
+    log(f"评分完成: {len(passed):,} 条 ✅")
 
-        # 写入评分
-        for chunk_start in range(0, len(to_score), BATCH_SIZE):
-            batch = to_score[chunk_start:chunk_start + BATCH_SIZE]
-            records = []
-            for c in batch:
-                cid_str = str(c["candidate_id"])
-                record = {"candidate_id": c["candidate_id"]}
-                for svc_name, svc_map in zip(DEEP_SERVICES, svc_results):
-                    score = svc_map.get(cid_str)
-                    record[f"{svc_name}_score"] = score
-                    record[f"{svc_name}_success"] = score is not None
-                records.append(record)
-            db.insert_round3_scores(records)
-            log(f"  评分写入: {chunk_start + len(batch):,}/{len(to_score):,}")
+    # ── 3. ToxinPred3 硬阈值淘汰 ──
+    log(f"\nToxinPred3 硬阈值 (≥{toxin_threshold} 淘汰)...")
+    toxin_result = db.apply_toxin_threshold(threshold=toxin_threshold)
+    log(f"  ToxinPred3 淘汰: {toxin_result['excluded']:,}")
+    log(f"  排名剩余: {toxin_result['remaining']:,}")
 
-        await client.close()
-        log(f"评分完成: {len(to_score):,} 条")
-
-    # ── 3. 方差感知加权 + 排名 ──
+    # ── 4. 方差感知加权 + 排名 ──
     log("\n计算方差感知权重...")
 
     score_columns = [f"{svc}_score" for svc in DEEP_SERVICES]
@@ -182,10 +166,9 @@ async def run(top_pct: float, manual_coeffs: dict[str, float]):
         rank_table="round3_ranking",
     )
 
-    # ── 4. 通道分类统计 ──
+    # ── 5. 通道分类统计 ──
     top_n = max(1, int(len(ranking) * top_pct / 100))
     log(f"\n取 Top {top_pct}% = {top_n:,} 候选进入 Round 4")
-    log(f"  (排名前 {top_n} 进入构造枚举)")
 
     total_elapsed = time.time() - start_time
     db.set_checkpoint("round3", "scoring", "done",
@@ -194,6 +177,7 @@ async def run(top_pct: float, manual_coeffs: dict[str, float]):
     log(f"\n{'='*55}")
     log(f"  Round 3 完成!")
     log(f"  输入:          {len(passed):>10,}")
+    log(f"  ToxinPred3 淘汰:{toxin_result['excluded']:>10,}")
     log(f"  排名完成:      {len(ranking):>10,}")
     log(f"  → Round 4:    {top_n:>10,}")
     log(f"  总耗时:        {total_elapsed:>8.0f}s ({total_elapsed/60:.1f} min)")
@@ -204,9 +188,15 @@ async def run(top_pct: float, manual_coeffs: dict[str, float]):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Round 3: 深度评分 + 方差加权")
+    parser = argparse.ArgumentParser(description="Round 3: 深度评分 + ToxinPred3 + 方差加权")
     parser.add_argument("--top-pct", type=float, default=5.0,
                         help="取前百分之几进入 Round 4 (default: 5.0)")
+    parser.add_argument("--max-top", type=int, default=150000,
+                        help="Top 通道取前 N 条 (default: 150000)")
+    parser.add_argument("--max-bottom", type=int, default=50000,
+                        help="Bottom 通道取前 N 条 (default: 50000)")
+    parser.add_argument("--toxin-threshold", type=float, default=TOXIN_THRESHOLD,
+                        help="ToxinPred3 阈值，≥此值淘汰 (default: 0.38)")
     parser.add_argument("--anoxpepred-coeff", type=float, default=None,
                         help="AnOxPePred 手动系数，如 1.3 (默认不参与加权)")
     parser.add_argument("--bepipred3-coeff", type=float, default=1.0)
@@ -230,6 +220,8 @@ def main():
     info = get_round_services("round3")
     log(f"Round 3: {info['desc']}")
     log(f"依赖服务: {', '.join(info['services'])}")
+    log(f"输入限制: Top ≤{args.max_top:,}, Bottom ≤{args.max_bottom:,}")
+    log(f"ToxinPred3 阈值: ≥{args.toxin_threshold}")
 
     if manual_coeffs:
         coeff_str = ", ".join(f"{k}={v}" for k, v in manual_coeffs.items() if not k.startswith("_"))
@@ -242,7 +234,9 @@ def main():
         sys.exit(1)
     log("✅ 所有服务就绪\n")
 
-    asyncio.run(run(args.top_pct, manual_coeffs))
+    asyncio.run(run(args.top_pct, manual_coeffs,
+                    max_top=args.max_top, max_bottom=args.max_bottom,
+                    toxin_threshold=args.toxin_threshold))
 
 
 if __name__ == "__main__":
