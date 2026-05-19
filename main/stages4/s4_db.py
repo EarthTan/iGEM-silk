@@ -367,62 +367,76 @@ class PipelineDB:
 
         按 AnOxPePred 降序排序，AlgPred2 ≥ 阈值淘汰。
         Top 通道取前 top_pct%，Bottom 通道取后 bottom_pct%。
+        使用纯 SQL 批量操作，避免逐行 INSERT。
 
         Returns:
-            {"top": N, "bottom": N, "excluded_algpred2": N}
+            {"top": N, "bottom": N, "excluded_algpred2": N,
+             "total_qualified": N, "top_anoxpepred_range": str, "bottom_anoxpepred_range": str}
         """
         conn = self.connect()
 
-        # 排除 AlgPred2 ≥ 阈值者
         excluded = conn.execute("""
             SELECT COUNT(*) FROM round1_scores
             WHERE algpred2_score >= 0.30 AND algpred2_success = true
         """).fetchone()[0]
 
-        # 获取通过 AlgPred2 的候选并按 AnOxPePred 排序
-        qualified = conn.execute("""
-            SELECT s.candidate_id, s.anoxpepred_score
-            FROM round1_scores s
-            WHERE (s.algpred2_score IS NULL OR s.algpred2_score < 0.30)
-              AND s.anoxpepred_score IS NOT NULL
-            ORDER BY s.anoxpepred_score DESC
-        """).fetchall()
+        total = conn.execute("""
+            SELECT COUNT(*) FROM round1_scores
+            WHERE (algpred2_score IS NULL OR algpred2_score < 0.30)
+              AND anoxpepred_score IS NOT NULL
+        """).fetchone()[0]
 
-        total = len(qualified)
         top_n = int(total * top_pct / 100)
         bottom_n = max(1, int(total * bottom_pct / 100))
 
-        # Top 通道
-        top_candidates = qualified[:top_n]
-        conn.execute("DELETE FROM round1_channels WHERE channel = 'top'")
-        for rank, (cid, score) in enumerate(top_candidates, start=1):
-            conn.execute("""
-                INSERT INTO round1_channels (candidate_id, channel, anoxpepred_score, rank_in_channel)
-                VALUES (?, 'top', ?, ?)
-                ON CONFLICT (candidate_id) DO UPDATE SET
-                    channel='top', anoxpepred_score=excluded.anoxpepred_score, rank_in_channel=?
-            """, [int(cid), float(score), rank, rank])
+        conn.execute("DELETE FROM round1_channels WHERE 1=1")
 
-        # Bottom 通道（取最后 bottom_n 个）
-        bottom_candidates = qualified[-bottom_n:]
-        conn.execute("DELETE FROM round1_channels WHERE channel = 'bottom'")
-        for rank, (cid, score) in enumerate(bottom_candidates, start=1):
-            conn.execute("""
-                INSERT INTO round1_channels (candidate_id, channel, anoxpepred_score, rank_in_channel)
-                VALUES (?, 'bottom', ?, ?)
-                ON CONFLICT (candidate_id) DO UPDATE SET
-                    channel='bottom', anoxpepred_score=excluded.anoxpepred_score, rank_in_channel=?
-            """, [int(cid), float(score), rank, rank])
+        conn.execute(f"""
+            INSERT INTO round1_channels (candidate_id, channel, anoxpepred_score, rank_in_channel)
+            SELECT candidate_id, 'top', anoxpepred_score,
+                   ROW_NUMBER() OVER (ORDER BY anoxpepred_score DESC) AS rn
+            FROM round1_scores
+            WHERE (algpred2_score IS NULL OR algpred2_score < 0.30)
+              AND anoxpepred_score IS NOT NULL
+            ORDER BY anoxpepred_score DESC
+            LIMIT {top_n}
+        """)
 
-        result = {
+        conn.execute(f"""
+            INSERT INTO round1_channels (candidate_id, channel, anoxpepred_score, rank_in_channel)
+            SELECT candidate_id, 'bottom', anoxpepred_score,
+                   ROW_NUMBER() OVER (ORDER BY anoxpepred_score DESC) AS rn
+            FROM round1_scores
+            WHERE (algpred2_score IS NULL OR algpred2_score < 0.30)
+              AND anoxpepred_score IS NOT NULL
+            ORDER BY anoxpepred_score ASC
+            LIMIT {bottom_n}
+        """)
+
+        top_min = conn.execute("""
+            SELECT MIN(anoxpepred_score), MAX(anoxpepred_score)
+            FROM round1_channels WHERE channel = 'top'
+        """).fetchone()
+        bottom_min = conn.execute("""
+            SELECT MIN(anoxpepred_score), MAX(anoxpepred_score)
+            FROM round1_channels WHERE channel = 'bottom'
+        """).fetchone()
+
+        top_count = conn.execute(
+            "SELECT COUNT(*) FROM round1_channels WHERE channel = 'top'"
+        ).fetchone()[0]
+        bottom_count = conn.execute(
+            "SELECT COUNT(*) FROM round1_channels WHERE channel = 'bottom'"
+        ).fetchone()[0]
+
+        return {
             "total_qualified": total,
-            "top": len(top_candidates),
-            "bottom": len(bottom_candidates),
+            "top": top_count,
+            "bottom": bottom_count,
             "excluded_algpred2": excluded,
-            "top_anoxpepred_range": f"{top_candidates[-1][1]:.4f} ~ {top_candidates[0][1]:.4f}" if top_candidates else "N/A",
-            "bottom_anoxpepred_range": f"{bottom_candidates[-1][1]:.4f} ~ {bottom_candidates[0][1]:.4f}" if bottom_candidates else "N/A",
+            "top_anoxpepred_range": f"{top_min[0]:.4f} ~ {top_min[1]:.4f}" if top_min[0] else "N/A",
+            "bottom_anoxpepred_range": f"{bottom_min[0]:.4f} ~ {bottom_min[1]:.4f}" if bottom_min[0] else "N/A",
         }
-        return result
 
     def get_channel_candidates(self, channel: str) -> list[dict]:
         """获取指定通道的候选列表。"""

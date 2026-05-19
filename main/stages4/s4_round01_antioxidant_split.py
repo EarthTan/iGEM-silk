@@ -31,13 +31,13 @@ from main.stages4.s4_service_map import get_round_services
 DB_BATCH = 100_000           # 每次从 DB 读取的行数
 HTTP_BATCH = 1_000           # 每次 HTTP 请求发送的序列数
 CONCURRENCY = 10             # 每个服务的并发 HTTP 请求数
-PROGRESS_INTERVAL = 10       # 每 N 轮打印一次进度
+PROGRESS_INTERVAL = 1        # 每轮打印一次进度
 ALGPRED2_THRESHOLD = 0.30    # AlgPred2 硬阈值（≥此值淘汰）
 
 
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}")
+    print(f"[{ts}] {msg}", flush=True)
 
 
 async def run(top_pct: float, bottom_pct: float, sample: int = 0):

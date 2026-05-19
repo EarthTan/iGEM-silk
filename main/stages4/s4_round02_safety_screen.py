@@ -43,8 +43,6 @@ def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
     print(f"[{ts}] {msg}", flush=True)
 
-# ToxinPred3 分批大小（单条发送，每批此数量后报告进度）
-TOXIN_BATCH_PROGRESS = 2000
 
 
 async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: float):
@@ -74,7 +72,7 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
     sem_hemo = asyncio.Semaphore(10)   # HemoPI2 轻量，高并发
     sem_mhc = asyncio.Semaphore(10)    # MHCflurry 可高并发
 
-    log("\n开始安全服务评分（HemoPI2/MHCflurry 与 ToxinPred3 并行）...")
+    log("\n开始安全服务评分（HemoPI2/MHCflurry → 立即写入，ToxinPred3 后续再打）...")
 
     hemo_chunks = [all_candidates[i:i + 100] for i in range(0, len(all_candidates), 100)]
     mhc_chunks = [all_candidates[i:i + 100] for i in range(0, len(all_candidates), 100)]
@@ -95,64 +93,7 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
                 return {int(r["peptide_id"]): r.get("score") for r in result["results"]}
             return {c["candidate_id"]: None for c in chunk}
 
-    # ToxinPred3 多实例并行（每个实例独立 Semaphore(2)，跨进程安全）
-    # 按实例分块，每个实例内部用 asyncio.gather 实现 2 并发
-    TOXIN_PER_INSTANCE_CONCURRENCY = 2
-    TOXIN_MINI_BATCH = 200  # 每实例每批并发数量
-    n_instances = len(TOXIN_INSTANCES)
-    total_t = len(all_candidates)
-    per_instance = total_t // n_instances
-    instance_batches = []
-    for idx, inst in enumerate(TOXIN_INSTANCES):
-        start = idx * per_instance
-        end = start + per_instance if idx < n_instances - 1 else total_t
-        instance_batches.append((inst, all_candidates[start:end]))
-
-    async def run_instance(inst: str, batch: list[dict],
-                           progress: dict[str, int]) -> dict[int, float | None]:
-        sem = asyncio.Semaphore(TOXIN_PER_INSTANCE_CONCURRENCY)
-        result_map: dict[int, float | None] = {}
-
-        async def score_one(c: dict) -> None:
-            async with sem:
-                result = await client.predict_single(inst, c["sequence"])
-                result_map[c["candidate_id"]] = result.get("score") if result.get("success") else None
-                progress["done"] += 1
-
-        for i in range(0, len(batch), TOXIN_MINI_BATCH):
-            mini = batch[i:i + TOXIN_MINI_BATCH]
-            await asyncio.gather(*[score_one(c) for c in mini], return_exceptions=True)
-        return result_map
-
-    async def run_toxin_scoring() -> dict[int, float | None]:
-        toxin_map: dict[int, float | None] = {}
-        progress = {"done": 0}
-        tasks = [run_instance(inst, batch, progress) for inst, batch in instance_batches]
-
-        # 启动进度监控协程
-        async def report_progress():
-            while True:
-                done = progress["done"]
-                if done >= total_t:
-                    break
-                pct = done / total_t * 100
-                elapsed = time.time() - start_time
-                rate = done / elapsed if elapsed > 0 else 0
-                log(f"  ToxinPred3: {done:,}/{total_t:,} ({pct:.1f}%) | {rate:.0f} seq/s | 耗时: {elapsed:.0f}s")
-                await asyncio.sleep(30)
-
-        monitor = asyncio.create_task(report_progress())
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        monitor.cancel()
-
-        for r in results:
-            if isinstance(r, dict):
-                toxin_map.update(r)
-        return toxin_map
-
-    # 并行执行：HemoPI2/MHCflurry（GPU 快） + ToxinPred3（CPU 慢）
-    toxin_task = asyncio.create_task(run_toxin_scoring())
-
+    # HemoPI2/MHCflurry 轻量快速，优先出结果
     hemo_results, mhc_results = await asyncio.gather(
         asyncio.gather(*[score_hemo(c) for c in hemo_chunks], return_exceptions=True),
         asyncio.gather(*[score_mhc(c) for c in mhc_chunks], return_exceptions=True),
@@ -169,16 +110,13 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
     log(f"  HemoPI2: {len(hemo_map):,} 条 ✅")
     log(f"  MHCflurry: {len(mhc_map):,} 条 ✅")
 
-    # 等待 ToxinPred3 完成
-    toxin_map = await toxin_task
-    log(f"  ToxinPred3: {len(toxin_map):,} 条 ✅")
-
-    # ── 4. 写入评分 ──
-    score_records = [
+    # ── HemoPI2/MHCflurry 先写入 DB（毒性的等 ToxinPred3 慢慢补） ──
+    # 关键: 先持久化快数据。即使后续崩溃，至少 hemo/mhc 不丢。
+    hemo_mhc_records = [
         {
             "candidate_id": c["candidate_id"],
-            "toxinpred3_score": toxin_map.get(c["candidate_id"]),
-            "toxinpred3_success": toxin_map.get(c["candidate_id"]) is not None,
+            "toxinpred3_score": None,
+            "toxinpred3_success": False,
             "hemopi2_score": hemo_map.get(c["candidate_id"]),
             "hemopi2_success": hemo_map.get(c["candidate_id"]) is not None,
             "mhcflurry_score": mhc_map.get(c["candidate_id"]),
@@ -186,8 +124,85 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
         }
         for c in all_candidates
     ]
-    written = db.insert_round2_scores(score_records)
-    log(f"评分写入完成: {written:,} 条")
+    db.insert_round2_scores(hemo_mhc_records)
+    log(f"  HemoPI2/MHCflurry 已写入 DB ✅")
+
+    # ── ToxinPred3 多实例并行，每批打分→立即写入 DB ──
+    # 关键设计: 永不全部收集在内存。每 200 条写一次 ON CONFLICT UPDATE。
+    # 任意时刻崩溃最多丢失 200 条（当前 mini-batch）。
+    TOXIN_PER_INSTANCE_CONCURRENCY = 2
+    TOXIN_MINI_BATCH = 200
+    n_instances = len(TOXIN_INSTANCES)
+    total_t = len(all_candidates)
+    per_instance = total_t // n_instances
+    instance_batches = []
+    for idx, inst in enumerate(TOXIN_INSTANCES):
+        start = idx * per_instance
+        end = start + per_instance if idx < n_instances - 1 else total_t
+        instance_batches.append((inst, all_candidates[start:end]))
+
+    async def run_instance(inst: str, batch: list[dict],
+                           progress: dict[str, int]) -> None:
+        """单个 ToxinPred3 实例：每批打分后立即写入 DB。"""
+        sem = asyncio.Semaphore(TOXIN_PER_INSTANCE_CONCURRENCY)
+
+        async def score_one(c: dict) -> tuple[int, float | None]:
+            async with sem:
+                result = await client.predict_single(inst, c["sequence"])
+                return (c["candidate_id"],
+                        result.get("score") if result.get("success") else None)
+
+        for i in range(0, len(batch), TOXIN_MINI_BATCH):
+            mini = batch[i:i + TOXIN_MINI_BATCH]
+            scored = await asyncio.gather(
+                *[score_one(c) for c in mini], return_exceptions=True
+            )
+
+            # 立即写入 — ON CONFLICT DO UPDATE 保证幂等
+            records = []
+            for c, s in zip(mini, scored):
+                if isinstance(s, Exception):
+                    continue  # 留 NULL，不阻塞流程
+                cid, score = s
+                records.append({
+                    "candidate_id": cid,
+                    "toxinpred3_score": score,
+                    "toxinpred3_success": score is not None,
+                    "hemopi2_score": hemo_map.get(cid),
+                    "hemopi2_success": hemo_map.get(cid) is not None,
+                    "mhcflurry_score": mhc_map.get(cid),
+                    "mhcflurry_success": mhc_map.get(cid) is not None,
+                })
+                progress["done"] += 1
+
+            if records:
+                db.insert_round2_scores(records)
+
+    async def run_toxin_scoring() -> None:
+        """启动多实例并行打分（已在 DB 中有初始 hemo/mhc 行）。"""
+        progress = {"done": 0}
+        tasks = [run_instance(inst, batch, progress)
+                 for inst, batch in instance_batches]
+
+        async def report_progress():
+            while True:
+                done = progress["done"]
+                if done >= total_t:
+                    break
+                pct = done / total_t * 100
+                elapsed = time.time() - start_time
+                rate = done / elapsed if elapsed > 0 else 0
+                log(f"  ToxinPred3: {done:,}/{total_t:,} ({pct:.1f}%) | "
+                    f"{rate:.0f} seq/s | 耗时: {elapsed:.0f}s")
+                await asyncio.sleep(30)
+
+        monitor = asyncio.create_task(report_progress())
+        await asyncio.gather(*tasks, return_exceptions=True)
+        monitor.cancel()
+        log(f"  ToxinPred3: {progress['done']:,}/{total_t:,} 条 ✅")
+
+    log(f"\n  ToxinPred3 开始多实例并行（每 {TOXIN_MINI_BATCH} 条写一次 DB）...")
+    await run_toxin_scoring()
 
     await client.close()
 

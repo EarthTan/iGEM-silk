@@ -14,7 +14,7 @@
 1. Never use subagent, do it yourself, step by step.
 2. `.agents/learnings` 存储了学到的经验和教训，值得参考
 3. `.agents/skills` 是本项目常用的skill，其中就包括了 "GEP-creator"
-4. 本项目在实际使用中 <u>**一律使用docker运行所有微服务，绝对禁止直接用python运行微服务**</u>
+4. 本项目在实际使用中 <u>**一律使用docker运行所有微服务，绝对禁止直接用python直接运行微服务**</u>
 
 # 安全规则（生产部署机器）
 
