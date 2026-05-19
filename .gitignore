@@ -26,6 +26,7 @@ tools/models/omegafold/
 
 
 # Output Fold
+*.wal
 # output/*
 # output3/*
 output3/*.wal

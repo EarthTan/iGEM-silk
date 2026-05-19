@@ -57,3 +57,5 @@ tools/BepiPred-3.0/repo/misc/biolib_bepipred3/output_directory/*.html linguist-g
 tools/BepiPred-3.0/repo/test_output/*.html linguist-generated=true
 output3/pipeline.db filter=lfs diff=lfs merge=lfs -text
 output3/pipeline.db !text !filter !merge !diff
+output4/precompute.db filter=lfs diff=lfs merge=lfs -text
+output4/pipeline.db filter=lfs diff=lfs merge=lfs -text
