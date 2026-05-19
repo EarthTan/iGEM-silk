@@ -35,10 +35,16 @@ TOXIN_THRESHOLD = 0.38   # ToxinPred3 ≥ 0.38 → 有毒
 HEMO_THRESHOLD = 0.55    # HemoPI2 ≥ 0.55 → 溶血
 MHC_THRESHOLD = 0.5      # MHCflurry ≥ 0.5 → 强免疫原性
 
+# ── ToxinPred3 多实例（跨进程安全，每个容器独立 2 并发） ──
+TOXIN_INSTANCES = ["toxinpred3", "toxinpred3-2", "toxinpred3-3"]
+
 
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}")
+    print(f"[{ts}] {msg}", flush=True)
+
+# ToxinPred3 分批大小（单条发送，每批此数量后报告进度）
+TOXIN_BATCH_PROGRESS = 2000
 
 
 async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: float):
@@ -65,22 +71,13 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
 
     # ── 3. 并发评分三个安全服务 ──
     client = ServiceClient(timeout=180.0)
-    sem_toxin = asyncio.Semaphore(2)   # ToxinPred3 线程不安全，低并发
     sem_hemo = asyncio.Semaphore(10)   # HemoPI2 轻量，高并发
     sem_mhc = asyncio.Semaphore(10)    # MHCflurry 可高并发
 
-    log("\n开始安全服务评分...")
+    log("\n开始安全服务评分（HemoPI2/MHCflurry 与 ToxinPred3 并行）...")
 
-    # 将候选分批（ToxinPred3 需要更小的 batch）
-    toxin_chunks = [[c] for c in all_candidates]  # 单条发送
     hemo_chunks = [all_candidates[i:i + 100] for i in range(0, len(all_candidates), 100)]
     mhc_chunks = [all_candidates[i:i + 100] for i in range(0, len(all_candidates), 100)]
-
-    async def score_toxin(chunk: list[dict]) -> dict[int, float | None]:
-        async with sem_toxin:
-            peptide_id = chunk[0]["candidate_id"]
-            result = await client.predict_single("toxinpred3", chunk[0]["sequence"])
-            return {peptide_id: result.get("score") if result.get("success") else None}
 
     async def score_hemo(chunk: list[dict]) -> dict[int, float | None]:
         async with sem_hemo:
@@ -98,28 +95,83 @@ async def run(toxin_threshold: float, hemo_threshold: float, mhc_threshold: floa
                 return {int(r["peptide_id"]): r.get("score") for r in result["results"]}
             return {c["candidate_id"]: None for c in chunk}
 
-    # 并发执行三个服务
-    toxin_results, hemo_results, mhc_results = await asyncio.gather(
-        asyncio.gather(*[score_toxin(c) for c in toxin_chunks], return_exceptions=True),
+    # ToxinPred3 多实例并行（每个实例独立 Semaphore(2)，跨进程安全）
+    # 按实例分块，每个实例内部用 asyncio.gather 实现 2 并发
+    TOXIN_PER_INSTANCE_CONCURRENCY = 2
+    TOXIN_MINI_BATCH = 200  # 每实例每批并发数量
+    n_instances = len(TOXIN_INSTANCES)
+    total_t = len(all_candidates)
+    per_instance = total_t // n_instances
+    instance_batches = []
+    for idx, inst in enumerate(TOXIN_INSTANCES):
+        start = idx * per_instance
+        end = start + per_instance if idx < n_instances - 1 else total_t
+        instance_batches.append((inst, all_candidates[start:end]))
+
+    async def run_instance(inst: str, batch: list[dict],
+                           progress: dict[str, int]) -> dict[int, float | None]:
+        sem = asyncio.Semaphore(TOXIN_PER_INSTANCE_CONCURRENCY)
+        result_map: dict[int, float | None] = {}
+
+        async def score_one(c: dict) -> None:
+            async with sem:
+                result = await client.predict_single(inst, c["sequence"])
+                result_map[c["candidate_id"]] = result.get("score") if result.get("success") else None
+                progress["done"] += 1
+
+        for i in range(0, len(batch), TOXIN_MINI_BATCH):
+            mini = batch[i:i + TOXIN_MINI_BATCH]
+            await asyncio.gather(*[score_one(c) for c in mini], return_exceptions=True)
+        return result_map
+
+    async def run_toxin_scoring() -> dict[int, float | None]:
+        toxin_map: dict[int, float | None] = {}
+        progress = {"done": 0}
+        tasks = [run_instance(inst, batch, progress) for inst, batch in instance_batches]
+
+        # 启动进度监控协程
+        async def report_progress():
+            while True:
+                done = progress["done"]
+                if done >= total_t:
+                    break
+                pct = done / total_t * 100
+                elapsed = time.time() - start_time
+                rate = done / elapsed if elapsed > 0 else 0
+                log(f"  ToxinPred3: {done:,}/{total_t:,} ({pct:.1f}%) | {rate:.0f} seq/s | 耗时: {elapsed:.0f}s")
+                await asyncio.sleep(30)
+
+        monitor = asyncio.create_task(report_progress())
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        monitor.cancel()
+
+        for r in results:
+            if isinstance(r, dict):
+                toxin_map.update(r)
+        return toxin_map
+
+    # 并行执行：HemoPI2/MHCflurry（GPU 快） + ToxinPred3（CPU 慢）
+    toxin_task = asyncio.create_task(run_toxin_scoring())
+
+    hemo_results, mhc_results = await asyncio.gather(
         asyncio.gather(*[score_hemo(c) for c in hemo_chunks], return_exceptions=True),
         asyncio.gather(*[score_mhc(c) for c in mhc_chunks], return_exceptions=True),
     )
-
-    # 合并结果
-    toxin_map: dict[int, float | None] = {}
-    for r in toxin_results:
-        if isinstance(r, dict):
-            toxin_map.update(r)
 
     hemo_map: dict[int, float | None] = {}
     for r in hemo_results:
         if isinstance(r, dict):
             hemo_map.update(r)
-
     mhc_map: dict[int, float | None] = {}
     for r in mhc_results:
         if isinstance(r, dict):
             mhc_map.update(r)
+    log(f"  HemoPI2: {len(hemo_map):,} 条 ✅")
+    log(f"  MHCflurry: {len(mhc_map):,} 条 ✅")
+
+    # 等待 ToxinPred3 完成
+    toxin_map = await toxin_task
+    log(f"  ToxinPred3: {len(toxin_map):,} 条 ✅")
 
     # ── 4. 写入评分 ──
     score_records = [
@@ -182,10 +234,11 @@ def main():
     args = parser.parse_args()
 
     info = get_round_services("round2")
+    all_services = info["services"] + [s for s in TOXIN_INSTANCES if s not in info["services"]]
     log(f"Round 2: {info['desc']}")
-    log(f"依赖服务: {', '.join(info['services'])}")
+    log(f"依赖服务: {', '.join(all_services)} (ToxinPred3 × {len(TOXIN_INSTANCES)} 实例)")
 
-    health = ensure_services(info["services"], info["profiles"], timeout=180.0)
+    health = ensure_services(all_services, info["profiles"], timeout=180.0)
     unavailable = [s for s, h in health.items() if not h["available"]]
     if unavailable:
         log(f"❌ 服务不可用，终止: {unavailable}")

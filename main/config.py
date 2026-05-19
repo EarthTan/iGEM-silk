@@ -39,6 +39,8 @@ SERVICES: dict[str, dict] = {
 
     # ═══════ 过滤型服务 ═══════
     "toxinpred3":   {"port": 8003, "group": "filter"},
+    "toxinpred3-2": {"port": 8013, "group": "filter"},
+    "toxinpred3-3": {"port": 8014, "group": "filter"},
     "hemopi2":      {"port": 8004, "group": "filter"},
     "algpred2":     {"port": 8008, "group": "filter"},
 
