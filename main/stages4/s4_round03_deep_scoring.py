@@ -76,14 +76,38 @@ async def run(top_pct: float, manual_coeffs: dict[str, float]):
         log("❌ 无候选可处理，请先运行 Round 2")
         return
 
-    # ── 2. 评分 ──
-    last_id = db.get_last_processed_id("round3_scores")
-    if last_id > 0:
-        log(f"已评分 (round3_scores): {last_id:,} 条")
+    # ── 2. 检查预打分数据（来自 s4_round03_precompute.py）──
+    conn = db.connect()
+    complete = conn.execute("""
+        SELECT COUNT(*) FROM round2_passed p
+        JOIN round3_scores s ON p.candidate_id = s.candidate_id
+        WHERE s.bepipred3_score IS NOT NULL
+          AND s.temstapro_score IS NOT NULL
+          AND s.sodope_score IS NOT NULL
+          AND s.plm4cpps_score IS NOT NULL
+          AND s.graphcpp_score IS NOT NULL
+    """).fetchone()[0]
+    total_passed = len(passed)
 
-    # 仅对未评分的候选评分
-    to_score = [c for c in passed if c["candidate_id"] > last_id]
-    log(f"待评分: {len(to_score):,} 条\n")
+    if complete >= total_passed:
+        log(f"✅ 预打分数据完整 ({complete:,}/{total_passed:,})，跳过评分阶段")
+        to_score: list[dict] = []
+    else:
+        log(f"预打分: {complete:,}/{total_passed:,} 条完整")
+        missing_rows = conn.execute("""
+            SELECT p.candidate_id
+            FROM round2_passed p
+            LEFT JOIN round3_scores s ON p.candidate_id = s.candidate_id
+            WHERE s.candidate_id IS NULL
+               OR s.bepipred3_score IS NULL
+               OR s.temstapro_score IS NULL
+               OR s.sodope_score IS NULL
+               OR s.plm4cpps_score IS NULL
+               OR s.graphcpp_score IS NULL
+        """).fetchall()
+        missing_ids = {int(r[0]) for r in missing_rows}
+        to_score = [c for c in passed if c["candidate_id"] in missing_ids]
+        log(f"待评分: {len(to_score):,} 条\n")
 
     if to_score:
         client = ServiceClient(timeout=300.0)
