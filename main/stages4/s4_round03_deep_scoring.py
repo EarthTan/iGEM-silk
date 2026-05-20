@@ -54,17 +54,35 @@ def log(msg: str):
 
 
 def get_passed_round2(db: PipelineDB, max_top: int = 150000, max_bottom: int = 50000) -> list[dict]:
-    """获取 Round 2 安全通过的候选（各通道按 rank_in_channel 限流）。"""
+    """获取 Round 2 安全通过的候选（各通道按 rank_in_channel 限流）。
+
+    Top 通道取 AnOxPePred 最佳（rank 最小）的前 max_top 条；
+    Bottom 通道取 AnOxPePred 最差（rank 最大）的后 max_bottom 条。
+    """
     conn = db.connect()
-    rows = conn.execute("""
-        SELECT p.candidate_id, c.sequence, c.length, p.channel
+
+    # Top: 最佳抗氧化分（rank_in_channel 最小）
+    top_rows = conn.execute("""
+        SELECT p.candidate_id, c.sequence, c.length, 'top'
         FROM round2_passed p
         JOIN candidates c ON c.candidate_id = p.candidate_id
         JOIN round1_channels ch ON ch.candidate_id = p.candidate_id
-        WHERE (p.channel = 'top' AND ch.rank_in_channel <= ?)
-           OR (p.channel = 'bottom' AND ch.rank_in_channel <= ?)
-        ORDER BY p.channel, ch.rank_in_channel
-    """, [max_top, max_bottom]).fetchall()
+        WHERE p.channel = 'top' AND ch.rank_in_channel <= ?
+        ORDER BY ch.rank_in_channel
+    """, [max_top]).fetchall()
+
+    # Bottom: 最差抗氧化分（rank_in_channel 最大）
+    bottom_rows = conn.execute("""
+        SELECT p.candidate_id, c.sequence, c.length, 'bottom'
+        FROM round2_passed p
+        JOIN candidates c ON c.candidate_id = p.candidate_id
+        JOIN round1_channels ch ON ch.candidate_id = p.candidate_id
+        WHERE p.channel = 'bottom'
+        ORDER BY ch.rank_in_channel DESC
+        LIMIT ?
+    """, [max_bottom]).fetchall()
+
+    rows = top_rows + bottom_rows
     return [
         {"candidate_id": int(r[0]), "sequence": r[1], "length": r[2], "channel": r[3]}
         for r in rows
