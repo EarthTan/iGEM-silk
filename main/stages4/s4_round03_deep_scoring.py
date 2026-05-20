@@ -50,7 +50,7 @@ DEEP_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp"]
 
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}")
+    print(f"[{ts}] {msg}", flush=True)
 
 
 def get_passed_round2(db: PipelineDB, max_top: int = 150000, max_bottom: int = 50000) -> list[dict]:
@@ -106,54 +106,100 @@ async def run(top_pct: float, manual_coeffs: dict[str, float],
         log("❌ 无候选可处理，请先运行 Round 2")
         return
 
-    # ── 2. 评分阶段：6 服务并行（含 ToxinPred3）──
+    # ── 2. 评分阶段：按 chunk 并行评分 + 立即写入 ──
+    # 关键设计：每 chunk 打完分立即写入 DB，永不全部收集在内存。
+    # 任意时刻崩溃最多丢失当前进行中的 chunks（~5 × BATCH_SIZE）。
     client = ServiceClient(timeout=300.0)
     sem = asyncio.Semaphore(CONCURRENCY)
-
     chunks = [passed[i:i + BATCH_SIZE] for i in range(0, len(passed), BATCH_SIZE)]
 
-    async def score_one(chunk: list[dict], svc: str) -> list[dict]:
+    async def score_chunk_write(chunk: list[dict]) -> int:
+        """对单个 chunk 并发调用 6 个服务，打完立即写入 DB。"""
         async with sem:
-            items = [
-                {"peptide_id": str(c["candidate_id"]), "sequence": c["sequence"]}
-                for c in chunk
-            ]
-            result = await client.predict_batch(svc, items)
-            if result.get("success") and result.get("results"):
-                return result["results"]
-            return [{"peptide_id": item["peptide_id"], "score": None} for item in items]
+            # 并行为 6 个服务各发一个 predict_batch
+            tasks = []
+            for svc in ALL_SERVICES:
+                items = [
+                    {"peptide_id": str(c["candidate_id"]), "sequence": c["sequence"]}
+                    for c in chunk
+                ]
+                tasks.append(client.predict_batch(svc, items))
 
-    async def score_service(svc: str) -> dict[str, float | None]:
-        tasks = [score_one(chunk, svc) for chunk in chunks]
-        results = await asyncio.gather(*tasks)
-        flat: dict[str, float | None] = {}
-        for batch_res in results:
-            for r in batch_res:
-                flat[r["peptide_id"]] = r.get("score")
-        return flat
+            svc_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # 并发所有 6 个服务（ToxinPred3 是 CPU，与 GPU 服务无竞争）
-    log(f"并发评分 {len(ALL_SERVICES)} 个服务（含 ToxinPred3）...")
-    svc_tasks = [score_service(svc) for svc in ALL_SERVICES]
-    svc_results = await asyncio.gather(*svc_tasks)
+        # 构建记录
+        # 按服务名索引结果
+        svc_score_map: dict[str, dict[str, float | None]] = {}
+        for svc_name, result in zip(ALL_SERVICES, svc_results):
+            by_id: dict[str, float | None] = {}
+            if isinstance(result, Exception):
+                for c in chunk:
+                    by_id[str(c["candidate_id"])] = None
+            else:
+                results_list = result.get("results", []) if result.get("success") else []
+                for r in results_list:
+                    by_id[r["peptide_id"]] = r.get("score")
+                for c in chunk:
+                    cid_str = str(c["candidate_id"])
+                    if cid_str not in by_id:
+                        by_id[cid_str] = None
+            svc_score_map[svc_name] = by_id
 
-    # 写入评分（含 ToxinPred3 列）
-    for chunk_start in range(0, len(passed), BATCH_SIZE):
-        batch = passed[chunk_start:chunk_start + BATCH_SIZE]
         records = []
-        for c in batch:
+        for c in chunk:
             cid_str = str(c["candidate_id"])
             record = {"candidate_id": c["candidate_id"]}
-            for svc_name, svc_map in zip(ALL_SERVICES, svc_results):
-                score = svc_map.get(cid_str)
-                record[f"{svc_name}_score"] = score
-                record[f"{svc_name}_success"] = score is not None
+            for svc in ALL_SERVICES:
+                score = svc_score_map[svc].get(cid_str)
+                record[f"{svc}_score"] = score
+                record[f"{svc}_success"] = score is not None
             records.append(record)
+
         db.insert_round3_scores(records)
-        log(f"  评分写入: {min(chunk_start + BATCH_SIZE, len(passed)):,}/{len(passed):,}")
+        return len(records)
+
+    log(f"并发评分 {len(ALL_SERVICES)} 个服务（每 chunk 打完即写）...")
+
+    # 进度追踪（线程安全的 list 近似原子操作）
+    progress: list[int] = [0]  # 已写入的 candidate 数
+    start_ts = time.time()
+
+    async def score_chunk_write_progress(chunk: list[dict]) -> int:
+        n = await score_chunk_write(chunk)
+        progress[0] += n
+        return n
+
+    async def report_progress():
+        total = len(passed)
+        while progress[0] < total:
+            done = progress[0]
+            if done > 0:
+                elapsed = time.time() - start_ts
+                rate = done / elapsed
+                eta = (total - done) / rate if rate > 0 else 0
+                log(f"  进度: {done:,}/{total:,} ({done/total*100:.1f}%) | "
+                    f"{rate:.0f} seq/s | ETA: {eta/60:.1f} min")
+            await asyncio.sleep(30)
+
+    monitor = asyncio.create_task(report_progress())
+
+    # 并发所有 chunks，每 chunk 完成后立即写入
+    written_counts = await asyncio.gather(
+        *[score_chunk_write_progress(chunk) for chunk in chunks],
+        return_exceptions=True,
+    )
+
+    monitor.cancel()
+
+    total_written = 0
+    for i, wc in enumerate(written_counts):
+        if isinstance(wc, Exception):
+            log(f"  ⚠️ chunk {i} 失败: {wc}")
+        else:
+            total_written += wc
 
     await client.close()
-    log(f"评分完成: {len(passed):,} 条 ✅")
+    log(f"评分写入完成: {total_written:,}/{len(passed):,} 条 ✅")
 
     # ── 3. ToxinPred3 硬阈值淘汰 ──
     log(f"\nToxinPred3 硬阈值 (≥{toxin_threshold} 淘汰)...")
