@@ -1,13 +1,15 @@
 """
 Round 3: 深度评分 + 方差加权（全流程唯一加权位置）+ ToxinPred3 阈值。
 
-对安全通过的候选运行 6 个并行服务:
-  - BepiPred3: B 细胞表位预测 (GPU)
+两阶段设计：Phase 1 跑 5 服务，排名后取 Top 5%；
+Phase 2 在缩小集上补 GraphCPP（~1.4 seq/s，不在 Phase 1 拖慢全流程）。
+
+Phase 1 — 5 个并行服务:
+  - BepiPred3: B 细胞表位预测 (GPU, ~7/s, 瓶颈)
   - TemStaPro: 热稳定性预测 (GPU)
   - SoDoPE: 溶解度预测 (CPU)
   - pLM4CPPs: 细胞穿透预测 (GPU)
-  - GraphCPP: 细胞穿透 GNN (GPU)
-  - ToxinPred3: 毒性预测 (CPU, ≥0.38 淘汰)
+  - ToxinPred3: 毒性预测 (CPU, ≥0.38 淘汰, 3 实例分片)
 
 ToxinPred3 分数写入 round3_scores 表，打分后应用硬阈值淘汰，
 不参与 SD 加权排名。
@@ -38,14 +40,14 @@ from main.stages4.s4_analytics import compute_variance_weights, apply_weights_an
 
 # ── 配置 ──
 BATCH_SIZE = 1_000
-CONCURRENCY = 5
+CONCURRENCY = 3
 PROGRESS_INTERVAL = 5
 TOXIN_THRESHOLD = 0.38
 
-# 参与打分的全部服务（含 ToxinPred3，CPU 无 GPU 竞争）
-ALL_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp", "toxinpred3"]
+# 参与评分的全部服务（GraphCPP 在 Phase 2 单独补跑）
+ALL_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "toxinpred3"]
 # 参与 SD 加权排名的服务（ToxinPred3 是硬阈值，不参与加权）
-DEEP_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp"]
+DEEP_SERVICES = ["bepipred3", "temstapro", "sodope", "plm4cpps"]
 
 
 def log(msg: str):
@@ -109,7 +111,7 @@ async def run(top_pct: float, manual_coeffs: dict[str, float],
     # ── 2. 评分阶段：按 chunk 并行评分 + 立即写入 ──
     # 关键设计：每 chunk 打完分立即写入 DB，永不全部收集在内存。
     # 任意时刻崩溃最多丢失当前进行中的 chunks（~5 × BATCH_SIZE）。
-    client = ServiceClient(timeout=300.0)
+    client = ServiceClient(timeout=1200.0)
     sem = asyncio.Semaphore(CONCURRENCY)
     chunks = [passed[i:i + BATCH_SIZE] for i in range(0, len(passed), BATCH_SIZE)]
 
@@ -267,13 +269,12 @@ def main():
     parser.add_argument("--temstapro-coeff", type=float, default=1.0)
     parser.add_argument("--sodope-coeff", type=float, default=1.0)
     parser.add_argument("--plm4cpps-coeff", type=float, default=1.0)
-    parser.add_argument("--graphcpp-coeff", type=float, default=1.0)
     parser.add_argument("--adjust-reason", type=str, default="默认配置，无手动调节")
     args = parser.parse_args()
 
     # 构建手动系数（只包含有值的）
     manual_coeffs: dict[str, float] = {}
-    for svc in ["bepipred3", "temstapro", "sodope", "plm4cpps", "graphcpp"]:
+    for svc in ["bepipred3", "temstapro", "sodope", "plm4cpps"]:
         val = getattr(args, f"{svc}_coeff")
         if val is not None:
             manual_coeffs[f"{svc}_score"] = val
