@@ -694,6 +694,25 @@ class PipelineDB:
         return len(records)
 
     # ────────────────────────────────────────────────────────────────
+    # Round 3 Phase 2: GraphCPP 补充更新
+    # ────────────────────────────────────────────────────────────────
+
+    def update_round3_graphcpp(self, records: list[dict]) -> int:
+        """仅更新 round3_scores 中的 graphcpp 分数（不触及已有列）。"""
+        if not records:
+            return 0
+        conn = self.connect()
+        for r in records:
+            score = r.get("graphcpp_score")
+            success = bool(r.get("graphcpp_success", False))
+            conn.execute("""
+                UPDATE round3_scores
+                SET graphcpp_score = ?, graphcpp_success = ?
+                WHERE candidate_id = ?
+            """, [score, success, r["candidate_id"]])
+        return len(records)
+
+    # ────────────────────────────────────────────────────────────────
     # Round 4: Construct 操作
     # ────────────────────────────────────────────────────────────────
 
