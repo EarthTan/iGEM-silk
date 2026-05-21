@@ -30,16 +30,27 @@ round7_score = 0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm
 | 4 | bottom | con_15869 | Both | Flex_GGGGSx1 | 0.8229 | 0.2753 | 0.4410 | 0.7296 |
 | 5 | bottom | con_1103 | Both | Flex_GGGGSx1 | 0.6777 | 0.2946 | 0.4743 | 0.7189 |
 
+## 快速查阅（CSV 摘要）
+
+| 文件 | 内容 |
+|------|------|
+| `top10.csv` | Top 通道排名前 10 的 constructs 摘要 |
+| `bottom10.csv` | Bottom 通道排名前 10 的 constructs 摘要 |
+
+CSV 字段：`global_rank`, `channel`, `channel_rank`, `construct_id`, `position`, `linker`, `peptide_seq`, `source_database`, `source_accession`, `round7_score`
+
 ## 输出结构
 
 ```
 output4/final/
 ├── README.md                           ← 本文件
+├── top10.csv                           ← Top 10 摘要
+├── bottom10.csv                        ← Bottom 10 摘要
 └── constructs/
-    ├── con_0001/
+    ├── con_0293/
     │   ├── construct.json              ← 全部评分、排名、来源信息
     │   └── omegafold.pdb               ← OmegaFold 预测的 3D 结构
-    ├── con_0002/
+    ├── con_0294/
     │   ├── construct.json
     │   └── omegafold.pdb
     └── ...                             ← 共 250 个 construct
@@ -52,7 +63,7 @@ output4/final/
 - `channel` — Top / Bottom 通道
 - `position` — 功能肽插入位置 (N/C/Both)
 - `linker` — 连接肽类型
-- `sequences` — 各片段序列及全长
+- `sequences` — 各片段序列（scaffold / linker / peptide / 全长）
 - `source` — 来源数据库 (uniprot/mgy) + accession + header
 - `scores.round1` — AnOxPePred, AlgPred2
 - `scores.round2` — ToxinPred3, HemoPI2, MHCflurry
