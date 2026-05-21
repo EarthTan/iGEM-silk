@@ -1,0 +1,74 @@
+{
+  "construct_id": 437,
+  "candidate_id": 468635,
+  "channel": "top",
+  "position": "Both",
+  "linker": "Flex_GGGGSx1",
+  "sequences": {
+    "scaffold": "MGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNC",
+    "linker": "GGGGS",
+    "peptide": "THTHTHRM",
+    "full": "THTHTHRMGGGGSMGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCGGGGSTHTHTHRMLEHHHHHH"
+  },
+  "source": {
+    "database": "uniprot",
+    "accession": "A0A1A7XF31",
+    "header": ">tr|A0A1A7XF31|A0A1A7XF31_9TELE TBC1 domain family, member 2B (Fragment) OS=Iconisemion striatum OX=60296 GN=TBC1D2B PE=4 SV=1"
+  },
+  "scores": {
+    "round1": {
+      "anoxpepred": 0.426800012588501,
+      "algpred2": 0.2630000114440918
+    },
+    "round2": {
+      "toxinpred3": null,
+      "hemopi2": 0.21187305450439453,
+      "mhcflurry": 0.0
+    },
+    "round3": {
+      "bepipred3": 0.21181364357471466,
+      "temstapro": 0.17239999771118164,
+      "sodope": 0.9618636965751648,
+      "plm4cpps": 0.9997200965881348,
+      "graphcpp": 0.8854474425315857,
+      "toxinpred3": 0.1550000011920929
+    },
+    "construct": {
+      "sodope": 0.6863951683044434,
+      "temstapro": 0.4844000041484833,
+      "bepipred3": null
+    },
+    "structure": {
+      "omegafold_plddt": 0.3953704237937927
+    },
+    "pdb_eval": {
+      "sasa": 0.8001000285148621,
+      "aggrescan3d": 0.3156999945640564
+    }
+  },
+  "rankings": {
+    "round1_channel": {
+      "rank_in_channel": 149277
+    },
+    "round3_peptide": {
+      "composite_score": 0.7660470008850098,
+      "rank": 2045
+    },
+    "round4_phase1": {
+      "combined_score": null,
+      "rank": null
+    },
+    "round7_final": {
+      "composite_score": 0.6287,
+      "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+      "weights": {
+        "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+        "W_SASA": 0.4,
+        "W_AGG": 0.4,
+        "W_PLDDT": 0.2
+      },
+      "global_rank": 156,
+      "channel_rank": 68
+    }
+  }
+}

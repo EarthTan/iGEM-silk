@@ -1,0 +1,74 @@
+{
+  "construct_id": 768,
+  "candidate_id": 2089497,
+  "channel": "top",
+  "position": "Both",
+  "linker": "Flex_GGGGSx2",
+  "sequences": {
+    "scaffold": "MGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNC",
+    "linker": "GGGGSGGGGS",
+    "peptide": "MKNPLQEVTPAGHPHKRKFPSKKR",
+    "full": "MKNPLQEVTPAGHPHKRKFPSKKRGGGGSGGGGSMGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCGGGGSGGGGSMKNPLQEVTPAGHPHKRKFPSKKRLEHHHHHH"
+  },
+  "source": {
+    "database": "uniprot",
+    "accession": "A0A5K0UWX3",
+    "header": ">tr|A0A5K0UWX3|A0A5K0UWX3_9MAGN Uncharacterized protein (Fragment) OS=Nymphaea colorata OX=210225 GN=NYM_LOCUS348 PE=4 SV=1"
+  },
+  "scores": {
+    "round1": {
+      "anoxpepred": 0.4632999897003174,
+      "algpred2": 0.16599999368190765
+    },
+    "round2": {
+      "toxinpred3": null,
+      "hemopi2": 0.33581793308258057,
+      "mhcflurry": 0.0
+    },
+    "round3": {
+      "bepipred3": 0.32270321249961853,
+      "temstapro": 0.7085000276565552,
+      "sodope": 0.976556122303009,
+      "plm4cpps": 0.28250887989997864,
+      "graphcpp": 0.6328871250152588,
+      "toxinpred3": 0.33500000834465027
+    },
+    "construct": {
+      "sodope": 0.7357566356658936,
+      "temstapro": 0.427700012922287,
+      "bepipred3": null
+    },
+    "structure": {
+      "omegafold_plddt": 0.4139622151851654
+    },
+    "pdb_eval": {
+      "sasa": 0.8201000094413757,
+      "aggrescan3d": 0.3167000114917755
+    }
+  },
+  "rankings": {
+    "round1_channel": {
+      "rank_in_channel": 28927
+    },
+    "round3_peptide": {
+      "composite_score": 0.672927975654602,
+      "rank": 3327
+    },
+    "round4_phase1": {
+      "combined_score": null,
+      "rank": null
+    },
+    "round7_final": {
+      "composite_score": 0.6671,
+      "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+      "weights": {
+        "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+        "W_SASA": 0.4,
+        "W_AGG": 0.4,
+        "W_PLDDT": 0.2
+      },
+      "global_rank": 50,
+      "channel_rank": 9
+    }
+  }
+}

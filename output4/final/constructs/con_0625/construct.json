@@ -1,0 +1,74 @@
+{
+  "construct_id": 625,
+  "candidate_id": 12800007,
+  "channel": "top",
+  "position": "N",
+  "linker": "Flex_GGGGSx1",
+  "sequences": {
+    "scaffold": "MGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNC",
+    "linker": "GGGGS",
+    "peptide": "EARKERREKHHEEHMKETPAQ",
+    "full": "EARKERREKHHEEHMKETPAQGGGGSMGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCLEHHHHHH"
+  },
+  "source": {
+    "database": "mgy",
+    "accession": "MGYP000975380002",
+    "header": ">MGYP000975380002"
+  },
+  "scores": {
+    "round1": {
+      "anoxpepred": 0.4503999948501587,
+      "algpred2": 0.23499999940395355
+    },
+    "round2": {
+      "toxinpred3": null,
+      "hemopi2": 0.18655475974082947,
+      "mhcflurry": 0.0
+    },
+    "round3": {
+      "bepipred3": 0.3229627311229706,
+      "temstapro": 0.4156000018119812,
+      "sodope": 0.9997644424438477,
+      "plm4cpps": 0.6579903364181519,
+      "graphcpp": 0.6650534272193909,
+      "toxinpred3": 0.2750000059604645
+    },
+    "construct": {
+      "sodope": 0.7464808821678162,
+      "temstapro": 0.453900009393692,
+      "bepipred3": null
+    },
+    "structure": {
+      "omegafold_plddt": 0.41257375478744507
+    },
+    "pdb_eval": {
+      "sasa": 0.613099992275238,
+      "aggrescan3d": 0.36579999327659607
+    }
+  },
+  "rankings": {
+    "round1_channel": {
+      "rank_in_channel": 52734
+    },
+    "round3_peptide": {
+      "composite_score": 0.7068390250205994,
+      "rank": 2873
+    },
+    "round4_phase1": {
+      "combined_score": null,
+      "rank": null
+    },
+    "round7_final": {
+      "composite_score": 0.5624,
+      "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+      "weights": {
+        "formula": "0.4×SASA + 0.4×(1−A3D) + 0.2×pLDDT_norm",
+        "W_SASA": 0.4,
+        "W_AGG": 0.4,
+        "W_PLDDT": 0.2
+      },
+      "global_rank": 222,
+      "channel_rank": 123
+    }
+  }
+}
