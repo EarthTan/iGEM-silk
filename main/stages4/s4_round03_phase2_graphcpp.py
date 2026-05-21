@@ -96,6 +96,7 @@ async def run(limit: int = 4324, top_pct: float = 5.0):
                 "graphcpp_success": score is not None,
             })
         db.update_round3_graphcpp(records)
+        progress[0] += len(records)
         return len(records)
 
     log(f"GraphCPP 评分开始（每次 {BATCH_SIZE} 条，并发 {CONCURRENCY}）...")
@@ -156,7 +157,7 @@ async def run(limit: int = 4324, top_pct: float = 5.0):
     top_n = max(1, int(len(ranking) * top_pct / 100))
     total_elapsed = time.time() - start_time
     db.set_checkpoint("round3", "phase2", "done",
-                      total=total, processed=total, notes="+GraphCPP")
+                      total=total, processed=total)
 
     log(f"\n{'='*55}")
     log(f"  Phase 2 完成!")

@@ -201,7 +201,25 @@ class PipelineDB:
                 sodope_success    BOOLEAN,
                 temstapro_score   FLOAT,
                 temstapro_success BOOLEAN,
+                bepipred3_score   FLOAT,
+                bepipred3_success BOOLEAN,
                 scored_at         TIMESTAMP DEFAULT now()
+            )
+        """)
+        # 兼容已有数据库（表已存在时补加 bepipred3 列）
+        for col in ["bepipred3_score FLOAT", "bepipred3_success BOOLEAN"]:
+            try:
+                conn.execute(f"ALTER TABLE construct_scores ADD COLUMN {col}")
+            except Exception:
+                pass
+
+        # Round 4: Phase 1 过滤通过表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS round4_phase1_passed (
+                construct_id   BIGINT PRIMARY KEY REFERENCES constructs(construct_id),
+                candidate_id   BIGINT NOT NULL,
+                combined_score FLOAT,
+                rank           BIGINT
             )
         """)
 
@@ -780,6 +798,45 @@ class PipelineDB:
             written += len(batch)
         return written
 
+    def insert_round4_phase1_passed(self, records: list[dict]) -> int:
+        """写入 Phase 1 过滤结果。"""
+        if not records:
+            return 0
+        conn = self.connect()
+        BATCH = 500
+        written = 0
+        for start_idx in range(0, len(records), BATCH):
+            batch = records[start_idx:start_idx + BATCH]
+            values = ",".join(
+                f"({r['construct_id']},{r['candidate_id']},{r['combined_score']},{r['rank']})"
+                for r in batch
+            )
+            conn.execute(f"""
+                INSERT INTO round4_phase1_passed
+                    (construct_id, candidate_id, combined_score, rank)
+                VALUES {values}
+                ON CONFLICT (construct_id) DO UPDATE SET
+                    combined_score = EXCLUDED.combined_score,
+                    rank           = EXCLUDED.rank
+            """)
+            written += len(batch)
+        return written
+
+    def update_construct_bepipred3(self, records: list[dict]) -> int:
+        """更新 construct 的 BepiPred3 评分。"""
+        if not records:
+            return 0
+        conn = self.connect()
+        for r in records:
+            score = r.get("bepipred3_score")
+            success = bool(r.get("bepipred3_success", False))
+            conn.execute("""
+                UPDATE construct_scores
+                SET bepipred3_score = ?, bepipred3_success = ?
+                WHERE construct_id = ?
+            """, [score, success, r["construct_id"]])
+        return len(records)
+
     # ────────────────────────────────────────────────────────────────
     # Round 5–6: 结构 + PDB 写入
     # ────────────────────────────────────────────────────────────────
@@ -830,6 +887,36 @@ class PipelineDB:
                     sasa_success        = EXCLUDED.sasa_success,
                     aggrescan3d_score   = EXCLUDED.aggrescan3d_score,
                     aggrescan3d_success = EXCLUDED.aggrescan3d_success
+            """)
+            written += len(batch)
+        return written
+
+    def insert_final_ranking(self, records: list[dict]) -> int:
+        """清空并重新写入最终排名结果。"""
+        if not records:
+            return 0
+        conn = self.connect()
+        conn.execute("DELETE FROM final_ranking WHERE 1=1")
+        BATCH = 100
+        written = 0
+
+        for start_idx in range(0, len(records), BATCH):
+            batch = records[start_idx:start_idx + BATCH]
+            values = ",".join(
+                f"({r['construct_id']},"
+                f"{r['candidate_id']},"
+                f"'{r['channel']}',"
+                f"{r['composite_score']},"
+                f"{r['rank']},"
+                f"{r['rank_in_channel'] if r.get('rank_in_channel') is not None else 'NULL'},"
+                f"'{r['weight_snapshot']}')"
+                for r in batch
+            )
+            conn.execute(f"""
+                INSERT INTO final_ranking
+                    (construct_id, candidate_id, channel,
+                     composite_score, rank, rank_in_channel, weight_snapshot)
+                VALUES {values}
             """)
             written += len(batch)
         return written
