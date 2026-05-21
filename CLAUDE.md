@@ -9,7 +9,8 @@ iGEM-silk is a computational platform for designing silk fibroin fusion proteins
 **Pipeline evolution**:
 - `main/stages/` — First attempt (1843 peptides, 7 stages, all written but not all run). See `main/PLAN.md`.
 - `main/stages2/` — **Production pipeline (completed)**. Full 8-round v2 run completed, 1,081,772 → 90 candidates. Output in `output2/`. REVIEW.md has full post-mortem.
-- `main/stages3/` — **Next-generation pipeline (in development)**. Billion-scale expansion using DuckDB, variance-aware weighting, 19.9M candidates processed in Stage 0. Output goes to `output3/`.
+- `main/stages3/` — **Next-generation pipeline (partially completed)**. Billion-scale DuckDB-based pipeline. Stage 0 complete (19.9M candidates), Stage 1 code ready. Output in `output3/`.
+- `main/stages4/` — **Latest pipeline (completed)**. 19.9M → 250 constructs (Top 150 + Bottom 100) through 8 rounds plus AlphaFold3 refinement. Output in `output4/`. Fixes stages2 design flaws: no cross-attribute weighted averaging, safety hard thresholds.
 
 **Who this is for**: synthetic biology researchers at the iGEM competition.
 
@@ -81,6 +82,37 @@ Next-generation pipeline at `main/stages3/`. Uses DuckDB for state, variance-awa
 
 **Design docs** in `plan/`: PLAN.md (roadmap), ARCHITECTURE.md (three-layer), DB_SCHEMA.md (15 tables), DATA_PREP.md, TECH_REQUIREMENTS.md.
 
+## stages4 pipeline (completed)
+
+The `main/stages4/` pipeline is the latest iteration, fixing two critical design flaws from stages2: (1) safety attributes were dilutable in weighted averages rather than being hard vetoes, and (2) antioxidant signal contaminated all downstream rounds. Stages4 enforces **hierarchical filtering**: each round uses a single criterion, safety is hard-threshold (pass/fail, no scoring), and antioxidant scores are used only in Round 1 for channel split.
+
+**Design docs**: `main/stages4/PLAN.md` — full design rationale, comparison with stages2.
+
+| Round | Script | Purpose | Status |
+|-------|--------|---------|--------|
+| 0 | `s4_round00_preprocess.py` | Import from stages3 DuckDB | ✅ complete |
+| 1 | `s4_round01_antioxidant_split.py` | AnOxPePred → Top 10% + Bottom 1%, AlgPred2 hard filter | ✅ complete |
+| 2 | `s4_round02_safety_screen.py` | ToxinPred3/HemoPI2/MHCflurry independent hard thresholds | ✅ complete |
+| 3p1 | `s4_round03_precompute.py` | Pre-compute BepiPred3+TemStaPro+SoDoPE+pLM4CPPs | ✅ complete |
+| 3p2 | `s4_round03_deep_scoring.py` | SD-driven weighted scoring (unique weighted position) | ✅ complete |
+| 3p3 | `s4_round03_phase2_graphcpp.py` | GraphCPP post-scoring on reduced set | ✅ complete |
+| 4p1 | `s4_round04_enumerate.py` | Construct enumeration + SoDoPE/TemStaPro | ✅ complete |
+| 4p2 | `s4_round04_phase2_bepipred3.py` | BepiPred3 on constructs | ✅ complete |
+| 5 | `s4_round05_3d.py` | OmegaFold 3D prediction (253 constructs, ~6h) | ✅ complete |
+| 6 | `s4_round06_pdb_eval.py` | SASA + Aggrescan3D evaluation | ✅ complete |
+| 7 | `s4_round07_final.py` | Dual-channel ranking (250 → Top 150 + Bottom 100) | ✅ complete |
+| 8 | `s4_round08_af3.py` | AlphaFold3 on Top 10 + Bottom 10 | 📝 written |
+
+**Key design changes from stages2**:
+- **Safety is a veto, not a score**: ToxinPred3/HemoPI2/MHCflurry have hard thresholds in Round 2. Fail any one → eliminated. No weighting, no compensation.
+- **Antioxidant used once**: AnOxPePred only in Round 1 for channel split. Never again in downstream scoring.
+- **SD-driven weights (Round 3 only)**: Base weight = winsorized stddev / total stddev. Manual coefficient α for domain knowledge tuning. Only place in the pipeline where weighted averaging occurs.
+- **DuckDB state**: Uses its own `s4_db.py` (based on stages3's `db.py`) with schema tailored for stages4 rounds.
+
+**Output**: `output4/` — 2.7GB `pipeline.db`, 253 PDBs, final ranking reports, construct-level JSON with full score provenance per round.
+
+**Total runtime (estimated)**: ~8-10h for 19.9M → 250 constructs. Critical path: Round 3 GPU services (~2h), Round 4 enumeration (~1h), Round 5 OmegaFold (~6h).
+
 ## Critical technical lessons
 
 These are hard-won from stages2 production.
@@ -148,6 +180,14 @@ uv run python -m main.stages2.round05_3d           # stages2 round 5
 uv run python -m main.stages3.stage00_preprocess
 uv run python -m main.stages3.stage01_lightweight
 
+# Run stages4 pipeline round
+uv run python -m main.stages4.s4_round01_antioxidant_split
+uv run python -m main.stages4.s4_round05_3d
+uv run python -m main.stages4.s4_round08_af3          # AlphaFold3 refinement
+
+# Open stages4 DuckDB shell (for inspection)
+uv run python -c "import duckdb; duckdb.connect('output4/pipeline.db')"
+
 # Run the old first-pipeline stage
 uv run python -m main.stages.stage01_filter        # first pipeline stage 1
 
@@ -173,7 +213,8 @@ curl http://127.0.0.1:8001/health
 |-----------|--------|-------------|
 | `main/stages/` | **First pipeline** | 7 stages written, 1843 peptide input. `PLAN.md` has the original funnel philosophy. |
 | `main/stages2/` | **Production pipeline (DONE)** | 8 rounds (0-7), 1M peptide input. All rounds completed with results in `output2/`. `output2/REVIEW.md` has full analysis. |
-| `main/stages3/` | **Next-gen pipeline (BUILDING)** | Stage 0 complete (19.9M candidates). Stage 1 code ready. 5 planning docs + as-built doc. |
+| `main/stages3/` | **Next-gen pipeline (PAUSED)** | Stage 0 complete (19.9M candidates). Stage 1 code ready. 5 planning docs + as-built doc. Superseded by stages4. |
+| `main/stages4/` | **Latest pipeline (DONE)** | 8 rounds (0-7) + AF3 round 8. 19.9M → 250 constructs. Results in `output4/`. Hierarchical filtering, safety hard thresholds, SD-driven weights. |
 
 ### Core modules (shared across all pipelines)
 
@@ -183,6 +224,8 @@ curl http://127.0.0.1:8001/health
 | `main/client.py` | Async httpx client. `predict_single()`, `predict_batch()`, `predict_pdb_single()`, `predict_pdb_batch()`, `evaluate_peptides()` for concurrent multi-service eval, `predict_structure_async()` for async job polling, `check_health()` |
 | `main/data_loader.py` | FASTA and CSV parsing functions (`load_scaffold()`, `load_linkers()`, `load_function_peptides()`) |
 | `main/__main__.py` | Entry point (currently raises NotImplementedError — use `python -m main.stages2.roundXX_*` instead) |
+| `main/stages4/s4_db.py` | stages4 DuckDB interface (44K, 30+ tables, checkpoint/resume, schema per round) |
+| `main/stages4/s4_analytics.py` | Variance-aware weighting engine (winsorized stddev → data-driven weights) |
 
 ### Service templates (`tools/template/`)
 
@@ -237,6 +280,8 @@ Each round directory has: README.md (report), run.log, final/ (passed/top candid
 
 `output3/` — stages3 pipeline output. Currently: `pipeline.db` (2.6GB DuckDB with 19.9M candidates), `reports/`, `pdb/`, `logs/`, `final/`.
 
+`output4/` — stages4 pipeline output. `pipeline.db` (2.7GB DuckDB), 253 PDB files (`pdb/`), reports per round (`reports/`), final constructs with full provenance (`final/constructs/`), Top 10/Bottom 10 CSVs (`final/`).
+
 ### Model file management
 
 Models live in `tools/<name>/models/` (`.gitignore`d except small files). Shared cross-service cache at `tools/models/fair-esm/` (ESM-2 checkpoints via `torch.hub`) for pLM4CPPs, BepiPred-3.0, and ESMFold.
@@ -246,6 +291,8 @@ Five sourcing strategies: git-tracked (< 50MB), first-run auto-download (> 10MB)
 ## Data directory
 
 `data/` contains input files: `silk.fasta` (scaffold, ~346 aa), `linker.fasta` (10 linkers), `function.csv` (~25K entries), `function_3.csv` (subset).
+
+Note: stages4 uses 10 linkers (`Flex_GGGGSx1`, `Flex_GGGGSx2` at N/C/Both positions) rather than stages2 design. Scaffold is the same 346aa silk fibroin with His-tag removed (364aa → 346aa in stages4 per `lix_silkworm_LiX_01`).
 
 ## Knowledge base
 
@@ -263,6 +310,7 @@ This project has a persistent memory system at `/home/lenovo/.claude/projects/-h
 
 ## Python environment
 
+- Active branch is `deploy` (not `main`) — all pipeline development happens on `deploy`.
 - Root project uses `uv` with `pyproject.toml`. Virtual env at `./venv`.
 - Each microservice has its own `.venv` under `tools/<name>/.venv`.
 - Never use `pip` or `requirements.txt` — use `uv add` / `uv sync`.
