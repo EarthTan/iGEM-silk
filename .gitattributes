@@ -57,3 +57,6 @@ tools/BepiPred-3.0/repo/** linguist-vendored
 # Generated HTML output (22 MB file skewing language stats)
 tools/BepiPred-3.0/repo/misc/biolib_bepipred3/output_directory/*.html linguist-generated=true
 tools/BepiPred-3.0/repo/test_output/*.html linguist-generated=true
+output4/precompute.db filter=lfs diff=lfs merge=lfs -text
+output4/precompute.db.wal filter=lfs diff=lfs merge=lfs -text
+output4/pipeline.db filter=lfs diff=lfs merge=lfs -text
