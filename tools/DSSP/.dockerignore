@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Test files and temporary files
+test_files/
+test_input/
+test_output/
+*.tmp
+*.log
+test_dssp_body.json
+
+# PDB/mmCIF local test structures
+*.pdb
+*.cif
+*.mmcif
+
+# DSSP / libcifpp large dictionary files
+components.cif
+components.cif.gz
+
+# Editor and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore

@@ -371,6 +371,24 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      
+  dssp:
+    build:
+      context: ..
+      dockerfile: tools/DSSP/Dockerfile
+    image: igem-silk/dssp:latest
+    container_name: dssp
+    ports:
+      - "8103:8103"
+    environment:
+      - PORT=8103
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ===========================================================================
   # Waveflow — Tamarind.bio API 代理 (profile: cpu)
