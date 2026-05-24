@@ -39,7 +39,16 @@
       "bepipred3": 0.147922083735466
     },
     "structure": {
-      "omegafold_plddt": 0.4853520095348358
+      "omegafold_plddt": 0.4853520095348358,
+      "alphafold3": {
+        "success": true,
+        "pdb_path": "alphafold3.cif",
+        "ranking_score": 0.52,
+        "ptm": 0.26,
+        "iptm": null,
+        "fraction_disordered": 0.54,
+        "has_clash": 0.0
+      }
     },
     "pdb_eval": {
       "sasa": 0.7055000066757202,

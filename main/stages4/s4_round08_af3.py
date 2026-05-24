@@ -45,11 +45,23 @@ def get_targets(db: PipelineDB) -> list[dict]:
     """从 final_ranking 表加载 Top N + Bottom N constructs."""
     conn = db.connect()
     rows = conn.execute(f"""
-        SELECT c.construct_id, c.full_sequence, c.channel
-        FROM constructs c
-        JOIN final_ranking fr ON fr.construct_id = c.construct_id
-        ORDER BY fr.channel, fr.rank_in_channel
-        LIMIT {TOTAL}
+        (
+            SELECT c.construct_id, c.full_sequence, c.channel
+            FROM constructs c
+            JOIN final_ranking fr ON fr.construct_id = c.construct_id
+            WHERE fr.channel = 'top'
+            ORDER BY fr.rank_in_channel
+            LIMIT {TOP_N}
+        )
+        UNION ALL
+        (
+            SELECT c.construct_id, c.full_sequence, c.channel
+            FROM constructs c
+            JOIN final_ranking fr ON fr.construct_id = c.construct_id
+            WHERE fr.channel = 'bottom'
+            ORDER BY fr.rank_in_channel
+            LIMIT {BOTTOM_N}
+        )
     """).fetchall()
     return [
         {"construct_id": r[0], "full_sequence": r[1], "channel": r[2]}
@@ -217,9 +229,11 @@ def main():
         # 5. 解析置信度
         confidence = parse_confidence(af3_out, job_name)
         if confidence:
-            log(f"  ranking_score={confidence['ranking_score']:.4f}  "
-                f"ptm={confidence['ptm']:.4f}  "
-                f"iptm={confidence['iptm']:.4f}")
+            def _fmt(v):
+                return f"{v:.4f}" if v is not None else "N/A"
+            log(f"  ranking_score={_fmt(confidence['ranking_score'])}  "
+                f"ptm={_fmt(confidence['ptm'])}  "
+                f"iptm={_fmt(confidence['iptm'])}")
         else:
             log(f"  ⚠ 未找到 summary_confidences.json")
 
