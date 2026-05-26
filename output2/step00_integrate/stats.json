@@ -1,0 +1,27 @@
+{
+  "stage": "step00_integrate",
+  "timestamp": "2026-05-17T15:02:46.295498",
+  "elapsed_sec": 18.1,
+  "input": {
+    "function_1": 24694,
+    "function_2": 1055961,
+    "function_3": 1117
+  },
+  "filtering": {
+    "total_antioxidant": 1058705,
+    "non_standard_aa": 42,
+    "too_short_<3aa": 113,
+    "too_long_>30aa": 1530,
+    "valid_sequences": 1057020,
+    "after_dedup": 1055116
+  },
+  "output": {
+    "path": "/home/lenovo/Projects/iGEM-silk/output2/step00_integrate/final/cleaned.csv",
+    "n_peptides": 1055116,
+    "length_range": [
+      3,
+      30
+    ],
+    "length_mean": 10.79
+  }
+}

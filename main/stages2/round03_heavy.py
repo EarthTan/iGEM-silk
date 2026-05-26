@@ -1,73 +1,85 @@
 """
-Round 3：重服务评分
+Round 3: 重服务评分 — 50K 双通道 (TemStaPro 预筛版)
 
-在 Top 10,000 条候选肽上运行 1-2 个追加重服务：
-  - BepiPred-3.0（B 细胞表位，权重 0.10，反向——高表位=免疫原性风险大，~50 seq/s）
-  - TemStaPro（热稳定性，权重 0.05，正向，可选）
+流程:
+  1. TemStaPro 跑全部 50K (快, ~15min)
+  2. 每个通道取 TemStaPro 前 30% → 15K 候选
+  3. BepiPred-3.0 只跑这 15K (~1h)
+  4. 7 服务加权综合分 → top80 + bottom10
 
-合并 Round 1+2 的全部 5 个服务分数，用 6-7 服务权重重算最终综合分，
-取 Top 80 进入下游枚举和 3D 预测。
+双通道输出:
+  - Top 通道: 在 top25K 的 TemStaPro 前 30% 中按 7 服务综合分取 Top 80
+  - Bottom 通道: 在 bottom25K 的 TemStaPro 前 30% 中安全过滤 + 抗氧化最差 10 条
 
-用法：
+用法:
     uv run python -m main.stages2.round03_heavy
 
-输入：
-    output/round02_scoring/final/top10k.csv
+输入:
+    output2/round02_scoring/final/all_50k.csv
 
-输出：
-    output/round03_heavy/
-    ├── README.md              ← 最终排名报告 + 跨轮轨迹
+输出:
+    output2/round03_heavy/
+    ├── README.md              ← 双通道报告
     ├── run.log
-    ├── scores/                ← BepiPred 等原始返回（JSON）
+    ├── scores/                ← 原始返回 (JSON)
     ├── final/
-    │   ├── top80.csv          ← 最终 Top 80 肽
-    │   ├── all_scored.csv     ← 全部 10K 评分明细
-    │   ├── trajectory.csv     ← 跨轮排名变动（R1→R2→R3）
-    │   └── danger_list.csv    ← 🔴 高危肽最终清单
-    └── stats.json             ← 程序化统计摘要
+    │   ├── all_scored.csv     ← 全 50K 评分明细 (BepiPred3 仅 15K 有值)
+    │   ├── top80.csv          ← Top 通道 Top 80
+    │   ├── bottom10.csv       ← Bottom 通道阴性对照
+    │   ├── trajectory.csv     ← 跨轮排名轨迹 (R1→R2→R3)
+    │   └── danger_list.csv    ← 高危肽清单
+    └── stats.json             ← 统计摘要
 """
 
 from __future__ import annotations
 
 import asyncio
 import csv
-import json
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-OUTPUT_DIR = PROJECT_ROOT / "output"
+from main.client import ServiceClient
+
+from main.stages2.common import (
+    OUTPUT_DIR, calc_safety_flag, describe, log, make_dir,
+    read_csv, select_bottom_n, setup_stage, write_csv, write_json,
+)
+
 STAGE = "round03_heavy"
 STAGE_DIR = OUTPUT_DIR / STAGE
 
-from main.client import ServiceClient
+# ── 批处理参数 ──
+MAX_BATCH_SIZE = 200
+PER_BATCH_TIMEOUT = 300
 
-LOG_FILE: Path | None = None
-MAX_BATCH_SIZE = 200          # 小批次避免单批挂死；BepiPred GPU ~50 seq/s，200条约4s
-CONCURRENT_CHUNKS = 2          # GPU 串行模型（ESM-2），并发高导致排队超时
-PER_BATCH_TIMEOUT = 300       # 每批超时秒数（BepiPred ESM-2 偶尔挂死）
+# ── TemStaPro 预筛比例 ──
+# 每个通道取 TemStaPro 得分最高前 30% 送 BepiPred3
+TEMSTAPRO_TOP_PCT = 0.30
 
-# ── Round 3 新增服务 ──
+# ── Round 3 新增服务配置 ──
+# (服务名, 权重, 是否反向, 描述)
 NEW_SERVICES = [
-    ("bepipred3",   0.10, True, "B 细胞表位（反向——越高越易被免疫系统识别，风险越大）"),
+    ("bepipred3", 0.10, True, "B 细胞表位 (反向)"),
 ]
-
-# TemStaPro 可选 —— 如果服务健康则追加
-TEMSTAPRO_CFG = ("temstapro", 0.05, False, "热稳定性（正向，可选）")
+TEMSTAPRO_CFG = ("temstapro", 0.05, False, "热稳定性 (正向, 可选)")
 
 # ── 全部服务权重 ──
+# 不包含 TemStaPro 时的权重
 BASE_WEIGHTS = {
     "anoxpepred":  0.50,
     "toxinpred3":  0.15,
     "algpred2":    0.10,
     "hemopi2":     0.10,
     "mhcflurry":   0.05,
-    "bepipred3":   0.07,   # Round 3 追加，降低权重给 TemStaPro 预留空间
+    "bepipred3":   0.10,
 }
+# 包含 TemStaPro 时的权重
 WITH_TEMSTAPRO_WEIGHTS = {
     "anoxpepred":  0.45,
     "toxinpred3":  0.13,
@@ -78,96 +90,21 @@ WITH_TEMSTAPRO_WEIGHTS = {
     "temstapro":   0.09,
 }
 
+# 反向服务: 分数越高越差, 需要取 1-score
+REVERSE_SERVICES = {"toxinpred3", "algpred2", "hemopi2", "mhcflurry", "bepipred3"}
+
+# 安全阈值 (用于主排名 caution/danger 标记)
 SAFETY_THRESHOLDS = {
     "toxinpred3": {"caution": 0.60, "danger": 0.80},
     "algpred2":   {"caution": 0.50, "danger": 0.70},
     "hemopi2":    {"caution": 0.70, "danger": 0.85},
+    "bepipred3":  {"caution": 0.60, "danger": 0.80},
 }
 
+# ── 双通道参数 ──
 TOP_N = 80
-ROUND2_INPUT = OUTPUT_DIR / "round02_scoring" / "final" / "top10k.csv"
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# 工具函数
-# ═══════════════════════════════════════════════════════════════════════
-
-def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line)
-    if LOG_FILE:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-
-
-def make_dir(name: str) -> Path:
-    d = STAGE_DIR / name
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def write_json(path: Path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def describe(name: str, values: list[float]) -> str:
-    n = len(values)
-    if n == 0:
-        return f"{name}: 无有效数据"
-    sorted_v = sorted(values)
-    mean = sum(sorted_v) / n
-    median = sorted_v[n // 2] if n % 2 == 1 else (sorted_v[n // 2 - 1] + sorted_v[n // 2]) / 2
-    variance = sum((x - mean) ** 2 for x in sorted_v) / n
-    std = variance ** 0.5
-    p5 = sorted_v[int(n * 0.05)]
-    p25 = sorted_v[int(n * 0.25)]
-    p75 = sorted_v[int(n * 0.75)]
-    p95 = sorted_v[int(n * 0.95)]
-    lines = [
-        f"{name} 分布 (n={n}):",
-        f"  均值:   {mean:.4f}",
-        f"  中位数: {median:.4f}",
-        f"  标准差: {std:.4f}",
-        f"  最小值: {sorted_v[0]:.4f}",
-        f"  最大值: {sorted_v[-1]:.4f}",
-        f"  P5: {p5:.4f}  |  P25: {p25:.4f}  |  P75: {p75:.4f}  |  P95: {p95:.4f}",
-        "",
-        "  分布直方图:",
-    ]
-    vmin = sorted_v[0]
-    vmax = sorted_v[-1]
-    if vmax - vmin < 0.001:
-        lines.append(f"  所有值 ≈ {vmin:.4f}，无分布")
-        return "\n".join(lines)
-    raw_bins = 8
-    bin_width = (vmax - vmin) / raw_bins
-    bins = [vmin + bin_width * i for i in range(raw_bins + 1)]
-    for i in range(len(bins) - 1):
-        lo = bins[i]
-        hi = bins[i + 1]
-        count = sum(1 for v in values if lo <= v < hi)
-        pct = count / n * 100
-        filled = round(count / n * 14)
-        bar = "█" * filled + "░" * (14 - filled)
-        marker = "  ← 均值" if lo <= mean < hi else ""
-        lines.append(f"  {lo:.4f}-{hi:.4f}: {bar}  ({count:,} 条, {pct:.1f}%){marker}")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def calc_safety_flag(peptide: dict) -> str:
-    flags = []
-    for svc_name, cfg in SAFETY_THRESHOLDS.items():
-        score = peptide.get(svc_name)
-        if score is None:
-            continue
-        if score >= cfg["danger"]:
-            flags.append(f"{svc_name}:danger({score:.3f})")
-        elif score >= cfg["caution"]:
-            flags.append(f"{svc_name}:caution({score:.3f})")
-    return ";".join(flags) if flags else "safe"
+BOTTOM_N = 10
+ROUND2_INPUT = OUTPUT_DIR / "round02_scoring" / "final" / "all_50k.csv"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -179,7 +116,8 @@ async def process_service(
     service_name: str,
     chunks: list[list[dict]],
 ) -> dict[str, dict]:
-    sem = asyncio.Semaphore(CONCURRENT_CHUNKS)
+    """对一个服务并发跑所有批次, 返回 {peptide_id: {score, label}}。"""
+    sem = asyncio.Semaphore(2)
     all_results: dict[str, dict] = {}
     errors = 0
     total = sum(len(c) for c in chunks)
@@ -190,38 +128,81 @@ async def process_service(
             try:
                 result = await asyncio.wait_for(
                     client.predict_batch(service_name, chunk),
-                    timeout=PER_BATCH_TIMEOUT
+                    timeout=PER_BATCH_TIMEOUT,
                 )
+                if result.get("success") and result.get("results"):
+                    for r in result["results"]:
+                        pid = r.get("peptide_id", "unknown")
+                        all_results[pid] = {"score": r.get("score"), "label": r.get("label", "")}
+                else:
+                    errors += 1
+                    for item in chunk:
+                        all_results[item.get("peptide_id", "unknown")] = {
+                            "score": None, "label": "SERVICE_ERROR"
+                        }
             except asyncio.TimeoutError:
-                result = None
-            if result is None:
                 errors += 1
                 for item in chunk:
-                    pid = item.get("peptide_id", "unknown")
-                    all_results[pid] = {"score": None, "label": "TIMEOUT"}
-            elif result.get("success") and result.get("results"):
-                for r in result["results"]:
-                    pid = r.get("peptide_id", "unknown")
-                    all_results[pid] = {
-                        "score": r.get("score"),
-                        "label": r.get("label", ""),
+                    all_results[item.get("peptide_id", "unknown")] = {
+                        "score": None, "label": "TIMEOUT"
                     }
-            else:
+            except Exception as e:
                 errors += 1
                 for item in chunk:
-                    pid = item.get("peptide_id", "unknown")
-                    all_results[pid] = {"score": None, "label": "SERVICE_ERROR"}
+                    all_results[item.get("peptide_id", "unknown")] = {
+                        "score": None, "label": f"ERROR:{str(e)[:60]}"
+                    }
 
     tasks = [process_chunk(chunk) for chunk in chunks]
     batch_size = 50
     for i in range(0, len(tasks), batch_size):
         batch = tasks[i:i + batch_size]
-        await asyncio.gather(*batch)
+        await asyncio.gather(*batch, return_exceptions=True)
         progress = min((i + batch_size) * MAX_BATCH_SIZE, total)
         log(f"  {service_name}: {progress:,}/{total:,} ({progress/total*100:.0f}%) | errors={errors}")
 
-    log(f"  ✅ {service_name}: {total:,} 完成, {errors} 批次错误")
+    log(f"  [{service_name}] {total:,} 完成, {errors} 批次错误")
     return all_results
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 加权综合分计算
+# ═══════════════════════════════════════════════════════════════════════
+
+def compute_r3_score(
+    peptide: dict,
+    all_weights: dict[str, float],
+    new_results: dict[str, dict[str, dict]],
+) -> tuple[float | None, list[str]]:
+    """计算 Round 3 加权综合分。
+
+    正向服务: score 直接 clamp(0,1)
+    反向服务: 1 - clamp(score, 0, 1)
+    综合分 = sum(normalized_i * weight_i) / sum(weight_i)
+    """
+    weighted_sum = 0.0
+    total_weight = 0.0
+    missing = []
+
+    for svc_name, weight in all_weights.items():
+        reverse = svc_name in REVERSE_SERVICES
+        # 新服务的分优先取自 new_results, 已有服务的分从 CSV 读
+        if svc_name in new_results:
+            svc_data = new_results[svc_name].get(peptide["peptide_id"], {})
+            raw_score = svc_data.get("score")
+        else:
+            raw_score = peptide.get(svc_name)
+        if raw_score is None:
+            missing.append(svc_name)
+            continue
+        normalized = max(0.0, min(1.0, raw_score))
+        if reverse:
+            normalized = 1.0 - normalized
+        weighted_sum += normalized * weight
+        total_weight += weight
+
+    score = round(weighted_sum / total_weight, 4) if total_weight > 0 else None
+    return score, missing
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -229,311 +210,385 @@ async def process_service(
 # ═══════════════════════════════════════════════════════════════════════
 
 async def run():
-    global LOG_FILE
     start_time = time.time()
-
-    STAGE_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_FILE = STAGE_DIR / "run.log"
+    setup_stage(STAGE)
     log("=" * 60)
-    log("Round 3：重服务评分 — BepiPred-3.0 (+ TemStaPro 可选)")
+    log("Round 3: 重服务评分 — 50K 双通道 (TemStaPro 预筛版)")
+    log("  顺序: TemStaPro 全部 50K → 各通道取 TemStaPro 前 30% → BepiPred3 候选子集")
     log("=" * 60)
 
-    # ── 加载 Round 2 Top 10K ──
+    # ══════════════════════════════════════════════════════════════════
+    # 加载 Round 2 全部 50K
+    # ══════════════════════════════════════════════════════════════════
     if not ROUND2_INPUT.exists():
         log(f"输入不存在: {ROUND2_INPUT}")
         log("请先运行: uv run python -m main.stages2.round02_scoring")
         return
 
-    peptides: list[dict] = []
-    with open(ROUND2_INPUT, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for k in ("anoxpepred", "toxinpred3", "algpred2", "hemopi2", "mhcflurry"):
-                row[k] = float(row[k]) if row.get(k) else None
-            row["weighted_score"] = float(row["weighted_score"]) if row.get("weighted_score") else None
-            row["length"] = int(row["length"])
-            peptides.append(row)
+    all_peptides = read_csv(ROUND2_INPUT)
+    for p in all_peptides:
+        for k in ("anoxpepred", "toxinpred3", "algpred2", "hemopi2", "mhcflurry"):
+            p[k] = float(p[k]) if p.get(k) else None
+        p["weighted_score"] = float(p["weighted_score"]) if p.get("weighted_score") else None
+        p["length"] = int(p["length"])
 
-    total = len(peptides)
-    log(f"\n输入: {total:,} 条 (Round 2 Top 10K)")
+    # ── 按 channel 分离 ──
+    top_peptides = [p for p in all_peptides if p.get("channel") == "top"]
+    bottom_peptides = [p for p in all_peptides if p.get("channel") == "bottom"]
+    log(f"\n输入: {len(all_peptides):,} 条")
+    log(f"  Top 通道:    {len(top_peptides):,} 条 (anoxpepred 前 25K)")
+    log(f"  Bottom 通道: {len(bottom_peptides):,} 条 (anoxpepred 后 25K)")
 
-    # ── 抗氧化性门槛 ──
-    ANOX_THRESHOLD = 0.50
-    before = len(peptides)
-    peptides = [p for p in peptides if p.get("anoxpepred") is not None and p["anoxpepred"] > ANOX_THRESHOLD]
-    after = len(peptides)
-    log(f"抗氧化性门槛: anoxpepred > {ANOX_THRESHOLD} — {before:,} → {after:,} 条 (过滤 {before-after:,})")
-    total = after
-    if total == 0:
-        log("无肽通过抗氧化性门槛，终止")
+    if not top_peptides:
+        log("Top 通道无数据, 终止")
         return
+    if not bottom_peptides:
+        log("Bottom 通道无数据, 只执行 Top 通道")
 
-    # ── 分块 ──
-    chunks: list[list[dict]] = []
-    for i in range(0, total, MAX_BATCH_SIZE):
-        chunk = peptides[i:i + MAX_BATCH_SIZE]
+    # ── 分块 (全部 50K 统一送评, 减少 HTTP 开销) ──
+    chunks = []
+    for i in range(0, len(all_peptides), MAX_BATCH_SIZE):
+        chunk = all_peptides[i:i + MAX_BATCH_SIZE]
         chunks.append([{"sequence": p["sequence"], "peptide_id": p["peptide_id"]} for p in chunk])
-    log(f"分块: {len(chunks)} 批 (≤{MAX_BATCH_SIZE}/批)")
+    log(f"分块: {len(chunks)} 批 (<= {MAX_BATCH_SIZE}/批)")
 
-    # ── 客户端 + 检查 TemStaPro ──
-    client = ServiceClient(timeout=300.0)
+    # ══════════════════════════════════════════════════════════════════
+    # 检查和启动服务 (直接用 stages3 async 接口)
+    # ══════════════════════════════════════════════════════════════════
+    from main.stages3.docker_utils import start_services, wait_for_services
 
-    # 检查 TemStaPro 是否可用
+    log("检查服务: bepipred3")
+
+    # BepiPred3 (GPU service)
+    start_services(["gpu"], ["bepipred3"])
+    bepi_health = await wait_for_services(["bepipred3"], timeout=180.0)
+    bepi_ok = bepi_health.get("bepipred3", {}).get("available", False)
+    if not bepi_ok:
+        log("BepiPred-3.0 不可用, 终止")
+        return
+    log("BepiPred-3.0 就绪")
+
+    # TemStaPro (optional GPU service)
     temstapro_available = False
-    try:
-        health = await client.check_health(["temstapro"])
-        h = health.get("temstapro", {})
-        if h.get("status") == "healthy" and h.get("available", False):
-            temstapro_available = True
-            log(f"\nTemStaPro 可用 ✅ 将参与评分")
-        else:
-            log(f"\nTemStaPro 不可用 (status={h.get('status')})，跳过")
-    except Exception as e:
-        log(f"\nTemStaPro 不可用 ({e})，跳过")
+    log("检查服务: temstapro (可选)")
+    start_services(["gpu"], ["temstapro"])
+    ts_health = await wait_for_services(["temstapro"], timeout=60.0)
+    temstapro_available = ts_health.get("temstapro", {}).get("available", False)
+    log(f"TemStaPro: {'可用' if temstapro_available else '不可用, 跳过'}")
 
     # 确定服务列表和权重
     round3_services = list(NEW_SERVICES)
-    all_services_list = list(BASE_WEIGHTS.keys())
     if temstapro_available:
         round3_services.append(TEMSTAPRO_CFG)
         all_weights = dict(WITH_TEMSTAPRO_WEIGHTS)
-        all_services_list = list(WITH_TEMSTAPRO_WEIGHTS.keys())
     else:
         all_weights = dict(BASE_WEIGHTS)
-        all_services_list = list(BASE_WEIGHTS.keys())
+    all_services_list = list(all_weights.keys())
+    log(f"服务: {len(all_services_list)} 个 — {', '.join(all_services_list)}")
 
     # ══════════════════════════════════════════════════════════════════
-    # 并发调用新增服务
+    # 第 1 步: TemStaPro 跑全部 50K (快)
     # ══════════════════════════════════════════════════════════════════
-    svc_names = [s[0] for s in round3_services]
-    log(f"\n新服务: {', '.join(svc_names)} ({len(chunks)} 批)")
+    client = ServiceClient(timeout=300.0)
+    new_results: dict[str, dict[str, dict]] = {}
 
-    async def run_one(svc_name: str, weight: float, reverse: bool, desc: str):
-        log(f"\n{svc_name} ({desc})")
+    # TemStaPro 始终是第一个 (如果可用)
+    first_service = TEMSTAPRO_CFG if temstapro_available else None
+    if first_service:
+        svc_name, weight, reverse, desc = first_service
+        log(f"\n--- {svc_name} ({desc}) — 全部 50K ---")
         t0 = time.time()
         results = await process_service(client, svc_name, chunks)
         elapsed = time.time() - t0
         n_valid = sum(1 for v in results.values() if v["score"] is not None)
         rate = n_valid / elapsed if elapsed > 0 else 0
-        log(f"  {svc_name}: {elapsed:.0f}s, {n_valid}/{len(results)} 有效 ({rate:.0f} seq/s)")
-        return svc_name, results, weight, reverse
+        log(f"[{svc_name}] {elapsed:.0f}s, {n_valid}/{len(results)} 有效 ({rate:.0f} seq/s)")
+        new_results[svc_name] = results
 
-    tasks = [run_one(svc, w, r, d) for svc, w, r, d in round3_services]
-    completed = await asyncio.gather(*tasks)
-    new_results: dict[str, dict[str, dict]] = {svc: res for svc, res, _, _ in completed}
+    # ══════════════════════════════════════════════════════════════════
+    # 第 2 步: 预筛选 — 每个通道取 TemStaPro 前 30%
+    # ══════════════════════════════════════════════════════════════════
+    ts_key = "temstapro"
+    if temstapro_available and ts_key in new_results:
+        ts_scores = new_results[ts_key]
+        top_with_ts = [(p, ts_scores.get(p["peptide_id"], {}).get("score", 0) or 0)
+                       for p in top_peptides]
+        top_with_ts.sort(key=lambda x: x[1], reverse=True)
+        top_subset = [p for p, _ in top_with_ts[:max(1, int(len(top_with_ts) * TEMSTAPRO_TOP_PCT))]]
+        log(f"  Top 通道 TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}%: {len(top_subset):,}/{len(top_peptides):,}")
+
+        bottom_with_ts = [(p, ts_scores.get(p["peptide_id"], {}).get("score", 0) or 0)
+                          for p in bottom_peptides]
+        bottom_with_ts.sort(key=lambda x: x[1], reverse=True)
+        bottom_subset = [p for p, _ in bottom_with_ts[:max(1, int(len(bottom_with_ts) * TEMSTAPRO_TOP_PCT))]]
+        log(f"  Bottom 通道 TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}%: {len(bottom_subset):,}/{len(bottom_peptides):,}")
+
+        bepi_candidate_ids = {p["peptide_id"] for p in top_subset} | {p["peptide_id"] for p in bottom_subset}
+        log(f"  BepiPred3 候选总数: {len(bepi_candidate_ids):,}")
+    else:
+        # TemStaPro 不可用时, 全部送 BepiPred3 (原始逻辑)
+        bepi_candidate_ids = {p["peptide_id"] for p in all_peptides}
+        top_subset = list(top_peptides)
+        bottom_subset = list(bottom_peptides)
+        log("  TemStaPro 不可用 → BepiPred3 跑全部 50K")
+
+    # ── 为 BepiPred3 构建子集块 ──
+    bepi_candidates = [p for p in all_peptides if p["peptide_id"] in bepi_candidate_ids]
+    bepi_chunks = []
+    for i in range(0, len(bepi_candidates), MAX_BATCH_SIZE):
+        chunk = bepi_candidates[i:i + MAX_BATCH_SIZE]
+        bepi_chunks.append([{"sequence": p["sequence"], "peptide_id": p["peptide_id"]} for p in chunk])
+    log(f"  BepiPred3 分块: {len(bepi_chunks)} 批 (候选 {len(bepi_candidates):,})")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 第 3 步: BepiPred3 跑候选子集
+    # ══════════════════════════════════════════════════════════════════
+    second_service = ("bepipred3", 0.10, True, "B 细胞表位 (反向)")
+    svc_name, weight, reverse, desc = second_service
+    log(f"\n--- {svc_name} ({desc}) — {len(bepi_candidates):,} 候选 ---")
+    t0 = time.time()
+    results = await process_service(client, svc_name, bepi_chunks)
+    elapsed = time.time() - t0
+    n_valid = sum(1 for v in results.values() if v["score"] is not None)
+    rate = n_valid / elapsed if elapsed > 0 else 0
+    log(f"[{svc_name}] {elapsed:.0f}s, {n_valid}/{len(results)} 有效 ({rate:.0f} seq/s)")
+    new_results[svc_name] = results
 
     await client.close()
 
     # ── 保存原始返回 ──
-    scores_dir = make_dir("scores")
+    scores_dir = make_dir(STAGE_DIR, "scores")
     for svc_name in new_results:
         write_json(scores_dir / f"{svc_name}_results.json", new_results[svc_name])
 
     # ══════════════════════════════════════════════════════════════════
-    # 重算最终综合分
+    # 重算综合分 (全部 50K)
     # ══════════════════════════════════════════════════════════════════
-    log(f"\n重算最终综合分 ({len(all_services_list)} 服务)...")
+    log(f"\n重算综合分 ({len(all_services_list)} 服务)...")
 
-    reverse_services = {"toxinpred3", "algpred2", "hemopi2", "mhcflurry", "bepipred3"}
-
-    scored_peptides: list[dict] = []
-    for pep in peptides:
+    scored_all = []
+    for pep in all_peptides:
         pid = pep["peptide_id"]
-        row = {k: pep.get(k) for k in ("peptide_id", "sequence", "length", "source",
-                                         "anoxpepred", "toxinpred3", "algpred2",
-                                         "hemopi2", "mhcflurry", "weighted_score")}
+        row = dict(pep)
+        for svc_name in new_results:
+            svc_data = new_results[svc_name].get(pid, {})
+            row[svc_name] = svc_data.get("score")
+        score, missing = compute_r3_score(pep, all_weights, new_results)
+        row["r3_weighted_score"] = score
+        if missing:
+            row["missing_services"] = ";".join(missing)
+        row["safety_flag"] = calc_safety_flag(row, SAFETY_THRESHOLDS)
+        scored_all.append(row)
 
-        weighted_sum = 0.0
-        total_weight = 0.0
-        missing_svc = []
+    n_valid = sum(1 for p in scored_all if p["r3_weighted_score"] is not None)
+    log(f"  完成: {n_valid:,}/{len(scored_all):,} 有效评分")
 
-        for svc_name in all_services_list:
-            weight = all_weights[svc_name]
-            reverse = svc_name in reverse_services
+    # ══════════════════════════════════════════════════════════════════
+    # Top 通道: 在有 BepiPred3 评分的候选池中按 7 服务综合分取前 80
+    # ══════════════════════════════════════════════════════════════════
+    top_candidate_ids = {p["peptide_id"] for p in top_subset}
+    scored_top = [p for p in scored_all
+                  if p.get("channel") == "top" and p["peptide_id"] in top_candidate_ids]
+    scored_top.sort(key=lambda x: (x["r3_weighted_score"] or 0), reverse=True)
+    n_top = min(TOP_N, len(scored_top))
+    top80 = scored_top[:n_top]
 
-            # 取分数
-            if svc_name in new_results:
-                svc_data = new_results[svc_name].get(pid, {})
-                raw_score = svc_data.get("score")
-                row[svc_name] = raw_score
-            else:
-                raw_score = pep.get(svc_name)
+    top_min_score = top80[-1]["r3_weighted_score"] if top80 else None
+    log(f"\nTop 通道: {len(scored_top):,} → Top {n_top}")
+    if top80:
+        log(f"  Top 1:  {top80[0]['peptide_id']}  score={top80[0]['r3_weighted_score']:.4f}")
+        log(f"  Top {n_top}: {top80[-1]['peptide_id']}  score={top_min_score:.4f}")
 
-            if raw_score is None:
-                missing_svc.append(svc_name)
-                continue
+    # ══════════════════════════════════════════════════════════════════
+    # Bottom 通道: 在有 BepiPred3 评分的候选池中安全过滤 → 抗氧化最差
+    # ══════════════════════════════════════════════════════════════════
+    bottom_candidate_ids = {p["peptide_id"] for p in bottom_subset}
+    scored_bottom = [p for p in scored_all
+                     if p.get("channel") == "bottom" and p["peptide_id"] in bottom_candidate_ids]
+    bottom10 = select_bottom_n(scored_bottom, n=BOTTOM_N, score_key="anoxpepred")
+    log(f"\nBottom 通道: {len(scored_bottom):,} → Bottom {len(bottom10)}")
+    for i, p in enumerate(bottom10, 1):
+        log(f"  #{i:2d} {p['peptide_id']:12s} | AnOxPePred={p.get('anoxpepred', 0):.4f}")
 
-            normalized = max(0.0, min(1.0, raw_score))
-            row[f"{svc_name}_raw_norm"] = round(normalized, 4)
-            if reverse:
-                normalized = 1.0 - normalized
-            weighted_sum += normalized * weight
-            total_weight += weight
+    # ══════════════════════════════════════════════════════════════════
+    # 输出 CSV
+    # ══════════════════════════════════════════════════════════════════
+    final_dir = make_dir(STAGE_DIR, "final")
 
-        if missing_svc:
-            row["missing_services"] = ";".join(missing_svc)
+    base_fields = [
+        "peptide_id", "sequence", "length", "source", "channel",
+        "anoxpepred", "toxinpred3", "algpred2", "hemopi2", "mhcflurry",
+    ]
+    r3_fields = list(new_results.keys())
+    score_fields = ["r3_weighted_score", "weighted_score", "safety_flag"]
+    fieldnames = base_fields + r3_fields + score_fields
 
-        row["weighted_score"] = round(weighted_sum / total_weight, 4) if total_weight > 0 else None
-        row["safety_flag"] = calc_safety_flag(row)
-        scored_peptides.append(row)
-
-    n_valid = sum(1 for p in scored_peptides if p["weighted_score"] is not None)
-    log(f"  完成: {n_valid:,}/{len(scored_peptides):,} 有效评分")
-
-    # ── 排序 + 输出 ──
-    log(f"\n排序...")
-    scored_peptides.sort(key=lambda x: (x["weighted_score"] or 0), reverse=True)
-
-    final_dir = make_dir("final")
-    fieldnames = ["peptide_id", "sequence", "length", "source",
-                  "anoxpepred", "toxinpred3", "algpred2", "hemopi2", "mhcflurry",
-                  "bepipred3", "temstapro", "weighted_score", "safety_flag"] if temstapro_available else \
-                 ["peptide_id", "sequence", "length", "source",
-                  "anoxpepred", "toxinpred3", "algpred2", "hemopi2", "mhcflurry",
-                  "bepipred3", "weighted_score", "safety_flag"]
-
-    # 全部
     all_path = final_dir / "all_scored.csv"
-    with open(all_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(scored_peptides)
+    write_csv(all_path, fieldnames, scored_all)
+    log(f"\n全量:      {all_path} ({len(scored_all):,})")
 
-    # Top N
-    n_top = min(TOP_N, len(scored_peptides))
-    top_peptides = scored_peptides[:n_top]
     top_path = final_dir / "top80.csv"
-    with open(top_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(top_peptides)
-    log(f"Top {n_top:,}: {top_path}")
+    write_csv(top_path, fieldnames, top80)
+    log(f"Top {n_top}:  {top_path}")
 
-    # 高危
-    danger_list = [p for p in scored_peptides if "danger" in p.get("safety_flag", "")]
+    bottom_path = final_dir / "bottom10.csv"
+    write_csv(bottom_path, fieldnames, bottom10)
+    log(f"Bottom {len(bottom10)}: {bottom_path}")
+
+    danger_list = [p for p in scored_all if "danger" in p.get("safety_flag", "")]
     danger_path = final_dir / "danger_list.csv"
-    with open(danger_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(danger_list)
-    log(f"高危清单: {danger_path} ({len(danger_list)} 条)")
+    write_csv(danger_path, fieldnames, danger_list)
+    log(f"高危:      {danger_path} ({len(danger_list)} 条)")
 
     # ══════════════════════════════════════════════════════════════════
-    # 跨轮排名轨迹
+    # 跨轮排名轨迹 (Top 80)
     # ══════════════════════════════════════════════════════════════════
-    log(f"\n计算跨轮排名轨迹...")
-    # 读取 Round 1 和 Round 2 的排名
+    log(f"\n计算跨轮排名轨迹 (Top 80)...")
+
+    # R1 排名: 在 1M 全量中的位置
     r1_rank: dict[str, int] = {}
-    r1_path = OUTPUT_DIR / "round01_lightweight" / "final" / "top100k.csv"
+    r1_path = OUTPUT_DIR / "round01_lightweight" / "final" / "all_scored.csv"
+    top80_ids = {p["peptide_id"] for p in top80}
     if r1_path.exists():
         with open(r1_path, newline="", encoding="utf-8") as f:
             for i, row in enumerate(csv.DictReader(f)):
-                r1_rank[row["peptide_id"]] = i + 1  # 1-based
+                if row["peptide_id"] in top80_ids:
+                    r1_rank[row["peptide_id"]] = i + 1
 
+    # R2 排名: 在 top25K 中的位置 (按 5 服务综合分排序)
     r2_rank: dict[str, int] = {}
-    r2_path = OUTPUT_DIR / "round02_scoring" / "final" / "all_scored.csv"
+    r2_path = OUTPUT_DIR / "round02_scoring" / "final" / "top25k.csv"
     if r2_path.exists():
         with open(r2_path, newline="", encoding="utf-8") as f:
             for i, row in enumerate(csv.DictReader(f)):
                 r2_rank[row["peptide_id"]] = i + 1
 
     trajectory = []
-    for p in scored_peptides:
+    for i, p in enumerate(top80):
         pid = p["peptide_id"]
-        r3 = p.get("weighted_score")
-        if r3 is None:
+        score = p.get("r3_weighted_score")
+        if score is None:
             continue
         trajectory.append({
             "peptide_id": pid,
             "sequence": p["sequence"],
-            "rank_r1": r1_rank.get(pid, None),
-            "rank_r2": r2_rank.get(pid, None),
-            "rank_r3": None,  # will fill below
-            "score_r1": None,  # will fill below
-            "score_r2": p.get("anoxpepred"),  # 近似用已有数据
-            "score_r3": round(r3, 4),
+            "rank_r1": r1_rank.get(pid),
+            "rank_r2": r2_rank.get(pid),
+            "rank_r3": i + 1,
+            "score_r3": round(score, 4),
+            "channel": "top",
         })
 
-    # 填 R3 排名
-    for i, t in enumerate(trajectory):
-        t["rank_r3"] = i + 1
-
     traj_path = final_dir / "trajectory.csv"
-    traj_fields = ["peptide_id", "sequence", "rank_r1", "rank_r2", "rank_r3",
-                   "score_r2", "score_r3"]
-    with open(traj_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=traj_fields, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(trajectory)
+    traj_fields = ["peptide_id", "sequence", "rank_r1", "rank_r2", "rank_r3", "score_r3", "channel"]
+    write_csv(traj_path, traj_fields, trajectory)
     log(f"轨迹: {traj_path} ({len(trajectory)} 条)")
 
     # ══════════════════════════════════════════════════════════════════
     # 统计报告
     # ══════════════════════════════════════════════════════════════════
     total_elapsed = time.time() - start_time
-    valid_scores = [p["weighted_score"] for p in scored_peptides if p["weighted_score"] is not None]
 
-    all_reports = [describe("综合分", valid_scores)]
-    for svc_name in all_services_list:
-        vals = [p[svc_name] for p in scored_peptides if p.get(svc_name) is not None]
+    all_reports = []
+    for svc_name in all_services_list + ["r3_weighted_score"]:
+        vals = [p[svc_name] for p in scored_all if p.get(svc_name) is not None]
         if vals:
             all_reports.append(describe(svc_name, vals))
     full_distro = "\n".join(all_reports)
 
-    n_safe = sum(1 for p in scored_peptides if p.get("safety_flag") == "safe")
-    n_caution = sum(1 for p in scored_peptides if "caution" in p.get("safety_flag", ""))
+    n_safe = sum(1 for p in scored_all if p.get("safety_flag") == "safe")
+    n_caution = sum(1 for p in scored_all if "caution" in p.get("safety_flag", ""))
     n_danger = len(danger_list)
-    n_missing = sum(1 for p in scored_peptides if p.get("missing_services"))
+    n_missing = sum(1 for p in scored_all if p.get("missing_services"))
 
-    top10_lines = [f"| {p['peptide_id']} | {p['sequence'][:25]:25s} | {p['length']} | {p['weighted_score']:.4f} | {p.get('safety_flag','safe')} |"
-                   for p in scored_peptides[:10]]
-    bottom_valid = [p for p in scored_peptides if p["weighted_score"] is not None]
-    bottom10_lines = [f"| {p['peptide_id']} | {p['sequence'][:25]:25s} | {p['length']} | {p['weighted_score']:.4f} | {p.get('safety_flag','safe')} |"
-                      for p in reversed(bottom_valid[-10:])]
+    # Top 10
+    top10_lines = "\n".join(
+        f"| {p['peptide_id']} | {p['sequence'][:25]:25s} | {p['length']} | "
+        f"{p['r3_weighted_score']:.4f} | {p.get('safety_flag','safe')} |"
+        for p in top80[:10]
+    )
 
-    # 排名变化最大的 Top/Bottom 10
-    traj_with_change = [t for t in trajectory if t["rank_r1"] is not None and t["rank_r2"] is not None]
-    traj_with_change.sort(key=lambda t: (t["rank_r3"] or 999) - t["rank_r1"])
-    top_rise = traj_with_change[:10]   # 上升最多
-    top_fall = traj_with_change[-10:]  # 下降最多
-    top_rise.reverse()  # 上升最多的排前面
+    # Bottom 10 详情
+    bottom_info_lines = ""
+    if bottom10:
+        bottom_info_lines = "\n".join(
+            f"| {i+1} | {p['peptide_id']} | {p['sequence'][:20]:20s} | "
+            f"{p.get('anoxpepred', 0):.4f} | {p.get('toxinpred3', 'N/A')} | "
+            f"{p.get('hemopi2', 'N/A')} | {p.get('algpred2', 'N/A')} |"
+            for i, p in enumerate(bottom10)
+        )
 
-    rise_lines = [f"| {t['peptide_id']} | R1:{t['rank_r1']} → R2:{t['rank_r2']} → R3:{t['rank_r3']} | {t['score_r3']:.4f} |"
-                  for t in top_rise]
-    fall_lines = [f"| {t['peptide_id']} | R1:{t['rank_r1']} → R2:{t['rank_r2']} → R3:{t['rank_r3']} | {t['score_r3']:.4f} |"
-                  for t in top_fall]
+    # 排名上升/下降 Top 10
+    traj_with_change = [t for t in trajectory if t["rank_r1"] is not None]
+    traj_with_change.sort(key=lambda t: (t.get("rank_r3", 999) or 999) - (t.get("rank_r1", 999) or 999))
+    top_rise = traj_with_change[:10][::-1] if traj_with_change else []
+    top_fall = traj_with_change[-10:] if len(traj_with_change) >= 10 else traj_with_change
+
+    rise_lines = "\n".join(
+        f"| {t['peptide_id']} | R1:{t['rank_r1']} -> R2:{t['rank_r2']} -> R3:{t['rank_r3']} | {t['score_r3']:.4f} |"
+        for t in top_rise
+    ) if top_rise else "无数据"
+
+    fall_lines = "\n".join(
+        f"| {t['peptide_id']} | R1:{t['rank_r1']} -> R2:{t['rank_r2']} -> R3:{t['rank_r3']} | {t['score_r3']:.4f} |"
+        for t in reversed(top_fall)
+    ) if top_fall else "无数据"
 
     stats = {
-        "stage": STAGE,
-        "timestamp": datetime.now().isoformat(),
+        "stage": STAGE, "timestamp": datetime.now().isoformat(),
         "elapsed_sec": round(total_elapsed, 1),
-        "input": total,
-        "services": list(all_weights.keys()),
-        "weights": all_weights,
+        "input": len(all_peptides),
+        "top_channel": len(top_peptides), "bottom_channel": len(bottom_peptides),
+        "services": list(all_weights.keys()), "weights": all_weights,
         "temstapro_used": temstapro_available,
-        "scoring": {"n_valid": len(valid_scores),
-                     "mean": round(sum(valid_scores)/len(valid_scores), 4) if valid_scores else None,
-                     "top_n": n_top},
+        "temstapro_prefilter_pct": TEMSTAPRO_TOP_PCT,
+        "bepipred3_candidates": len(bepi_candidate_ids),
+        "top_n": n_top, "bottom_n": len(bottom10),
+        "scoring": {
+            "n_valid": len([p for p in scored_all if p["r3_weighted_score"] is not None]),
+        },
         "safety": {"safe": n_safe, "caution": n_caution, "danger": n_danger, "missing": n_missing},
     }
     write_json(STAGE_DIR / "stats.json", stats)
 
     # ── README ──
-    readme = f"""# Round 3：重服务评分 — 报告
+    readme = f"""# Round 3: 重服务评分 — 50K 双通道 (TemStaPro 预筛版)
 
 **时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **耗时**: {total_elapsed:.0f} 秒
-**输入**: {total:,} 条肽（Round 2 Top 10K）
+**输入**: {len(all_peptides):,} 条肽 (top25K + bottom25K)
+**输出目录**: output2/
 
-## 评分服务（{len(all_services_list)} 服务）
+## 评分服务 ({len(all_services_list)} 个)
 
-| 服务 | 权重 | 方向 | 有效 |
-|------|------|------|------|
-{"".join(f"| {svc} | {all_weights[svc]:.2f} | {'正向' if svc not in reverse_services else '反向'} | {sum(1 for p in scored_peptides if p.get(svc) is not None):,} |\\n" for svc in all_services_list).strip()}
+| 服务 | 权重 | 方向 |
+|------|------|------|
+{"".join(f"| {svc} | {all_weights[svc]:.2f} | {'正向' if svc not in REVERSE_SERVICES else '反向'} |\\n" for svc in all_services_list)}
 
-**TemStaPro**: {"已使用 ✅" if temstapro_available else "未就绪，跳过"}
+**TemStaPro**: {'已使用 (预筛+BepiPred3 候选缩减)' if temstapro_available else '未就绪, 跳过'}
 
-## 综合分分布
+## TemStaPro 预筛
+
+为了提高效率, TemStaPro 先跑全部 50K, 然后每个通道取 TemStaPro 得分前 {TEMSTAPRO_TOP_PCT*100:.0f}%:
+- Top 通道: {len(top_peptides):,} → TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% → {len(top_subset):,} 送 BepiPred3
+- Bottom 通道: {len(bottom_peptides):,} → TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% → {len(bottom_subset):,} 送 BepiPred3
+- BepiPred3 总候选: {len(bepi_candidate_ids):,}
+
+## 双通道设计
+
+| 通道 | TemStaPro 预筛来源 | 最终筛选逻辑 | 输出 |
+|------|--------------------|-------------|------|
+| Top | top25K → TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% ({len(top_subset):,}) | 按 7 服务综合分排序取前 {n_top} | top80.csv |
+| Bottom | bottom25K → TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% ({len(bottom_subset):,}) | 安全维度正常 -> anoxpepred 升序取 {len(bottom10)} | bottom10.csv |
+
+Bottom 通道安全阈值:
+- ToxinPred3 < 0.60
+- AlgPred2 < 0.50
+- HemoPI2 < 0.70
+- MHCflurry < 0.50
+- BepiPred3 < 0.60
+
+## 分数分布
 
 ```
 {full_distro}
@@ -541,57 +596,65 @@ async def run():
 
 ## 安全标记
 
-| 级别 | 数量 | 占比 |
+| 级别 | 全部 50K | 占比 |
+|------|----------|------|
+| Safe | {n_safe:,} | {n_safe/max(len(scored_all),1)*100:.1f}% |
+| Caution | {n_caution:,} | {n_caution/max(len(scored_all),1)*100:.1f}% |
+| Danger | {n_danger:,} | {n_danger/max(len(scored_all),1)*100:.1f}% |
+| Missing | {n_missing:,} | {n_missing/max(len(scored_all),1)*100:.1f}% |
+
+## Top 10 (Top 通道按综合分)
+
+| ID | 序列 | 长度 | 综合分 | 安全 |
+|----|------|------|--------|------|
+{top10_lines}
+
+## Bottom 10 (安全但抗氧化最差)
+
+| # | ID | 序列 | AnOxPePred | ToxinPred3 | HemoPI2 | AlgPred2 |
+|---|-----|------|-----------|------------|---------|----------|
+{bottom_info_lines}
+
+## 排名上升 Top 10 (R1 -> R3)
+
+| 肽 | 排名变化 | R3 综合分 |
+|----|----------|-----------|
+{rise_lines}
+
+## 排名下降 Top 10 (R1 -> R3)
+
+| 肽 | 排名变化 | R3 综合分 |
+|----|----------|-----------|
+{fall_lines}
+
+## 输出文件
+
+| 文件 | 说明 | 行数 |
 |------|------|------|
-| 正常 | {n_safe:,} | {n_safe/max(len(scored_peptides),1)*100:.1f}% |
-| 注意 | {n_caution:,} | {n_caution/max(len(scored_peptides),1)*100:.1f}% |
-| 高危 | {n_danger:,} | {n_danger/max(len(scored_peptides),1)*100:.1f}% |
-| 数据缺失 | {n_missing:,} | {n_missing/max(len(scored_peptides),1)*100:.1f}% |
-
-## Top 10
-
-| ID | 序列 | 长度 | 综合分 | 安全 |
-|----|------|------|--------|------|
-{chr(10).join(top10_lines)}
-
-## Bottom 10
-
-| ID | 序列 | 长度 | 综合分 | 安全 |
-|----|------|------|--------|------|
-{chr(10).join(bottom10_lines)}
-
-## 排名上升 Top 10（R1 → R3）
-
-| 肽 | 排名变化 | R3 综合分 |
-|----|----------|-----------|
-{chr(10).join(rise_lines)}
-
-## 排名下降 Top 10（R1 → R3）
-
-| 肽 | 排名变化 | R3 综合分 |
-|----|----------|-----------|
-{chr(10).join(fall_lines)}
-
-## 输出
-
-- `final/top80.csv` — Top {n_top:,} 条 → Stage 4 枚举
-- `final/all_scored.csv` — 全部 {len(scored_peptides):,} 条
-- `final/danger_list.csv` — 高危 {len(danger_list)} 条
-- `final/trajectory.csv` — 跨轮排名轨迹（{len(trajectory)} 条）
+| final/all_scored.csv | 全部 50K 评分明细 (BepiPred3 仅 {len(bepi_candidate_ids):,} 有值) | {len(scored_all)} |
+| final/top80.csv | Top 通道前 {n_top} (来自 TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% 候选池) | {len(top80)} |
+| final/bottom10.csv | Bottom 通道 {len(bottom10)} 条阴性对照 (来自 TemStaPro 前 {TEMSTAPRO_TOP_PCT*100:.0f}% 候选池) | {len(bottom10)} |
+| final/danger_list.csv | 高危肽清单 | {len(danger_list)} |
+| final/trajectory.csv | 跨轮排名轨迹 (R1->R2->R3) | {len(trajectory)} |
 """
+
     readme_path = STAGE_DIR / "README.md"
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(readme)
     log(f"\n报告: {readme_path}")
+
+    # ── 汇总 ──
     log(f"\n{'='*60}")
     log(f"Round 3 汇总")
-    log(f"  输入: {total:,} 条 | Top: {n_top:,}")
-    if valid_scores:
-        log(f"  综合分: mean={sum(valid_scores)/len(valid_scores):.4f}, max={max(valid_scores):.4f}")
-    log(f"  安全: {n_safe:,} / {n_caution:,} / {n_danger:,}")
-    log(f"  耗时: {total_elapsed:.0f}s")
+    log(f"  输入: {len(all_peptides):,} 条 (top={len(top_peptides):,}, bottom={len(bottom_peptides):,})")
+    if temstapro_available:
+        log(f"  TemStaPro 预筛: 每个通道前 {TEMSTAPRO_TOP_PCT*100:.0f}% → BepiPred3 候选 {len(bepi_candidate_ids):,}")
+    log(f"  Top: {n_top:,} | Bottom: {len(bottom10)}")
+    log(f"  服务: {', '.join(all_services_list)}")
+    log(f"  安全: {n_safe:,} safe / {n_caution:,} caution / {n_danger:,} danger")
     if temstapro_available:
         log(f"  TemStaPro: 已使用")
+    log(f"  耗时: {total_elapsed:.0f}s")
     log(f"{'='*60}")
 
 

@@ -1,0 +1,27 @@
+{
+  "construct_id": "con_0260",
+  "channel": "bottom",
+  "peptide_id": "pep_206019",
+  "peptide_sequence": "EGCNILCLLKRKVKAVKNVVKNVVKSVVG",
+  "linker_id": "Flex_GGGGSx1",
+  "position": "C",
+  "sequence_length": "413",
+  "construct_sequence": "MGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCLEGGGGSEGCNILCLLKRKVKAVKNVVKNVVKSVVGGGGGSLEHHHHHH",
+  "original_database": {
+    "is_antimicrobial": 0,
+    "is_antioxidant": 1,
+    "is_antiglycation": 0,
+    "is_collagen_stimulating": 0,
+    "is_cell_penetrating": 0,
+    "source_name": "apd3; dbamp; dbaasp",
+    "source_species": "",
+    "source_protein": "",
+    "database_id": 18614,
+    "database_name": "Peptipedia",
+    "refs_journal": "",
+    "refs_title": "Wang Y, et al. Identification and characterization of novel bi-functional cathelicidins from the black-spotted frog (Pelophylax nigromaculata) with both anti-infective and antioxidant activities. Identification and characterization of novel bi-functional cathelicidins from the black-spotted frog (Pelophylax nigromaculata) with both anti-infective and antioxidant activities. 2021; 116:103928. doi: 10.1016/j.dci.2020.103928",
+    "doi": "10.1016/j.dci.2020.103928",
+    "additional_info": "LENGTH:29; MOLECULAR_WEIGHT:3137.91; ISOELECTRIC_POINT:10.9585; CHARGE:6.861; INSTABILITY_INDEX:36.5759; AROMATICITY:0; ALIPHATIC_INDEX:137.2414; BOMAN_INDEX:0.6931; HYDROPHOBIC_RATIO:0.5172; KEYWORD:anti-endotoxin (sepsis related), anti-gram+_gram- bacteria, anti-inflammatory, antifungal, antigram_n, antigram_p, antioxidant, cancer, fungus, gram+, gram-, mammalian cell, mammaliancells",
+    "source_files": "peptipedia.sql"
+  }
+}

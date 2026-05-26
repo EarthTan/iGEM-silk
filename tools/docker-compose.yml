@@ -173,6 +173,8 @@ services:
       - "8010:8010"
     environment:
       - PORT=8010
+      - PROTTRANS_MODEL_DIR=/app/models/prot_t5_xl
+      - TEMSTAPRO_MODELS_DIR=/app/models
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./TemStaPro/models:/app/models
@@ -371,24 +373,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      
-  dssp:
-    build:
-      context: ..
-      dockerfile: tools/DSSP/Dockerfile
-    image: igem-silk/dssp:latest
-    container_name: dssp
-    ports:
-      - "8103:8103"
-    environment:
-      - PORT=8103
-    profiles: [cpu]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # ===========================================================================
   # Waveflow — Tamarind.bio API 代理 (profile: cpu)
@@ -433,6 +417,42 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  toxinpred3-2:
+    build:
+      context: ..
+      dockerfile: tools/ToxinPred3/Dockerfile
+    image: igem-silk/toxinpred3:latest
+    container_name: toxinpred3-2
+    ports:
+      - "8013:8013"
+    environment:
+      - PORT=8013
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8013/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  toxinpred3-3:
+    build:
+      context: ..
+      dockerfile: tools/ToxinPred3/Dockerfile
+    image: igem-silk/toxinpred3:latest
+    container_name: toxinpred3-3
+    ports:
+      - "8014:8014"
+    environment:
+      - PORT=8014
+    profiles: [cpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8014/health"]
       interval: 30s
       timeout: 10s
       retries: 3

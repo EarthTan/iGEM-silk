@@ -22,13 +22,20 @@ from __future__ import annotations
 
 import sys
 import os
+import time
 from pathlib import Path
 
 # 向上跳 2 级目录，作为根路径
 root_path = Path(__file__).parents[2]
 sys.path.insert(0, str(root_path))
 
-from tools.template.fasta_service import FastaToolService, create_app, ToolResult
+from tools.template.fasta_service import (
+    FastaToolService,
+    create_app,
+    ToolResult,
+    BatchPredictRequest,
+    BatchPredictResponse,
+)
 from tools.utils import detect_gpu, detect_system
 
 
@@ -100,6 +107,61 @@ class AnOxPePredService(FastaToolService):
                 "gpu_backend": self.model.gpu_info.get("backend", "unknown"),
                 "gpu_count": self.model.gpu_info.get("gpu_count", 0),
             },
+        )
+
+
+    async def predict_batch(
+        self, request: BatchPredictRequest
+    ) -> BatchPredictResponse:
+        """
+        批量预测 — 使用 true GPU batch inference 替代逐条处理。
+
+        关键优化：将 N 条序列编码为单个 tensor（N, 30, 20），做 1 次
+        model.predict() 调用。N 条序列的推理时间 ≈ 单条时间，在 GPU
+        上可提升 50-100 倍。
+        """
+        if not self._loaded:
+            async with self._lock:
+                if not self._loaded:
+                    await self.load_model()
+                    self._loaded = True
+
+        sequences = [item.sequence for item in request.sequences]
+        peptide_ids = [
+            item.peptide_id or f"pep_{i}"
+            for i, item in enumerate(request.sequences)
+        ]
+
+        t0 = time.time()
+        predictions = self.model.predict_batch_encoded(sequences)
+        elapsed = time.time() - t0
+
+        tool_results = []
+        for i, pred in enumerate(predictions):
+            tr = ToolResult(
+                peptide_id=peptide_ids[i],
+                sequence=pred.sequence,
+                score=round(pred.overall_score, 4),
+                label=pred.overall_class,
+                details={
+                    "frs_score": round(pred.frs_score, 4),
+                    "chel_score": round(pred.chel_score, 4),
+                    "confidence": pred.confidence,
+                    "is_antioxidant": pred.is_antioxidant,
+                    "gpu_backend": self.model.gpu_info.get("backend", "unknown"),
+                },
+            )
+            tool_results.append(tr)
+
+        self.logger.info(
+            "Batch predict done: %d sequences (%.2fs, %.0f seq/s)",
+            len(sequences), elapsed, len(sequences) / elapsed if elapsed > 0 else 0,
+        )
+        return BatchPredictResponse(
+            success=True,
+            results=tool_results,
+            total=len(tool_results),
+            error=None,
         )
 
 

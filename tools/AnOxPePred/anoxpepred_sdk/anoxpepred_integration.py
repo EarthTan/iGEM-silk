@@ -464,6 +464,63 @@ class AnOxPePredIntegration:
 
         return results
 
+    def predict_batch_encoded(
+        self,
+        sequences: list[str],
+        threshold: float = 0.5,
+    ) -> list[PredictionResult]:
+        """
+        True batch prediction — 编码所有序列后做单次 GPU 推理调用。
+
+        相比 predict_single() 逐条处理，此方法对 N 条序列仅做 1 次
+        model.predict() 调用，GPU 上的 CNN 并行处理整个 batch，速度
+        可提升 50-100 倍。
+
+        Args:
+            sequences: 肽序列列表
+            threshold: 分类阈值
+
+        Returns:
+            list[PredictionResult]: 预测结果列表
+        """
+        if self.model is None:
+            return [self.predict_single(seq, threshold=threshold) for seq in sequences]
+
+        n = len(sequences)
+        encoded = np.zeros((n, 30, 20), dtype=np.float32)
+        for i, seq in enumerate(sequences):
+            encoded[i] = _encode_sequence(seq)
+
+        # 单次 GPU 推理调用（关键优化！）
+        predictions = self.model.predict(encoded, verbose=0, batch_size=min(1024, n))
+
+        results = []
+        for i, seq in enumerate(sequences):
+            frs_score = float(predictions[i][0])
+            chel_score = float(predictions[i][1])
+            overall_score = _calculate_overall_score(frs_score, chel_score)
+
+            frs_class = "FRS_active" if frs_score >= threshold else "FRS_inactive"
+            chel_class = "Chel_active" if chel_score >= threshold else "Chel_inactive"
+            overall_class = "Antioxidant" if overall_score >= threshold else "Non-antioxidant"
+            is_antioxidant = overall_score >= threshold
+            confidence = _calculate_confidence(overall_score, len(seq))
+
+            results.append(PredictionResult(
+                peptide_id="",
+                sequence=seq,
+                frs_score=frs_score,
+                chel_score=chel_score,
+                frs_class=frs_class,
+                chel_class=chel_class,
+                confidence=confidence,
+                overall_score=overall_score,
+                overall_class=overall_class,
+                is_antioxidant=is_antioxidant,
+            ))
+
+        return results
+
     def predict_from_fasta(
         self,
         fasta_file: str,

@@ -21,6 +21,7 @@ LABEL org.opencontainers.image.source="https://github.com/UberClifford/BepiPred-
 # 安装服务依赖 (torch 已由基础镜像提供)
 RUN pip install --no-cache-dir \
     bp3==0.0.12.7 \
+    fair-esm>=2.0.0 \
 	    numpy pandas plotly \
     numpy pandas plotly \
     fastapi "uvicorn[standard]" pydantic \

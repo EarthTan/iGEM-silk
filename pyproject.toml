@@ -18,6 +18,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "requests>=2.34.1",
     "duckdb>=1.5.2",
+    "huggingface-hub>=1.15.0",
 ]
 
 [project.optional-dependencies]
@@ -27,9 +28,6 @@ dev = [
     "ruff>=0.5.0",
     "mypy>=1.10.0",
 ]
-
-[project.scripts]
-igem-silk = "main:main"
 
 [tool.uv]
 dev-dependencies = [

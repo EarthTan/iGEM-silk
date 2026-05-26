@@ -1,0 +1,27 @@
+{
+  "construct_id": "con_0074",
+  "channel": "top",
+  "peptide_id": "pep_977590",
+  "peptide_sequence": "VPSLRDVHHEPVYPQPPF",
+  "linker_id": "Flex_GGGGSx1",
+  "position": "C",
+  "sequence_length": "402",
+  "construct_sequence": "MGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCLEGGGGSVPSLRDVHHEPVYPQPPFGGGGSLEHHHHHH",
+  "original_database": {
+    "is_antimicrobial": 0,
+    "is_antioxidant": 1,
+    "is_antiglycation": 0,
+    "is_collagen_stimulating": 0,
+    "is_cell_penetrating": 0,
+    "source_name": "Peptipedia",
+    "source_species": "",
+    "source_protein": "",
+    "database_id": 1293547,
+    "database_name": "Peptipedia",
+    "refs_journal": "",
+    "refs_title": "",
+    "doi": "",
+    "additional_info": "LENGTH:18; MOLECULAR_WEIGHT:2113.39; ISOELECTRIC_POINT:7.8281; CHARGE:0.195; INSTABILITY_INDEX:108.4111; AROMATICITY:0.1111; ALIPHATIC_INDEX:70; BOMAN_INDEX:1.6017; HYDROPHOBIC_RATIO:0.2778",
+    "source_files": "peptipedia.sql"
+  }
+}

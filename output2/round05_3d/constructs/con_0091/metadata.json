@@ -1,0 +1,27 @@
+{
+  "construct_id": "con_0091",
+  "channel": "top",
+  "peptide_id": "pep_679714",
+  "peptide_sequence": "PAFELHYPHMVER",
+  "linker_id": "Flex_GGGGSx1",
+  "position": "N",
+  "sequence_length": "392",
+  "construct_sequence": "PAFELHYPHMVERGGGGSMGLPTALVNFVDVNEARPVIDNGQLVSRALIDKVFELIDGADIPLYAQMMIQSVNDQANSGDAASQASAVVLAINAIAELANGIPGDACESAALVNAYAYAVSTGNSAGLRSALVKYVQRINANIDAIVRLVNSPLEFSTSAAVGAGAGSGAASGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGSGAGAGYGAGVGAGYGAGYGAGAGYGFGPYVANGGYSRREGYEYAWSSKSDFETGSGAASGAGAGAGSGAGAGSGAGAGSGAGAGSGAGAGGSVSYGAGRGYGQGAGSAASSVSSASSRSYDYSRRNVRKNCGIPRRQLVVKFRALPCVNCLELEHHHHHH",
+  "original_database": {
+    "is_antimicrobial": 0,
+    "is_antioxidant": 1,
+    "is_antiglycation": 0,
+    "is_collagen_stimulating": 0,
+    "is_cell_penetrating": 0,
+    "source_name": "peptideatlas",
+    "source_species": "",
+    "source_protein": "",
+    "database_id": 3283836,
+    "database_name": "Peptipedia",
+    "refs_journal": "",
+    "refs_title": "",
+    "doi": "",
+    "additional_info": "LENGTH:13; MOLECULAR_WEIGHT:1624.87; ISOELECTRIC_POINT:7.8281; CHARGE:0.195; INSTABILITY_INDEX:67.3385; AROMATICITY:0.1538; ALIPHATIC_INDEX:60; BOMAN_INDEX:1.6846; HYDROPHOBIC_RATIO:0.3846",
+    "source_files": "peptipedia.sql"
+  }
+}

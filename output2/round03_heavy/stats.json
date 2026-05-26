@@ -1,0 +1,40 @@
+{
+  "stage": "round03_heavy",
+  "timestamp": "2026-05-17T20:34:37.170789",
+  "elapsed_sec": 3891.2,
+  "input": 50000,
+  "top_channel": 25000,
+  "bottom_channel": 25000,
+  "services": [
+    "anoxpepred",
+    "toxinpred3",
+    "algpred2",
+    "hemopi2",
+    "mhcflurry",
+    "bepipred3",
+    "temstapro"
+  ],
+  "weights": {
+    "anoxpepred": 0.45,
+    "toxinpred3": 0.13,
+    "algpred2": 0.09,
+    "hemopi2": 0.09,
+    "mhcflurry": 0.05,
+    "bepipred3": 0.1,
+    "temstapro": 0.09
+  },
+  "temstapro_used": true,
+  "temstapro_prefilter_pct": 0.3,
+  "bepipred3_candidates": 15000,
+  "top_n": 80,
+  "bottom_n": 10,
+  "scoring": {
+    "n_valid": 50000
+  },
+  "safety": {
+    "safe": 47034,
+    "caution": 2770,
+    "danger": 201,
+    "missing": 35000
+  }
+}

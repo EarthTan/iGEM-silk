@@ -1,0 +1,28 @@
+{
+  "construct_composite": 0.5361,
+  "peptide_composite": "0.6664",
+  "sodope": "0.6736090027553862",
+  "temstapro_construct": "0.4239",
+  "construct_anoxpepred": "0.3335",
+  "construct_bepipred3": 0.13282925027680684,
+  "anox_change_ratio": null,
+  "round3_services": {
+    "anoxpepred": 0.5312,
+    "toxinpred3": 0.155,
+    "algpred2": 0.244,
+    "hemopi2": 0.18150028586387634,
+    "mhcflurry": 0.0,
+    "bepipred3": 0.2803936765744136,
+    "temstapro": 0.4261
+  },
+  "safety_flag": "safe",
+  "structure": {
+    "omegafold": {
+      "success": true,
+      "plddt": 0.4012,
+      "elapsed": 80.9,
+      "error": null,
+      "pdb_file": "con_0093_omegafold.pdb"
+    }
+  }
+}
