@@ -57,7 +57,7 @@ uv run python service.py
 | `AlphaFold3` | 8201 | GPU 必需（Linux + Docker 运行时） | [Docker] AF3 参数 + 遗传数据库 · TB 级 | 蛋白质/肽/DNA/RNA/配体 | 3D 生物分子结构预测 |
 | `PEP-FOLD4` | 8202 | CPU（Docker 运行时） | [Docker] sOPEP 力场内置 | 短肽 5–40 aa | 肽从头结构预测 |
 | `ESMFold` | 8203 | GPU 必需 | [下载][共享] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB | 短肽~蛋白质（无上限） | 快速 3D 结构预测（~60× AF2） |
-| `OmegaFold` | 8204 | GPU/CPU/MPS | [下载] OmegaFold ~1.5 GB（AWS S3 自动下载） | 短肽~蛋白质（无上限） | PLM + 几何变换器结构预测 |
+| `OmegaFold` | 8204 | GPU/CPU/MPS | [下载] OmegaFold ~3 GB（AWS S3 自动下载） | 短肽~蛋白质（无上限） | PLM + 几何变换器结构预测 |
 | `Waveflow` | 8205 | CPU | [—] 纯远程 API，无需本地模型 | 全范围 | Tamarind.bio 云端代理（需 `TAMARIND_API_KEY`） |
 
 ---
@@ -72,21 +72,42 @@ uv run python service.py
 | **无需模型** | `[—]` | 纯算法或启动时合成训练 | TIPred、SoDoPE、SASA |
 | **Docker 内置** | `[Docker]` | Docker 镜像内，不暴露到宿主机；wrapper 服务通过 `subprocess` 调用 | PEP-FOLD4、Aggrescan3D、AlphaFold3 |
 
-**共享模型缓存**：`tools/models/` 存放被多个服务共用的模型，避免重复下载。当前共享内容：
+**共享模型缓存**：`tools/models/` 存放被多个服务共用的模型权重，避免重复下载。当前共享内容：
 
 ```
 tools/models/
-  fair-esm/                     ← ESM-2 checkpoints（torch.hub 缓存）
-    hub/checkpoints/
-      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务（Git 跟踪 ~29 MB）
-      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务（首次自动下载 ~2.5 GB）
-      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干，首次自动下载 ~5.3 GB）
-      esmfold_3B_v1.pt          ← ESMFold 结构头（首次自动下载 ~2.6 GB）
-  omegafold/
-    model.pt                    ← OmegaFold 权重（首次自动下载 ~1.5 GB）
+├── fair-esm/                          # ESM 系列权重（torch.hub 缓存，约 11 GB）
+│   └── hub/
+│       ├── checkpoints/               # 权重文件（.pt）
+│       │   ├── esm2_t6_8M_UR50D.pt
+│       │   ├── esm2_t33_650M_UR50D.pt
+│       │   ├── esm2_t36_3B_UR50D.pt
+│       │   ├── esmfold_3B_v1.pt
+│       │   └── *-contact-regression.pt
+│       └── facebookresearch_esm_main/ # torch.hub 自动克隆的 fair-esm 源码
+└── omegafold/
+    └── model.pt                       # OmegaFold release1 权重（约 3 GB）
 ```
 
-BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
+**模型清单**（大小为本次实测）：
+
+| 文件 | 实测大小 | 归属服务 | 获取方式 |
+|------|---------:|---------|---------|
+| `fair-esm/hub/checkpoints/esm2_t36_3B_UR50D.pt` | ~5.3 GiB | ESMFold（3B 主干） | 首次启动自动下载 |
+| `fair-esm/hub/checkpoints/esmfold_3B_v1.pt` | ~2.6 GiB | ESMFold（结构头） | 首次启动自动下载 |
+| `fair-esm/hub/checkpoints/esm2_t33_650M_UR50D.pt` | ~2.4 GiB | BepiPred-3.0 | 首次启动自动下载 |
+| `fair-esm/hub/checkpoints/esm2_t6_8M_UR50D.pt` | ~29 MiB | pLM4CPPs | Git 跟踪 |
+| `fair-esm/hub/checkpoints/*-contact-regression.pt` | 数 KB | 各 ESM 模型配套 contact 预测头 | 随主权重一起下载 |
+| `omegafold/model.pt` | ~3.0 GiB | OmegaFold（model_idx=1） | 首次启动自动下载 |
+
+> `model_idx=2` 的权重会落盘为同目录 `model2.pt`，当前未下载；HemoPI2 使用的 ESM-2 t6 来自 HuggingFace 缓存，**不在** `tools/models/` 内。
+
+BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，OmegaFold 通过 `OMEGAFOLD_CACHE` 默认指向 `tools/models/omegafold/`，各模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
+
+**注意事项**：
+
+- `tools/models/` 下的权重体积大、下载成本高（学校网络下重新下载需数小时到一天），**请勿删除**；如确需清理，先列出清单并人工确认，禁止 `git clean` / `git checkout -- .` / `git reset --hard` 等命令波及此目录。
+- 该目录若由 root 用户创建，属主可能为 `root`，普通用户启动的服务将无法写入缓存；遇到"模型无法落盘"时，先检查 `ls -ld tools/models tools/models/*`。
 
 **共享池**仅存放被 ≥2 个服务使用的模型，或者体积较大的模型。独有且体积较小模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
 
@@ -101,7 +122,7 @@ BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/
 | `ESMFold` | `esmfold_3B_v1.pt` | ~2.6 GB | `dl.fbaipublicfiles.com/fair-esm/` (Meta CDN) | `ESMFOLD_MODEL_URL` |
 | `BepiPred-3.0` | `esm2_t33_650M_UR50D.pt` | ~2.5 GB | 同上 | `ESM2_URL` |
 | `TemStaPro` | ProtT5-XL | ~3 GB | HuggingFace `Rostlab/prot_t5_xl_half_uniref50-enc` | `HF_ENDPOINT=https://hf-mirror.com` |
-| `OmegaFold` | `release1.pt` | ~1.5 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
+| `OmegaFold` | `release1.pt` | ~3 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
 | `HemoPI2` | ESM-2 t6（通过 pip） | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
 
 镜像源配置示例：
