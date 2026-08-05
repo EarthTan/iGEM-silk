@@ -41,10 +41,10 @@ uv run python service.py
 | `AlgPred2` | 8008 | CPU | [pip] RandomForest · 1 MB | 中肽~蛋白质（长序列优化） | 过敏原性预测 |
 | `GraphCPP` | 8009 | GPU/CPU | [Git] GraphSAGE ckpt · 200 KB | 短肽 5–40（>100 精度下降） | 细胞穿膜肽预测（GNN） |
 | `TemStaPro` | 8010 | GPU/CPU | [下载] ProtT5-XL · 2.3 GB + MLP×30 · 80 MB | 全范围 | 热稳定性预测（40–65°C） |
-| `AMP-ESM` | 8011 | GPU/CPU | [移植] v0.1.0 TF/Keras h5 · 300 MB + [下载] ESM-2 t33 · 2.5 GB + [移植] 5×fold ckpt · 37 GB | 短肽 2–200（v0.1.0）/ 3–200（v0.2.0，超出拒绝） | 抗菌肽预测（v0.1.0 AMPlify / v0.2.0 ESM-2 双版本） |
+| `AMP-ESM` | 8011 | GPU/CPU | [移植] v0.1.0 TF/Keras h5 · 300 MB + [移植] 5×fold ckpt ×2 · 74 GB（imbalanced + balanced） + [下载] ESM-2 t33 · 2.5 GB | 短肽 2–200（两版本一致，超出拒绝） | 抗菌肽预测（v0.1.0 AMPlify / v0.2.0 ESM-2 双版本，balanced / imbalanced 都可用） |
 | `SoDoPE` | 8012 | CPU | [—] 纯查表 + 数学运算 | 全范围 | 溶解度预测（SWI） |
 
-**AMP-ESM 双版本说明**：默认 `v0.1.0`（原 AMPlify TF/Keras 基线，用户指定优先使用；balanced/imbalanced 均可），用 `AMP_ESM_VERSION=v0.2.0` 切换 ESM-2 版（仅 imbalanced）。`AMP_ESM_MODE` 覆盖模式（两版本默认均为 imbalanced）。v0.2.0 权重约 37 GB 随服务提供；v0.1.0 权重约 300 MB 随服务提供。TF 推理在本机走 CPU（TF 2.16 wheel 需 CUDA 12 运行库，本机为 CUDA 13）。
+**AMP-ESM 双版本说明**：默认 `v0.1.0`（原 AMPlify TF/Keras 基线，用户指定优先使用；balanced/imbalanced 均可），用 `AMP_ESM_VERSION=v0.2.0` 切换 ESM-2 版（balanced/imbalanced 也均可）。`AMP_ESM_MODE` 覆盖模式（两版本默认均为 imbalanced）。v0.2.0 权重约 74 GB 随服务提供（imbalanced + balanced 两组 5×fold ckpt，每组 ~37 GB）；v0.1.0 权重约 300 MB 随服务提供。TF 推理在本机走 CPU（TF 2.16 wheel 需 CUDA 12 运行库，本机为 CUDA 13）。
 
 ### ② PDB Service（8101+）— PDB 结构 → 评分
 

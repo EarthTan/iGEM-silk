@@ -11,8 +11,8 @@ AMP-ESM 微服务入口 — 抗菌肽（AMP）预测，支持两个模型版本�
       AMPlify h5（balanced / imbalanced 各 5 个，共 ~300 MB）。
     - v0.2.0（PyTorch + ESM-2）— facebook/esm2_t33_650M_UR50D 端到端微调 +
       MHA(32 heads) + Context Attention + Dense(1)，5 折 ensemble。
-      权重为 models/amp_esm_imbalanced/（5×fold ckpt，~37 GB），
-      当前仅 imbalanced 可用（balanced 上游未发布）。
+      权重为 models/amp_esm_<mode>/（5×fold ckpt，每组 ~37 GB），
+      imbalanced 与 balanced 都可用（balanced 来自 2026-08-05 的训练 run）。
     - v0.2.1（推理优化）— 与 v0.2.0 同一组权重，仅推理代码优化
       （双 forward 合并 + inference_mode）；本服务移植的 amp_esm 包即此代码，
       因此 v0.2.0 天然带 v0.2.1 的加速。
@@ -26,7 +26,7 @@ AMP-ESM 微服务入口 — 抗菌肽（AMP）预测，支持两个模型版本�
     PORT               覆盖默认端口（默认 8011）
     AMP_ESM_VERSION    模型版本: v0.1.0（默认）/ v0.2.0
     AMP_ESM_MODE       训练模式: imbalanced（默认）/ balanced
-                       （v0.1.0 两者都有；v0.2.0 仅 imbalanced）
+                       （v0.1.0 与 v0.2.0 都支持）
     AMP_ESM_MODELS_DIR 模型根目录（默认: 本服务 models/，
                        可指向 ../amp-esm/models 复用原仓库权重）
 
