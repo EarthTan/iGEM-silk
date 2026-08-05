@@ -1,0 +1,37 @@
+model:
+  esm2_name: "facebook/esm2_t33_650M_UR50D"
+  max_len: 200
+  mha_heads: 32
+  mha_activation: "relu"
+  context_attention_activation: "tanh"
+  dropout: 0.2
+
+training:
+  batch_size: 16
+  epochs: 5
+  patience: 2                 # EarlyStopping on val_loss
+  optimizer: "adamw"
+  lr_backbone: 1.0e-5
+  lr_head: 1.0e-3
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  scheduler: "cosine"
+  precision: "16-mixed"       # PyTorch Lightning AMP
+  grad_accum_steps: 1
+  seed: 50
+
+augment:
+  enabled: true
+  mask_prob: 0.15
+  mask_random_prob: 0.1
+  mask_keep_prob: 0.1
+
+data:
+  train_amp_fa: "data/AMPlify_AMP_train_common.fa"
+  train_non_amp_fa: ""        # 由 --mode {balanced,imbalanced} 决定
+  test_amp_fa: "data/AMPlify_AMP_test_common.fa"
+  test_non_amp_fa: ""         # 由 --mode {balanced,imbalanced} 决定
+
+ensemble:
+  n_folds: 5
+  random_state: 50

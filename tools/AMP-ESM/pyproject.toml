@@ -1,0 +1,45 @@
+[project]
+name = "amp-esm-service"
+version = "0.2.1"
+description = "AMP-ESM 微服务 — 抗菌肽预测（ESM-2 t33 650M + 5-fold 集成）"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "biopython>=1.81",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+ml = [
+    "torch>=2.1",
+    "transformers>=4.35",
+    "pytorch-lightning>=2.0",
+    "torchmetrics>=1.0",
+    "tensorflow==2.16.*",
+]
+all = ["amp-esm-service[ml]"]
+
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff.lint]
+ignore = ["F401", "E402", "F841"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+  "gpu: tests that require an NVIDIA GPU",
+  "slow: long-running tests",
+  "integration: end-to-end / network-dependent tests",
+]

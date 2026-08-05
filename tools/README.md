@@ -1,6 +1,6 @@
 # tools/ — 微服务使用手册
 
-`tools/` 下是 20 个 FastAPI 微服务 + 共享资源。本手册说明每个服务的**启动方式、依赖、模型来源、API 端点**。
+`tools/` 下是 21 个 FastAPI 微服务 + 共享资源。本手册说明每个服务的**启动方式、依赖、模型来源、API 端点**。
 
 顶层仓库介绍见 [`README.md`](../README.md)，Agent 行为约束见 [`AGENTS.md`](../AGENTS.md)。
 
@@ -41,7 +41,10 @@ uv run python service.py
 | `AlgPred2` | 8008 | CPU | [pip] RandomForest · 1 MB | 中肽~蛋白质（长序列优化） | 过敏原性预测 |
 | `GraphCPP` | 8009 | GPU/CPU | [Git] GraphSAGE ckpt · 200 KB | 短肽 5–40（>100 精度下降） | 细胞穿膜肽预测（GNN） |
 | `TemStaPro` | 8010 | GPU/CPU | [下载] ProtT5-XL · 2.3 GB + MLP×30 · 80 MB | 全范围 | 热稳定性预测（40–65°C） |
+| `AMP-ESM` | 8011 | GPU/CPU | [移植] v0.1.0 TF/Keras h5 · 300 MB + [下载] ESM-2 t33 · 2.5 GB + [移植] 5×fold ckpt · 37 GB | 短肽 2–200（v0.1.0）/ 3–200（v0.2.0，超出拒绝） | 抗菌肽预测（v0.1.0 AMPlify / v0.2.0 ESM-2 双版本） |
 | `SoDoPE` | 8012 | CPU | [—] 纯查表 + 数学运算 | 全范围 | 溶解度预测（SWI） |
+
+**AMP-ESM 双版本说明**：默认 `v0.1.0`（原 AMPlify TF/Keras 基线，用户指定优先使用；balanced/imbalanced 均可），用 `AMP_ESM_VERSION=v0.2.0` 切换 ESM-2 版（仅 imbalanced）。`AMP_ESM_MODE` 覆盖模式（两版本默认均为 imbalanced）。v0.2.0 权重约 37 GB 随服务提供；v0.1.0 权重约 300 MB 随服务提供。TF 推理在本机走 CPU（TF 2.16 wheel 需 CUDA 12 运行库，本机为 CUDA 13）。
 
 ### ② PDB Service（8101+）— PDB 结构 → 评分
 
@@ -100,7 +103,7 @@ tools/models/
 | `fair-esm/hub/checkpoints/*-contact-regression.pt` | 数 KB | 各 ESM 模型配套 contact 预测头 | 随主权重一起下载 |
 | `omegafold/model.pt` | ~3.0 GiB | OmegaFold（model_idx=1） | 首次启动自动下载 |
 
-> `model_idx=2` 的权重会落盘为同目录 `model2.pt`，当前未下载；HemoPI2 使用的 ESM-2 t6 来自 HuggingFace 缓存，**不在** `tools/models/` 内。
+> `model_idx=2` 的权重会落盘为同目录 `model2.pt`，当前未下载；HemoPI2 使用的 ESM-2 t6 与 AMP-ESM 使用的 ESM-2 t33（transformers 格式）都来自 HuggingFace 缓存，**不在** `tools/models/` 内（`tools/models/fair-esm/` 下的是 fair-esm/torch.hub 格式，二者不通用）。
 
 BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，OmegaFold 通过 `OMEGAFOLD_CACHE` 默认指向 `tools/models/omegafold/`，各模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
 
@@ -124,6 +127,7 @@ BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/
 | `TemStaPro` | ProtT5-XL | ~3 GB | HuggingFace `Rostlab/prot_t5_xl_half_uniref50-enc` | `HF_ENDPOINT=https://hf-mirror.com` |
 | `OmegaFold` | `release1.pt` | ~3 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
 | `HemoPI2` | ESM-2 t6（通过 pip） | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
+| `AMP-ESM` | ESM-2 t33 650M（transformers 格式） | ~2.5 GB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
 
 镜像源配置示例：
 

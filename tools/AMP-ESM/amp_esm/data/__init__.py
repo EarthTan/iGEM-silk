@@ -1,0 +1,1 @@
+"""Data pipeline: FASTA parsing, AMPDataset, and dynamic-padding collate_fn."""

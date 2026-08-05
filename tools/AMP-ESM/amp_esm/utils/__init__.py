@@ -1,0 +1,1 @@
+"""Shared utilities: FASTA parsing helpers and random amino-acid masking."""
