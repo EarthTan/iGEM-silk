@@ -1,58 +1,91 @@
-# Docker Operations Guide — iGEM-silk
+# Docker 历史归档 — iGEM-silk
 
-> 本文件整合了 `.agents/learnings/` 中所有 Docker 相关的经验教训（23 个胶囊），
-> 作为项目 Docker 部署、运行和故障排查的唯一参考。
+> ⚠️ **本文件为历史归档**。本项目（`as-micro-service` 及之后分支）已**不再使用 Docker**
+> 作为部署方式。当前微服务全部以 `uv`-managed venv 直接运行：
 >
-> **最后更新**: 2026-05-18
+> ```bash
+> cd tools/<service-name>
+> uv sync                                # 首次：装依赖
+> .venv/bin/python service.py            # 启动
+> ```
+>
+> 详情见 [`tools/README.md`](./README.md)；Agent 行为约束见仓库根 [`AGENTS.md`](../AGENTS.md)。
+>
+> 本仓库仍遗留 `docker-compose.yml` 与若干 `tools/*/Dockerfile` 作为历史产物，**它们已无人维护、不要新提交依赖其正确性**，新部署请使用上面 `uv` 方式。本文档保留所有 Docker 相关经验教训，仅供：
+>
+> - 排查遗留 `Dockerfile` / `docker-compose.yml` 中可能存在的旧 bug
+> - 复用本文沉淀的 GPU 显存、命名空间、健康检查等通用微服务经验
+> - 必要时回退到 Docker 化部署的参考
+>
+> **最后更新**: 2026-08-06（标记归档；最后一次有效 Docker 操作经验为 2026-05-18）
 
 ---
 
-## 1. 核心原则
+## 0. 当前部署方式（取代 Docker）
 
-### 1.1 所有服务必须用 Docker 运行
+按 [`AGENTS.md` §1–§2](../AGENTS.md) 与 [`tools/README.md`](./README.md)：
 
-生产环境中的所有微服务**必须**通过 Docker Compose 运行。禁止直接在宿主机上用 `python service.py` 启动。
+| 项目 | 值 |
+|------|-----|
+| 包管理 | `uv`（不用 `pip` / `requirements.txt`） |
+| Python 环境 | 每个服务独立 `pyproject.toml` + `uv.lock`，独立 `.venv` |
+| 启动方式 | `cd tools/<name> && uv sync && .venv/bin/python service.py` |
+| 端口覆盖 | `PORT=8888 .venv/bin/python service.py` |
+| Host 覆盖 | `HOST=127.0.0.1 .venv/bin/python service.py` |
+| 健康检查 | `curl http://localhost:<port>/health` |
 
-理由：
-- 每个微服务有独立的 Python 环境和系统依赖，宿主机无法同时满足所有依赖版本
-- 模型文件路径在不同环境中硬编码，直接在宿主机运行会因路径不对而报错
-- Docker 环境已在构建时验证，直接运行等于跳过所有验证
-- 宿主机上残留的进程会占用 GPU 显存，影响后续 Docker 服务
+**删除/保留判断**（参考 `AGENTS.md` §3）：
 
-唯一例外：**开发调试**时可以在宿主机运行单个服务，但调试完成后必须在 Docker 中重新验证。
+- `tools/*/Dockerfile`、`tools/docker-compose.yml`：历史部署产物，新部署不使用 → 可删
+- `tools/models/**`、`tools/*/models/**`：共享权重与专属权重 → **绝不删**
+- `tools/utils.py`、`tools/template/`：跨包导入目标 → **绝不删**
 
-### 1.2 按需启动，用完即关
+**安全规则**（仍适用，见 `AGENTS.md` §4）：
 
-**不要一次性启动所有 16 个微服务。** 每个 pipeline step 只启动该 step 实际依赖的服务。
-
-- GPU 服务之间会争夺显存（48GB 总量，单个 GPU 服务可能占用 6-34GB）
-- 不必要的服务浪费系统资源（CPU、内存、网络连接）
-- 服务越多，健康检查链越长，故障排查越复杂
-
-每个 step 启动哪些服务由 `main/stages3/service_map.py` 定义，通过 `docker_utils.py` 的 `ensure_services()` 统一管理。
-
-### 1.3 禁止裸机执行
-
-| ❌ 禁止 | ✅ 正确 |
-|---------|--------|
-| `cd tools/AnOxPePred && python service.py` | `docker compose --profile gpu up -d anoxpepred` |
-| `cd tools/SASA && python service.py` | `docker compose --profile cpu up -d sasa` |
-| 修改 `uvicorn.run(host="0.0.0.0")` 来控制暴露范围 | 在 `docker-compose.yml` 的 `ports:` 中控制暴露范围 |
-
-**特别说明**：所有服务代码中 `uvicorn.run(host="0.0.0.0")` 是**正确且必须的**。Docker 容器内部通信要求绑定 `0.0.0.0`，暴露范围由 Compose 端口映射控制：
-- `"8001:8001"` — 局域网可访问（默认）
-- `"127.0.0.1:8001:8001"` — 仅本机可访问
-永远不要修改服务代码中的 host 绑定。
+- 禁止 `git clean` / `git checkout -- .` / `git reset --hard` / `git restore .`
+- 任何清理前先列清单确认
 
 ---
 
-## 2. 服务总览
+## 1. 核心原则（历史）
+
+> 适用于旧版 Docker 化部署；当前不再适用，仅作背景。
+
+### 1.1 ~~所有服务必须用 Docker 运行~~ → 改为 `uv` 直接运行
+
+旧原则：所有微服务通过 Docker Compose 运行，宿主机不直接 `python service.py`。
+
+**当前**：
+
+- 服务独立 `uv` venv，每个服务一套 Python 环境，比 Docker 更轻量
+- 模型文件路径已按仓库布局硬编码，裸跑 (`uv` 启动) 即可
+- `service.py` 的 `uvicorn.run(host="0.0.0.0")` 仍是正确且必须的，**永远不要修改**
+- Docker 容器内部通信要求绑定 `0.0.0.0`；裸跑时同样需要 `0.0.0.0` 以接受跨容器/跨主机的健康检查
+
+### 1.2 ~~按需启动，用完即关~~
+
+旧 Docker 部署下，GPU 服务之间会争夺显存（48GB），需要按 step 启停。
+
+**当前**：每个服务独立进程，启停粒度自然就是单个服务，约束更松，但仍建议：
+
+- GPU 显存总量 48GB，单个 GPU 服务可能占用 6–34GB
+- 不同 step 切换前确认已停掉前 step 的 GPU 服务，`nvidia-smi` 检查残留
+
+### 1.3 ~~禁止裸机执行~~ → 改为鼓励裸机执行（用 `uv`）
+
+旧原则禁止 `cd tools/AnOxPePred && python service.py`。
+
+**当前**：`cd tools/AnOxPePred && uv run python service.py` 正是推荐方式。
+
+---
+
+## 2. 服务总览（历史）
 
 ### 2.1 微服务清单
 
-共 19 个微服务，分为两组 profile：
+历史版本共 19 个微服务，分为两组 profile。本节仅作为旧部署的记忆。
 
-#### GPU services (`--profile gpu`)
+#### 旧 GPU services (`--profile gpu`)
 
 | 服务 | 端口 | 分组 | 显存占用 | 启动等待 | 备注 |
 |------|------|------|---------|---------|------|
@@ -67,9 +100,7 @@
 | esmfold | 8203 | structure | ~17GB | 120s | openfold 编译 |
 | omegafold | 8204 | structure | ~11GB | 120s | 同步推理阻塞事件循环 |
 
-> **注意**：`alphafold3` 是 Docker 套娃包装，它本身不占 GPU，但会通过 Docker socket 启动真正的 AF3 镜像。
-
-#### CPU services (`--profile cpu`)
+#### 旧 CPU services (`--profile cpu`)
 
 | 服务 | 端口 | 分组 | 备注 |
 |------|------|------|------|
@@ -82,17 +113,15 @@
 | waveflow | 8205 | structure | Tamarind.bio API wrapper |
 | pepfold4 | 8202 | structure | Docker socket 包装 |
 
+**当前**：参见 [`tools/README.md`](./README.md) 的服务清单（21 个服务，含 `AMP-ESM` 等新增项）。当前服务全部以 `uv` 直接启动，不再有 GPU/CPU profile 概念。
+
 ### 2.2 Profile 实际分布（与规划文档的差异）
 
-早期规划假设大多数评分服务是 CPU，但 `docker-compose.yml` 的实际配置不同：
+历史笔记：旧 Docker Compose 实际分布与早期规划不一致——大多数评分服务是 GPU 而非 CPU。这意味着大多数 pipeline step 需要同时启动 `gpu` 和 `cpu` 两个 profile。
 
-| 实际 GPU | 实际 CPU |
-|----------|---------|
-| anoxpepred, bepipred3, plm4cpps, graphcpp, temstapro, mhcflurry, hemopi2 | toxinpred3, algpred2, sodope, tipred |
+**当前**：该约束已不存在。
 
-这意味着大多数 pipeline step 需要同时启动 `gpu` 和 `cpu` 两个 profile。
-
-### 2.3 Step 依赖地图
+### 2.3 Step 依赖地图（历史）
 
 ```
 step0: []                          — 纯本地预处理
@@ -108,11 +137,15 @@ step5: [sasa, aggrescan3d]         — cpu only
 step6: []                          — 纯本地排名
 ```
 
+**当前**：主流程（`main/`、`data/`、`output*`）已在 `as-micro-service` 分支删除，pipeline 不再存在；本图仅作历史参考。
+
 ---
 
-## 3. Docker Compose 用法
+## 3. Docker Compose 用法（历史）
 
 ### 3.1 构建与启动（正确顺序）
+
+> 仅在回退到 Docker 部署时使用。
 
 #### 错误做法
 
@@ -148,41 +181,27 @@ docker compose up -d anoxpepred
 
 > **关键**：`docker compose up -d --build` 是原子性的——15 个服务中即使只有一个构建失败，前面已经构建成功的 10 个也会被丢弃。始终将构建（build）和启动（up）分开。
 
-### 3.2 常见陷阱
+### 3.2 常见陷阱（依然有参考价值）
 
-#### 陷阱 1：dockerfile 路径是相对于 build context 的
+虽然 Docker 不再使用，但以下陷阱在裸跑 `service.py` 时部分仍然适用。
 
+#### 陷阱 1：路径是相对于 build context 的
+
+旧 Docker Compose：
 ```yaml
-# docker-compose.yml 中：
 build:
   context: ..          # context = tools/..
   dockerfile: tools/AnOxPePred/Dockerfile   # ✅ 正确
-  # dockerfile: Dockerfile                   # ❌ 错误 — 会在 context 根目录找
+  # dockerfile: Dockerfile                 # ❌ 错误 — 会在 context 根目录找
 ```
 
-配置后用 `grep 'dockerfile:' docker-compose.yml` 验证。
+**当前等价**：服务代码里 `service.py` 有 `PROJECT_ROOT = Path(__file__).parent.parent.parent; sys.path.insert(0, str(PROJECT_ROOT))` 来支持跨包导入，**不要删**，否则 `from tools.template....` 会失败。
 
-#### 陷阱 2：COPY 遗漏共享依赖
+#### 陷阱 2：共享依赖遗漏
 
-几乎所有服务的 Dockerfile 都依赖项目根目录的共享文件。遗漏的 COPY 不会导致构建失败，但会在运行时抛出 `ModuleNotFoundError`。
+历史 Docker 构建中遗漏 `COPY tools/utils.py` 或 `COPY tools/template/` 不会导致构建失败，但会在运行时抛 `ModuleNotFoundError`。
 
-**必须 COPY 的文件**：
-```dockerfile
-COPY tools/utils.py ./tools/utils.py           # GPU 检测工具
-COPY tools/template/ ./tools/template/         # FastAPI 模板
-```
-
-**审计命令**：
-```bash
-for f in tools/*/Dockerfile; do
-  if ! grep -q 'COPY.*utils\.py' "$f" 2>/dev/null; then
-    echo "MISS utils.py: $f"
-  fi
-  if ! grep -q 'COPY.*template' "$f" 2>/dev/null; then
-    echo "MISS template: $f"
-  fi
-done
-```
+**当前**：直接 `uv sync` 安装依赖；服务代码通过 `PROJECT_ROOT` 路径追加 `sys.path` 来引用 `tools/utils.py` 和 `tools/template/`，只要这两个目录存在就不会出问题。
 
 #### 陷阱 3：`latest` 标签导致 CI 突发失败
 
@@ -194,7 +213,7 @@ FROM ghcr.io/astral-sh/uv:latest
 FROM ghcr.io/astral-sh/uv:0.4.30
 ```
 
-`latest` 在不同时间点拉取不同版本。上游发布新版本后，你的构建会在没有做任何代码更改的情况下突然失败。
+**当前**：`uv` 版本通过 `uv self update` 控制；不要在 `pyproject.toml` 中钉 `uv` 自身版本。如果遇到上游破坏，升级/降级全局 `uv`。
 
 #### 陷阱 4：Linux 文件名大小写
 
@@ -207,7 +226,7 @@ macOS 的文件系统（APFS）默认不区分大小写，Linux（ext4/xfs）区
 ls -1 tools/
 ```
 
-影响范围：Dockerfile `COPY`、docker-compose `dockerfile` 路径、Dockerfile 内的 `WORKDIR`。
+**当前仍适用**：影响 `cd tools/Tipred` 的服务路径、跨包 `import` 等。Linux 部署时一定先 `ls -1` 确认。
 
 #### 陷阱 5：Python 命名空间遮蔽（最隐蔽的错误）
 
@@ -221,6 +240,8 @@ python -c "import tools; print(tools.__path__)"
 ```
 
 **修复**：微服务内部代码目录绝不能命名为 `tools/`。例如 `mv tools/AnOxPePred/tools tools/AnOxPePred/anoxpepred_sdk`。
+
+**当前仍适用**：本仓库根目录的 `tools/` 是命名空间包（注意 `tools/__init__.py` 是空的），如果新服务内建了 `tools/` 子目录就会出现这个问题。
 
 #### 陷阱 6：slim 镜像缺少 C 扩展编译依赖
 
@@ -236,9 +257,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ```
 
-### 3.3 基础镜像选型
+**当前仍适用**：如果某个服务在 `uv sync` 时报 `Python.h` 缺失，说明系统缺编译工具链：
 
-本项目的 Dockerfile 使用 7 种基础镜像模式：
+```bash
+# Debian/Ubuntu
+sudo apt install build-essential python3-dev
+
+# macOS (Homebrew)
+xcode-select --install
+```
+
+### 3.3 基础镜像选型（历史）
+
+旧 Docker 部署使用 7 种基础镜像模式，本节仅供历史归档查阅。`uv` 部署下不再涉及。
 
 | 模式 | 基础镜像 | 适用场景 | 服务示例 |
 |------|---------|---------|---------|
@@ -250,18 +281,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 | **F** | `ghcr.io/mamba-org/micromamba:latest` | Conda 环境 / Python 2.7 | Aggrescan3D |
 | **G** | `python:3.11-slim` + Docker socket | Docker 套娃包装 | AlphaFold3, PEP-FOLD4, Waveflow |
 
-**CUDA 版本矩阵**：
-- CUDA 12.4 + cuDNN 9: PyTorch base image (Pattern A)
-- CUDA 12.1: structure prediction (Pattern B)
-- Torch index: `https://download.pytorch.org/whl/cu121`
-
 ### 3.4 GPU 服务管理
 
-#### 健康检查不同步
+#### 健康检查不同步（依然适用）
 
 GPU 服务的健康检查通过并不意味预测一定能成功。模型可能在容器启动后才开始加载到 GPU，健康检查的超时期限（`start_period`）需要足够长。
 
-`docker-compose.yml` 中的健康检查模式：
+裸跑 `service.py` 时等价问题：访问 `/health` 返回 200，但模型还没加载完，第一个预测请求会超时。`curl` 几次 `/health` 或在前几次预测上加更长超时。
+
+旧 `docker-compose.yml` 中的健康检查模式：
 ```yaml
 healthcheck:
   test: curl -f http://localhost:PORT/health || exit 1
@@ -274,7 +302,7 @@ healthcheck:
   start_period: 60s  # GPU 服务（模型加载时间）
 ```
 
-#### 桥接 IP 直连（绕过 docker-proxy）
+#### 桥接 IP 直连（绕过 docker-proxy）—— Docker 专属
 
 通过 `127.0.0.1:PORT`（docker-proxy）访问容器在长耗时请求下会出现间歇性挂死——容器内正常处理请求，但客户端收不到响应。
 
@@ -290,21 +318,9 @@ docker exec bepipred3 curl http://localhost:8002/health
 curl http://172.18.0.X:8002/health
 ```
 
-**修复**：获取桥接 IP 并直接访问：
-```python
-import subprocess, json
-result = subprocess.run(
-    ["docker", "inspect", "omegafold", "--format", '{{json .NetworkSettings.Networks}}'],
-    capture_output=True, text=True
-)
-networks = json.loads(result.stdout)
-bridge_ip = networks.get("bridge", {}).get("IPAddress")
-# 设置环境变量: export OMEGAFOLD_HOST=<bridge_ip>
-```
+**当前**：本节是 Docker 专属问题，裸跑 `service.py` 时服务直接绑定宿主机 `0.0.0.0`，不再有 docker-proxy 中间层。仍可能遇到类似的间歇性挂死，那是 asyncio/uvicorn 自身问题（如 OmegaFold 同步阻塞，见下），需要排查具体服务。
 
-`docker_utils.py` 中的 `detect_bridge_ip()` 自动完成此操作。
-
-#### GPU 显存检查
+#### GPU 显存检查（依然适用）
 
 启动 GPU 服务前确认显存充足：
 ```bash
@@ -327,82 +343,39 @@ nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits
 
 ---
 
-## 4. 服务生命周期管理
+## 4. 服务生命周期管理（历史 + 部分仍适用）
 
-### 4.1 启动前检查清单
-
-每个 pipeline step 执行前应确认：
+### 4.1 启动前检查清单（部分仍适用）
 
 ```
-□ Docker daemon 是否运行？  → docker info
+□ Python 环境是否就绪？  → cd tools/<name> && uv sync
 □ 所需 GPU 服务显存是否充足？ → nvidia-smi
-□ 所需 CPU 服务是否有端口冲突？ → ss -tnp | grep <PORT>
-□ Docker Compose 文件是否存在？ → ls tools/docker-compose.yml
+□ 所需端口是否冲突？ → ss -tnp | grep <PORT>
+□ 端口/Host 是否需要覆盖？ → 确认 PORT / HOST 环境变量
 □ 之前 step 的 GPU 进程是否已清理？ → ps aux | grep python
 ```
 
-### 4.2 按需启动协议
+### 4.2 按需启动协议（历史）
 
-使用 `docker_utils.py` 的统一入口 `ensure_services()`：
+旧版通过 `main/stages3/docker_utils.py::ensure_services()` 统一入口。当前主流程已删除，本节仅供历史归档。
 
-```python
-from main.stages3.docker_utils import ensure_services
-from main.stages3.service_map import get_step_services
-
-# 1. 查询当前 step 需要哪些服务
-info = get_step_services("step1")
-
-# 2. 启动并等待就绪
-health = ensure_services(
-    info["services"],
-    profiles=info["profiles"],
-    timeout=120.0,
-)
-
-# 3. 检查不可用的服务
-unavailable = [s for s, h in health.items() if not h["available"]]
-if unavailable:
-    sys.exit(f"服务不可用: {unavailable}")
-```
-
-**API 速查**：
-
-| 函数 | 作用 | 幂等 |
-|------|------|------|
-| `ensure_services(names, profiles, timeout, skip_docker)` | 主入口：启动 → 健康检查 → 缓存 | ✅ 缓存 120s |
-| `check_docker_daemon()` | 检查 Docker 是否运行 | ❌ |
-| `detect_bridge_ip(container)` | 获取容器桥接 IP | ✅ 缓存 |
-| `clear_cache()` | step 切换时清空缓存 | — |
-| `wait_for_services(services, timeout, poll_interval)` | 轮询等待 /health | ❌ |
-
-**幂等机制**：同一服务连续调用 `ensure_services` 直接返回缓存结果，不会重复启动或重复健康检查。缓存：
-- `_health_cache`: 服务健康状态（step 内有效）
-- `_bridge_cache`: 容器桥接 IP（进程内有效）
-- `_started_profiles`: 已启动的 profile（避免重复 `docker compose up`）
-
-**Step 切换时清空缓存**：
-```python
-from main.stages3.docker_utils import clear_cache
-clear_cache()  # 切换到新 step 前调用
-```
-
-### 4.3 运行中监控
+### 4.3 运行中监控（依然适用）
 
 ```bash
-# 查看服务日志
-docker compose logs -f anoxpepred
-
-# 查看所有服务状态
-docker compose ps
+# 查看服务进程
+ps aux | grep service.py
 
 # 查看 GPU 使用情况
 watch -n 2 nvidia-smi
 
-# 查看容器资源占用
-docker stats --no-stream
+# 查看端口监听
+ss -tnlp | grep <PORT>
+
+# 健康检查
+curl http://localhost:<port>/health
 ```
 
-**超时策略**（按服务类型）：
+**超时策略**（按服务类型，仍适用）：
 
 | 服务类型 | 超时 | 说明 |
 |---------|------|------|
@@ -414,29 +387,31 @@ docker stats --no-stream
 
 ### 4.4 关机与清理
 
-#### 4.4.1 正常关闭
+#### 4.4.1 正常关闭（已不适用）
+
+旧 Docker 部署下 `docker compose stop` / `docker compose down`。
+
+**当前**：找到进程并 `kill`：
 
 ```bash
-# 停止当前 step 使用的服务
-docker compose stop anoxpepred algpred2
+# 找到服务进程
+ps aux | grep service.py | grep <name>
 
-# 停止所有服务
-docker compose down
+# 优雅终止
+kill <PID>
 
-# 停止并删除卷（谨慎——会删模型缓存）
-docker compose down -v
+# 仍未释放则强制
+kill -9 <PID>
 ```
 
-#### 4.4.2 GPU 显存释放（==第 4 号坑==）
+#### 4.4.2 GPU 显存释放（第 4 号坑，依然适用）
 
-**`docker stop` 不能释放 GPU 显存。** 如果 GPU 进程属于宿主机 PID 命名空间，容器停止后 CUDA context 仍然占用显存。
-
-AnOxPePred 尤其严重——即使进程退出，PyTorch 缓存分配器会保留曾分配过的所有 CUDA 内存块（最多 ~34GB）。
+**容器 `docker stop` 不能释放 GPU 显存**——这是旧 Docker 部署的痛点。即使切到裸跑，仍会出现 PyTorch 缓存分配器保留 CUDA context 导致显存不释放的问题（AnOxPePred 尤其严重，可残留 ~34GB）。
 
 **正确的 GPU 显存释放流程**：
 ```bash
 # 1. 找到残留的 Python 进程
-ps aux | grep anoxpepred
+ps aux | grep service.py | grep anoxpepred
 
 # 2. 强制杀死
 kill -9 <PID>
@@ -446,108 +421,66 @@ nvidia-smi
 ```
 
 **预防措施**：
-- `docker-compose.yml` 中设置 `init: true`（tini init 进程，防止僵尸进程）
-- `stop_grace_period: 5s`（快速终止）
 - 启动新 GPU 服务前执行 `nvidia-smi` 确认显存
 - **不同 step 之间务必检查是否有残留 GPU 进程**
+- 旧 Docker 下还会设置 `init: true`（tini init 进程）、`stop_grace_period: 5s`；裸跑下注意 SIGTERM 处理
 
-#### 4.4.3 Step 切换标准流程
+#### 4.4.3 Step 切换标准流程（历史）
+
+主流程已删除，本节作废。当前只需：
 
 ```
-1. 停止当前 step 的服务：docker compose stop <services>
-2. 检查 GPU 显存：nvidia-smi（如有残留 → kill -9）
-3. 清空 docker_utils 缓存：clear_cache()
-4. 启动新 step 的服务：ensure_services(...)
-5. 确认新服务健康
+1. 停旧服务：kill <PID>（必要时 kill -9）
+2. 检查 GPU 显存：nvidia-smi
+3. 启动新服务：cd tools/<name> && .venv/bin/python service.py
+4. 确认新服务健康：curl http://localhost:<port>/health
 ```
 
 ---
 
-## 5. 故障排查手册
+## 5. 故障排查手册（部分仍适用）
 
-### 5.1 Docker 构建失败
+### 5.1 Docker 构建失败（已不适用）
 
-**症状**：`docker compose build` 失败，或构建通过但启动失败。
+本节是 Docker 专属。当前问题转写为：
 
-**排查步骤**：
-1. 查看构建日志：`docker compose build <service> 2>&1 | tail -50`
-2. 区分构建阶段 vs 运行阶段错误
-3. 检查基础镜像是否可拉取（中国网络可能不通）
-4. 检查 COPY 路径是否正确（大小写、相对路径）
-5. 批量审计所有 Dockerfile 的常见问题：
+**`uv sync` 失败**：
+1. 查看错误最后几行：`uv sync 2>&1 | tail -50`
+2. 检查 Python 版本（`tools/<name>/.python-version` 是否钉了版本，宿主机是否安装）
+3. 检查系统编译依赖（见 §3.2 陷阱 6）
+4. 网络问题：设置 `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 或 `HF_ENDPOINT=https://hf-mirror.com`
 
+### 5.2 Docker Hub 不可达（中国网络）→ 改为 PyPI/HF 镜像
+
+**当前症状**：`uv sync` 在某些包下载时超时或失败。
+
+**解决方案 — 配置镜像**：
 ```bash
-# 审计脚本——一次收集所有问题
-echo "=== dockerfile 路径 ==="
-grep 'dockerfile:' docker-compose.yml
+# 临时
+export UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+export HF_ENDPOINT=https://hf-mirror.com
 
-echo "=== COPY 遗漏 ==="
-for f in tools/*/Dockerfile; do
-  if ! grep -q 'COPY.*utils\.py' "$f"; then echo "MISS utils.py: $f"; fi
-  if ! grep -q 'COPY.*template' "$f"; then echo "MISS template: $f"; fi
-done
-
-echo "=== 基础镜像 ==="
-grep '^FROM' tools/*/Dockerfile
-
-echo "=== WORKDIR ==="
-grep 'WORKDIR' tools/*/Dockerfile
-
-echo "=== 大小写敏感问题 ==="
-ls -1 tools/
+# 永久（写入 shell rc）
+echo 'export UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple' >> ~/.zshrc
+echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.zshrc
 ```
 
-### 5.2 Docker Hub 不可达（中国网络）
-
-**症状**：`docker pull` 超时，`docker compose build` 在 `FROM` 行挂死。
-
-**解决方案 A — 配置镜像加速器**：
+历史 Docker Hub 镜像配置（已不适用，仅归档）：
 ```json
 // /etc/docker/daemon.json
 {
   "registry-mirrors": ["https://docker.m.daocloud.io"]
 }
 ```
-```bash
-sudo systemctl restart docker
-```
 
-**注意**：Daocloud 镜像有白名单，不在白名单的镜像（如 `ghcr.io/mamba-org/micromamba`）会被拒绝。此时需从原始源（如 GHCR）直接拉取。
+### 5.3 容器健康但请求挂死（docker-proxy bug）→ 已不适用
 
-**解决方案 B — 切换到原生执行**：
-当 Docker 构建持续失败时，可以回退到宿主机原生 conda/pip 环境：
-```bash
-# 例如 Aggrescan3D 的回退
-conda install -c lcbio aggrescan3d
-export AGGRESCAN_CONDA_ENV=aggrescan3d
-```
-通过环境变量驱动切换，不修改代码。但**原生执行仅作临时回退**，Docker 化仍需修复。
+Docker 专属问题。裸跑下若出现类似挂死，请先排除：
+1. OmegaFold 同步推理阻塞事件循环（见 §5.5）
+2. asyncio 任务队列堆积
+3. 系统层面 DNS/socket 问题（`dmesg | tail`）
 
-### 5.3 容器健康但请求挂死（docker-proxy bug）
-
-**症状**：服务健康检查通过，但长时间运行的预测请求间歇性挂死——客户端收不到响应，服务端实际上已完成。
-
-**诊断三步法**：
-```bash
-# 1. 宿主机 curl —— 可能挂死
-timeout 10 curl http://127.0.0.1:8002/predict -X POST ...
-
-# 2. 容器内 curl —— 正常
-docker exec bepipred3 curl http://localhost:8002/predict -X POST ...
-
-# 3. 桥接 IP curl —— 正常（确认是 docker-proxy 问题）
-BRIDGE_IP=$(docker inspect bepipred3 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-curl http://${BRIDGE_IP}:8002/predict -X POST ...
-```
-
-**根因**：docker-proxy（dockerd 的用户态 TCP 代理）在处理 keep-alive 连接时存在 bug——连接池状态不同步、重启后 TCP 连接未清理、高并发下 epoll 竞争条件。
-
-**修复**：使用桥接 IP 直连，通过 `{SERVICE}_HOST` 环境变量注入。
-`docker_utils.detect_bridge_ip()` 可自动获取桥接 IP。
-
-**适用范围**：仅在宿主机访问容器时受影响。Docker Compose 内部服务间通信使用 DNS 解析，不受影响。
-
-### 5.4 GPU 显存不足
+### 5.4 GPU 显存不足（依然适用）
 
 **症状**：服务健康检查通过但预测失败，或模型加载到一半静默挂死（无 OOM 错误，无日志）。
 
@@ -572,9 +505,9 @@ nvidia-smi
   → 启动 omegafold
 ```
 
-**JAX 的 CUDA 初始化时机**（陷阱）：JAX 在容器启动时初始化 CUDA，而不是在模型加载时。这意味着健康检查通过时显存可能已经不够，但不会报错。预测时才会因 `RuntimeError: No supported devices found` 或 `OutOfMemoryError` 而失败。
+**JAX 的 CUDA 初始化时机**（陷阱）：JAX 在进程启动时初始化 CUDA，而不是在模型加载时。这意味着健康检查通过时显存可能已经不够，但不会报错。预测时才会因 `RuntimeError: No supported devices found` 或 `OutOfMemoryError` 而失败。
 
-### 5.5 服务挂死
+### 5.5 服务挂死（依然适用）
 
 #### ToxinPred3（sklearn 单线程挂死）
 
@@ -587,7 +520,7 @@ nvidia-smi
 - 连续 5 批超时时调用 `/restart` 端点
 - 完全串行化（单连接，单请求）
 
-参见 `main/stages2/round02_toxinpred3_sync.py`。
+参见 `main/stages2/round02_toxinpred3_sync.py`（主流程已删除，请参考思路自行迁移）。
 
 #### OmegaFold（同步推理阻塞事件循环）
 
@@ -596,56 +529,65 @@ nvidia-smi
 **客户端修复**：`asyncio.Semaphore(1)` 串行化请求。
 **服务端推荐修复**（尚未实施）：将推理移入 `run_in_executor(ThreadPoolExecutor(max_workers=1), ...)`。
 
-### 5.6 Python 命名空间遮蔽
+### 5.6 Python 命名空间遮蔽（依然适用）
 
-**症状**：`ModuleNotFoundError: No module named 'tools.template'`，但 `tools/template/` 确实存在且已被 COPY。
+**症状**：`ModuleNotFoundError: No module named 'tools.template'`，但 `tools/template/` 确实存在。
 
 **诊断**：
 ```bash
-# 在容器内运行
-docker exec -it <container> python -c "import tools; print(tools.__path__)"
-# 输出类似：['/app/tools/AnOxPePred/tools'] ← 错误的路径！
-# 应该是：['/app/tools']
+cd tools/<name>
+.venv/bin/python -c "import tools; print(tools.__path__)"
+# 输出类似：['/.../tools/AnOxPePred/tools'] ← 错误的路径！
+# 应该是：['/.../tools']
 ```
 
-**修复**：微服务内部代码目录绝不能命名为 `tools/`。
+**修复**：微服务内部代码目录绝不能命名为 `tools/`。必要时 `mv tools/<name>/tools tools/<name>/<name>_sdk`。
 
-### 5.7 Linux 大小写敏感导致的构建失败
+### 5.7 Linux 大小写敏感导致的构建失败 → 改为 Linux 大小写敏感导致的服务找不到
 
-**症状**：在 macOS 上构建通过，推到 Linux 服务器上构建失败。错误信息为 `COPY failed: file not found`。
+**症状**：在 macOS 上 `uv run python service.py` 正常，部署到 Linux 上 `ModuleNotFoundError`。
 
 **排查**：
 ```bash
 # macOS 和 Linux 上分别执行
-ls -1 tools/<可疑目录>
-
-# 检查 docker-compose.yml 中引用的路径是否与真实目录名匹配
-grep 'dockerfile:' docker-compose.yml
 ls -1 tools/
+
+# 确认 cd 进去的目录名与代码中引用一致
+cd tools/Tipred && cat pyproject.toml | grep -i name
 ```
 
-### 5.8 Docker-outside-Docker 路径问题
+### 5.8 Docker-outside-Docker 路径问题（已不适用）
 
-**症状**：通过 Docker socket 启动子容器的服务（AlphaFold3, PEP-FOLD4）找不到挂载卷——容器内的路径在宿主机上不存在。
+Docker 专属问题，裸跑下不再存在。AF3 / PEP-FOLD4 / Waveflow 等若仍依赖 Docker socket 启动子容器，请参考历史方案：
 
-**根因**：`docker run --volume` 的源路径由**宿主机 Docker 守护进程**解析，不是由 API 容器解析。
-
-**修复**：使用双路径——宿主机路径（docker socket 用）和容器内路径（健康检查用）：
 ```yaml
-# docker-compose.yml
 environment:
-  AF3_MODEL_DIR: /root/models           # 容器内路径（健康检查用）
-  AF3_MODEL_HOST_DIR: /home/lenovo/af_models  # 宿主机路径（docker.sock 用）
+  AF3_MODEL_DIR: /root/models
+  AF3_MODEL_HOST_DIR: /home/lenovo/af_models
 volumes:
   - /var/run/docker.sock:/var/run/docker.sock
-  - /usr/bin/docker:/usr/bin/docker      # 挂载 docker CLI，不在容器内安装
+  - /usr/bin/docker:/usr/bin/docker
 ```
 
 ---
 
-## 6. 速查命令表
+## 6. 速查命令表（更新版）
 
-### 构建
+### 启动/停止（当前）
+
+| 命令 | 说明 |
+|------|------|
+| `cd tools/<name>` | 所有服务操作在各自目录下执行 |
+| `uv sync` | 安装/同步依赖到 `.venv` |
+| `.venv/bin/python service.py` | 启动服务 |
+| `uv run python service.py` | 启动服务（备选） |
+| `PORT=8888 .venv/bin/python service.py` | 覆盖端口 |
+| `HOST=127.0.0.1 .venv/bin/python service.py` | 覆盖 host |
+| `kill <PID>` | 优雅终止服务 |
+| `kill -9 <PID>` | 强制终止 |
+| `curl http://localhost:<port>/health` | 健康检查 |
+
+### 历史 Docker 命令（归档参考）
 
 | 命令 | 说明 |
 |------|------|
@@ -653,77 +595,60 @@ volumes:
 | `docker compose --profile cpu build` | 构建所有 CPU 服务 |
 | `docker compose --profile gpu build` | 构建所有 GPU 服务 |
 | `docker compose build anoxpepred` | 构建单个服务 |
-| `docker compose --no-ansi build 2>&1 \| tail -50` | 查看构建最后 50 行日志 |
-
-### 启动/停止
-
-| 命令 | 说明 |
-|------|------|
 | `docker compose --profile gpu up -d` | 启动所有 GPU 服务 |
 | `docker compose --profile cpu up -d` | 启动所有 CPU 服务 |
 | `docker compose up -d anoxpepred algpred2` | 启动指定服务 |
 | `docker compose stop anoxpepred` | 停止指定服务 |
 | `docker compose down` | 停止并移除所有容器 |
-| `docker compose restart anoxpepred` | 重启服务 |
 
-### 监控
+### 监控（依然适用）
 
 | 命令 | 说明 |
 |------|------|
-| `docker compose ps` | 查看服务状态 |
-| `docker compose logs -f anoxpepred` | 查看实时日志 |
+| `ps aux \| grep service.py` | 查看服务进程 |
 | `nvidia-smi` | 查看 GPU 显存 |
 | `watch -n 2 nvidia-smi` | 实时监控 GPU |
-| `docker stats --no-stream` | 查看容器资源占用 |
-| `ss -tnp \| grep <PORT>` | 查看端口占用 |
+| `ss -tnlp \| grep <PORT>` | 查看端口占用 |
+| `curl http://localhost:<port>/health` | 健康检查 |
 
-### 容器内调试
-
-| 命令 | 说明 |
-|------|------|
-| `docker exec -it anoxpepred bash` | 进入容器 shell |
-| `docker exec anoxpepred curl localhost:8001/health` | 容器内健康检查 |
-| `docker inspect anoxpepred --format '{{json .NetworkSettings.Networks}}'` | 查看网络配置 |
-
-### 排查
+### 排查（依然适用）
 
 | 命令 | 说明 |
 |------|------|
-| `docker inspect anoxpepred \| jq '.[0].State'` | 查看容器状态详情 |
-| `docker logs anoxpepred --tail 100` | 查看最后 100 行日志 |
 | `ps aux \| grep python` | 查找残留 Python 进程 |
 | `kill -9 <PID>` | 强制释放 GPU 显存 |
-| `docker system df` | 查看磁盘占用 |
-| `docker builder prune` | 清理构建缓存 |
+| `uv sync 2>&1 \| tail -50` | 查看依赖安装最后几行 |
+| `dmesg \| tail` | 查看内核日志（OOM、CUDA 错误） |
+| `ls -1 tools/` | 确认目录名大小写 |
 
 ---
 
 ## 附录：经验胶囊索引
 
-本文件的内容来自以下 `.agents/learnings/` 中的经验胶囊，如需查看完整上下文请参阅原文：
+本文件的内容来自以下 `.agents/learnings/` 中的经验胶囊，部分仍在裸跑下适用：
 
-| 主题 | 胶囊文件 |
-|------|---------|
-| Docker Compose 原子性回滚 | `docker/compose-atomic-build.md` |
-| 批量故障审计 | `docker/batch-failure-audit.md` |
-| Dockerfile COPY 遗漏 | `docker/dockerfile-copy-audit.md` |
-| dockerfile 路径相对于 context | `docker/dockerfile-path-compose.md` |
-| latest 标签版本不确定性 | `docker/latest-tag-pinning.md` |
-| Linux 大小写敏感 | `docker/linux-case-sensitivity.md` |
-| Python 命名空间遮蔽 | `docker/python-namespace-shadowing.md` |
-| slim 缺少 C 编译依赖 | `docker/slim-image-build-deps.md` |
-| Docker Hub 中国镜像 | `docker/docker-hub-china-mirror.md` |
-| Docker-outside-Docker 路径 | `docker/docker-outside-docker-paths.md` |
-| 容器内 Docker CLI 安装 | `docker/docker-cli-in-container.md` |
-| 桥接 IP 直连 | `gep-docker-container-bridge-ip.md` |
-| Docker 不可达时原生回退 | `gep-docker-native-hybrid.md` |
-| PyTorch CUDA 缓存残留 | `gep-pytorch-cuda-cache-gpu-memory-leak.md` |
-| GPU 显存争用 | `gpu-memory-contention.md` |
-| BepiPred3 GPU 超时调优 | `gep-bepipred3-gpu-timeout-tuning.md` |
-| OmegaFold 同步推理阻塞 | `gep-omegafold-sync-inference-blocking.md` |
-| ToxinPred3 单线程挂死 | `gep-toxinpred3-concurrency-limit.md` |
-| TemStaPro 预筛减少 GPU 瓶颈 | `gep-temstapro-prescreen-gpu-bottleneck.md` |
-| 结构预测置信度级联 | `gep-pipeline-confidence-cascade.md` |
-| 流水线阶段编排与检查点 | `gep-pipeline-stage-orchestration.md` |
-| 微服务网络绑定策略 | `microservice-host-binding.md` |
-| 结构预测 Docker 模式 | `structure-service-pattern.md` |
+| 主题 | 胶囊文件 | 当前是否适用 |
+|------|---------|-------------|
+| Docker Compose 原子性回滚 | `docker/compose-atomic-build.md` | ❌ Docker 专属 |
+| 批量故障审计 | `docker/batch-failure-audit.md` | ❌ Docker 专属 |
+| Dockerfile COPY 遗漏 | `docker/dockerfile-copy-audit.md` | ❌ Docker 专属 |
+| dockerfile 路径相对于 context | `docker/dockerfile-path-compose.md` | ❌ Docker 专属 |
+| latest 标签版本不确定性 | `docker/latest-tag-pinning.md` | ❌ Docker 专属 |
+| Linux 大小写敏感 | `docker/linux-case-sensitivity.md` | ✅ 仍适用 |
+| Python 命名空间遮蔽 | `docker/python-namespace-shadowing.md` | ✅ 仍适用 |
+| slim 缺少 C 编译依赖 | `docker/slim-image-build-deps.md` | ✅ 仍适用（系统级） |
+| Docker Hub 中国镜像 | `docker/docker-hub-china-mirror.md` | ❌ Docker 专属 |
+| Docker-outside-Docker 路径 | `docker/docker-outside-docker-paths.md` | ❌ Docker 专属 |
+| 容器内 Docker CLI 安装 | `docker/docker-cli-in-container.md` | ❌ Docker 专属 |
+| 桥接 IP 直连 | `gep-docker-container-bridge-ip.md` | ❌ Docker 专属 |
+| Docker 不可达时原生回退 | `gep-docker-native-hybrid.md` | ❌ Docker 专属 |
+| PyTorch CUDA 缓存残留 | `gep-pytorch-cuda-cache-gpu-memory-leak.md` | ✅ 仍适用 |
+| GPU 显存争用 | `gpu-memory-contention.md` | ✅ 仍适用 |
+| BepiPred3 GPU 超时调优 | `gep-bepipred3-gpu-timeout-tuning.md` | ✅ 仍适用 |
+| OmegaFold 同步推理阻塞 | `gep-omegafold-sync-inference-blocking.md` | ✅ 仍适用 |
+| ToxinPred3 单线程挂死 | `gep-toxinpred3-concurrency-limit.md` | ✅ 仍适用 |
+| TemStaPro 预筛减少 GPU 瓶颈 | `gep-temstapro-prescreen-gpu-bottleneck.md` | ✅ 仍适用 |
+| 结构预测置信度级联 | `gep-pipeline-confidence-cascade.md` | ❌ 主流程已删除 |
+| 流水线阶段编排与检查点 | `gep-pipeline-stage-orchestration.md` | ❌ 主流程已删除 |
+| 微服务网络绑定策略 | `microservice-host-binding.md` | ✅ 仍适用 |
+| 结构预测 Docker 模式 | `structure-service-pattern.md` | ❌ Docker 专属 |

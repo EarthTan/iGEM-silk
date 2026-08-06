@@ -44,7 +44,7 @@ uv run python service.py
 | `AMP-ESM` | 8011 | GPU/CPU | [移植] v0.1.0 TF/Keras h5 · 300 MB + [移植] 5×fold ckpt ×2 · 74 GB（imbalanced + balanced） + [下载] ESM-2 t33 · 2.5 GB | 短肽 2–200（两版本一致，超出拒绝） | 抗菌肽预测（v0.1.0 AMPlify / v0.2.0 ESM-2 双版本，balanced / imbalanced 都可用） |
 | `SoDoPE` | 8012 | CPU | [—] 纯查表 + 数学运算 | 全范围 | 溶解度预测（SWI） |
 
-**AMP-ESM 双版本说明**：默认 `v0.1.0`（原 AMPlify TF/Keras 基线，用户指定优先使用；balanced/imbalanced 均可），用 `AMP_ESM_VERSION=v0.2.0` 切换 ESM-2 版（balanced/imbalanced 也均可）。`AMP_ESM_MODE` 覆盖模式（两版本默认均为 imbalanced）。v0.2.0 权重约 74 GB 随服务提供（imbalanced + balanced 两组 5×fold ckpt，每组 ~37 GB）；v0.1.0 权重约 300 MB 随服务提供。TF 推理在本机走 CPU（TF 2.16 wheel 需 CUDA 12 运行库，本机为 CUDA 13）。
+**AMP-ESM 双版本说明**：默认 `v0.1.0`（原 AMPlify TF/Keras 基线，用户指定优先使用；balanced/imbalanced 均可），用 `AMP_ESM_VERSION=v0.2.0` 切换 ESM-2 版（balanced/imbalanced 也均可）。`AMP_ESM_MODE` 覆盖模式（两版本默认均为 imbalanced）。v0.2.0 权重约 74 GB 随服务提供（imbalanced + balanced 两组 5×fold ckpt，每组 ~37 GB）；v0.1.0 权重约 300 MB 随服务提供。v0.1.0 走 GPU（按 2026-08-05 部署，CUDA 12.6 toolkit + `tensorflow[and-cuda]==2.16.*` 装在 `.venv`，启动需 `export CUDA_HOME=/usr/local/cuda-12.6 PATH="$CUDA_HOME/bin:$PATH" LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"`）。
 
 ### ② PDB Service（8101+）— PDB 结构 → 评分
 

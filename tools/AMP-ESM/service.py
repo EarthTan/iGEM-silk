@@ -211,13 +211,19 @@ class AMPESMService(FastaToolService):
         # TF 的 CUDA 运行时库可能缺失（本机仅驱动），如实上报实际设备
         tf_devices = tf.config.list_physical_devices("GPU")
         self.device = "gpu" if tf_devices else "cpu"
+        # v0.1.0 走 GPU 时开启按需显存分配，避免独占整张 5880 Ada（48 GB）
+        for _g in tf_devices:
+            try:
+                tf.config.experimental.set_memory_growth(_g, True)
+            except RuntimeError:
+                pass  # 已被初始化，忽略
         if not tf_devices:
             self.logger.info(
                 "TF GPU libraries unavailable, falling back to CPU "
                 "(v0.1.0 BiLSTM 推理 CPU 足够快)"
             )
 
-        self.recommended_batch_size = 20  # v0.1.0 轻量，CPU 可高并发
+        self.recommended_batch_size = 20  # v0.1.0 轻量；CPU 高并发 / GPU 走批
 
     def _load_v02(self) -> None:
         """加载 v0.2.0 ESM-2 5-fold 集成（每个 fold 重建一个 AmplifyESM）。"""
@@ -292,21 +298,35 @@ class AMPESMService(FastaToolService):
 
     def _forward_one_v01(self, sequence: str) -> dict:
         """v0.1.0 单序列 5 折集成前向（复用原 src/AMPlify.py 的 ensemble）。"""
+        return self._forward_batch_v01([sequence])[0]
+
+    def _forward_batch_v01(self, sequences: list[str]) -> list[dict]:
+        """v0.1.0 批量 5 折集成前向（GPU 批处理路径，单条请求仍走 _forward_one_v01）。
+
+        src/AMPlify.py:ensemble() 在 n_samples==1 时用 X_padded=concat([X,X]) 走 batch=2 的
+        绕路；本函数保证永远走 n_samples≥2 的正常路径（长度为 1 时复制一条凑 batch）。
+        """
         mod = self._v01_module
-        X = mod.one_hot_padding([sequence], MAX_LEN)
+        n = len(sequences)
+        # 永远走 ensemble() 的 batch≥2 路径，避免 n_samples==1 的 X_padded 特殊分支
+        run_seqs = sequences if n >= 2 else sequences + sequences
+        X = mod.one_hot_padding(run_seqs, MAX_LEN)
         ens, indv = mod.ensemble(self.models, X)
-        score = float(ens[0])
-        label = str(mod.proba_to_class_name([score])[0])
-        return {
-            "probability": score,
-            "amplify_score": self._amplify_log_score(score),
-            "prediction": label,
-            "charge": (
-                sequence.count("K") + sequence.count("R")
-                - sequence.count("D") - sequence.count("E")
-            ),
-            "sub_model_probabilities": [float(p) for p in indv[:, 0]],
-        }
+        labels = mod.proba_to_class_name(list(ens[:n]))
+        out: list[dict] = []
+        for i, seq in enumerate(sequences):
+            score = float(ens[i])
+            out.append({
+                "probability": score,
+                "amplify_score": self._amplify_log_score(score),
+                "prediction": str(labels[i]),
+                "charge": (
+                    seq.count("K") + seq.count("R")
+                    - seq.count("D") - seq.count("E")
+                ),
+                "sub_model_probabilities": [float(p) for p in indv[:, i]],
+            })
+        return out
 
     def _forward_one_v02(self, sequence: str) -> dict:
         """v0.2.0 单序列 5-fold 集成前向，数学与原 predict_records 完全一致:
@@ -399,6 +419,88 @@ class AMPESMService(FastaToolService):
                 ],
             },
         )
+
+    async def predict_batch(self, request) -> "BatchPredictResponse":
+        """批量预测。
+
+        v0.1.0 路径：把所有合法序列拼成一个 batch，一次性走 5 折 GPU 集成前向
+        （避免默认实现那样发 N 个单条协程在 GPU 上随机乱跳）。
+        v0.2.0 路径：仍走模板默认实现（PyTorch 内部已批处理，v0.2.1 加速在 amp_esm 里）。
+        """
+        from tools.template.fasta_service import BatchPredictResponse
+
+        # 确保模型已加载
+        if not self._loaded:
+            async with self._lock:
+                if not self._loaded:
+                    await self.load_model()
+                    self._loaded = True
+
+        items = list(request.sequences)
+
+        if self.version == "v0.1.0":
+            cleaned: list[tuple[str, str]] = []  # (peptide_id, sequence)
+            errors: list[tuple[str, str, str]] = []  # (peptide_id, sequence, msg)
+            for it in items:
+                seq = it.sequence.strip().upper()
+                if seq.endswith("*"):
+                    seq = seq[:-1]
+                pid = it.peptide_id or "unknown"
+                try:
+                    if not (2 <= len(seq) <= MAX_LEN):
+                        raise ValueError(
+                            f"sequence length {len(seq)} outside [2, {MAX_LEN}]"
+                        )
+                    bad = sorted({c for c in seq if c not in STANDARD_AA})
+                    if bad:
+                        raise ValueError(f"non-standard amino acid(s): {''.join(bad)}")
+                except ValueError as e:
+                    errors.append((pid, it.sequence, str(e)))
+                else:
+                    cleaned.append((pid, seq))
+
+            results = []
+            if cleaned:
+                with self._infer_lock:
+                    outputs = self._forward_batch_v01([s for _, s in cleaned])
+                for (pid, seq), out in zip(cleaned, outputs):
+                    results.append(ToolResult(
+                        peptide_id=pid,
+                        sequence=seq,
+                        score=float(out["probability"]),
+                        label=out["prediction"],
+                        details={
+                            "length": len(seq),
+                            "charge": int(out["charge"]),
+                            "amplify_log_scaled_score": round(float(out["amplify_score"]), 6),
+                            "version": self.version,
+                            "implementation": VERSION_INFO[self.version]["implementation"],
+                            "mode": self.mode,
+                            "device": self.device,
+                            "gpu_backend": self.gpu_info.get("backend", "unknown"),
+                            "sub_model_probabilities": [
+                                round(float(p), 6) for p in out["sub_model_probabilities"]
+                            ],
+                        },
+                    ))
+
+            total = len(items)
+            ok = len(results)
+            # 失败项记录到 error 字段（保持 ToolResult 形状不变）
+            err_msg: str | None = None
+            if errors:
+                msgs = "; ".join(f"{p}: {m}" for p, _, m in errors)
+                err_msg = f"{total - ok}/{total} failed: {msgs}" if ok else f"all failed: {msgs}"
+                ok = 0  # 只要有失败，success 走 False
+            return BatchPredictResponse(
+                success=(err_msg is None),
+                results=results,
+                total=len(results),
+                error=err_msg,
+            )
+
+        # v0.2.0：保留默认实现（PyTorch 路径不受本次 TF 改动影响）
+        return await super().predict_batch(request)
 
 
 # 创建 FastAPI 应用
