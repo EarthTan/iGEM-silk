@@ -35,3 +35,6 @@ output3/*.db
 
 # log files
 *.log
+
+
+.workbuddy
