@@ -1,3 +1,5 @@
+> **English** | [中文](CLAUDE.zh.md)
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -31,7 +33,7 @@ The `main/stages2/` pipeline (v2) processed 1M+ antioxidant peptides through 8 r
 | 6 | `round06_pdb_eval.py` | SASA+Aggrescan3D evaluation | PDB→scores | ~6min |
 | 7 | `round07_final.py` | Final dual-channel output, two rankings | →90 Top + 60 Bottom reports | ~1min |
 
-**Total**: ~6.5h, 1,081,772 → 150 candidates, 99.986%淘汰率.
+**Total**: ~6.5h, 1,081,772 → 150 candidates, 99.986% elimination rate.
 
 **Key v2 design decisions**:
 - Round 1 skips ToxinPred3 (1M sequences would take ~22h), deferred to Round 2 on 50K subset
@@ -119,7 +121,7 @@ These are hard-won from stages2 production.
 
 **Docker mandatory**: All microservices MUST run in Docker for production. Running `python service.py` on the host causes environment drift, missing models, and wasted debugging. See `main/stages3/TECH_REQUIREMENTS.md`.
 
-**按需启动原则（stages3）**: 每个 stage 只启动该阶段实际依赖的微服务，不提前启动不需要的服务。Docker Compose 的 `--profile` 机制天然支持这种模式。不要一次性启动全部 16 个服务，避免 GPU 显存竞争和资源浪费。在启动任何 stage 前先执行 health check 确认依赖服务就绪。
+**On-demand startup principle (stages3)**: Each stage starts only the microservices it actually depends on; do not start unneeded services in advance. Docker Compose's `--profile` mechanism naturally supports this pattern. Do not start all 16 services at once, to avoid GPU memory contention and wasted resources. Before starting any stage, run a health check to confirm that the dependent services are ready.
 
 **OmegaFold blocks the event loop**: OmegaFold's `self.model(input_data)` is a synchronous PyTorch CUDA call (90-120s) inside an `async def`. This blocks uvicorn's event loop. Client-side fix: `asyncio.Semaphore(1)` to serialize requests. See `.agents/learnings/gep-omegafold-sync-inference-blocking.md`.
 

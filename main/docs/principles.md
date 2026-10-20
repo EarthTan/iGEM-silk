@@ -1,44 +1,46 @@
-# Pipeline 工程原则
+> **English** | [中文](principles.zh.md)
 
-<!-- 本文档阐述 main/ 目录下管线代码的设计原则、工程美学和最佳实践。 -->
+# Pipeline Engineering Principles
+
+<!-- This document describes the design principles, engineering aesthetics, and best practices of the pipeline code under the main/ directory. -->
 
 ---
 
-## (a) 微服务调用的方法
+## (a) How to Call Microservices
 
-### 1. 三大服务模板
+### 1. The Three Service Templates
 
-所有微服务遵循三种接口模板，`ServiceClient` 对应提供三种调用方式：
+All microservices follow one of three interface templates, and `ServiceClient` provides a corresponding call method for each:
 
-| 模板 | 输入 | 输出 | 调用方法 |
-|------|------|------|----------|
-| FASTA 服务 | `sequence` (str) | `score` (float) | `predict_single()` / `predict_batch()` |
-| Structure 服务 | `sequence` (str) | `pdb_content` (str) | `predict_structure_async()` (job 轮询) |
-| PDB 评分服务 | `pdb_content` (str) + `sequence` (str) | `score` (float) | `predict_pdb_single()` / `predict_pdb_batch()` |
+| Template | Input | Output | Call method |
+|----------|-------|--------|-------------|
+| FASTA service | `sequence` (str) | `score` (float) | `predict_single()` / `predict_batch()` |
+| Structure service | `sequence` (str) | `pdb_content` (str) | `predict_structure_async()` (job polling) |
+| PDB scoring service | `pdb_content` (str) + `sequence` (str) | `score` (float) | `predict_pdb_single()` / `predict_pdb_batch()` |
 
-每个服务只属于一个模板。不要在业务逻辑中猜测服务接口——查 `services.json` 的 `type` 字段。
+Each service belongs to exactly one template. Do not guess a service's interface inside business logic — check the `type` field in `services.json`.
 
-### 2. 批量调用优先
+### 2. Prefer Batch Calls
 
-- 默认使用 `predict_batch()`，除非服务强制单条发送
-- 例外：ToxinPred3（sklearn `ExtraTreesClassifier` 线程不安全，只能单条）
-- batch 大小是**性能关键参数**，需要在吞吐和超时之间平衡
+- Use `predict_batch()` by default, unless the service forces single-sequence sends
+- Exception: ToxinPred3 (sklearn `ExtraTreesClassifier` is not thread-safe, so single sequences only)
+- Batch size is a **performance-critical parameter** and must be balanced between throughput and timeout
 
-### 3. Semaphore 控制并发
+### 3. Use Semaphore to Control Concurrency
 
-每个服务的并发数在代码中显式声明为 `asyncio.Semaphore(N)`。N 的取值取决于：
+Each service's concurrency is declared explicitly in code as `asyncio.Semaphore(N)`. The value of N depends on:
 
-- **服务类型**：GPU 服务需考虑显存限制（TemStaPro → 低并发；pLM4CPPs → 可高并发）
-- **线程安全**：CPU 服务中 sklearn/skrebayes 的 C 扩展可能线程不安全 → Semaphore(1-2)
-- **实例数**：多容器部署时每个容器独立 Semaphore（跨进程安全）
+- **Service type**: GPU services must consider VRAM limits (TemStaPro → low concurrency; pLM4CPPs → high concurrency possible)
+- **Thread safety**: in CPU services, the C extensions of sklearn/skrebayes may not be thread-safe → Semaphore(1-2)
+- **Instance count**: with multi-container deployment, each container has its own Semaphore (safe across processes)
 
-Semaphore 的默认值服务于**吞吐 × 稳定性的平衡点**，通过实际压测确定。
+The default Semaphore values serve a **balance point between throughput × stability**, determined through actual stress testing.
 
-### 4. 避免 127.0.0.1（Docker bridge IP）
+### 4. Avoid 127.0.0.1 (Docker Bridge IP)
 
-访问 Docker 容器时**绝对不要用 `127.0.0.1:PORT`**。docker-proxy 转发会导致 httpx 间歇性 keep-alive 挂起。
+When accessing Docker containers, **never use `127.0.0.1:PORT`**. Forwarding through docker-proxy causes intermittent httpx keep-alive hangs.
 
-正确做法：`docker inspect` 获取 bridge IP：
+The correct approach: get the bridge IP with `docker inspect`:
 
 ```python
 def _fix_docker_network(service_name: str) -> str:
@@ -50,230 +52,230 @@ def _fix_docker_network(service_name: str) -> str:
     return bridge["IPAddress"]
 ```
 
-替代方案：如果主机能直接访问容器端口且无 keep-alive 问题，可以用 127.0.0.1（需要验证）。
+Alternative: if the host can reach the container port directly and there is no keep-alive problem, 127.0.0.1 can be used (requires verification).
 
-### 5. 健康检查前置
+### 5. Health Check First
 
-任何评分步骤开始前调用 `ensure_services()` 确认依赖服务就绪。这避免了"跑了一小时发现服务挂了"的灾难。
+Before any scoring step begins, call `ensure_services()` to confirm the dependent services are ready. This avoids the disaster of "running for an hour and then discovering the service is down".
 
 ```python
 health = ensure_services(required_services, profiles=["gpu"], timeout=180.0)
 unavailable = [s for s, h in health.items() if not h["available"]]
 if unavailable:
-    sys.exit(1)  # 绝不继续
+    sys.exit(1)  # never continue
 ```
 
-### 6. asyncio.gather 必须带 return_exceptions=True
+### 6. asyncio.gather Must Use return_exceptions=True
 
-否则一个协程抛出异常→所有协程被取消。这在批量处理中是毁灭性的。
+Otherwise, when one coroutine raises an exception → all coroutines are cancelled. That is devastating in batch processing.
 
 ```python
-# ❌ 错误：一个失败全部取消
+# ❌ Wrong: one failure cancels everything
 results = await asyncio.gather(*tasks)
 
-# ✅ 正确：异常以返回值形式返回
+# ✅ Correct: exceptions are returned as values
 results = await asyncio.gather(*tasks, return_exceptions=True)
 for r in results:
     if isinstance(r, Exception):
-        continue  # 宽容处理，不阻塞整体流程
+        continue  # handle leniently, do not block the overall flow
 ```
 
-### 7. 服务不可知调用
+### 7. Service-Agnostic Calls
 
-`ServiceClient` 对服务名透明——`predict_batch("hemopi2", items)` 和 `predict_batch("sodope", items)` 走同一套代码。服务地址和端口只由 `config.py` 管理，业务逻辑无需关心。
+`ServiceClient` is transparent with respect to service names — `predict_batch("hemopi2", items)` and `predict_batch("sodope", items)` go through the same code. Service addresses and ports are managed only by `config.py`, and business logic need not care.
 
 ```python
-# config.py 是唯一的参数控制面板
+# config.py is the single parameter control panel
 SERVICES["hemopi2"]   = {"port": 8004}
 SERVICES["sodope"]    = {"port": 8012}
 
-# 运行时可通过环境变量覆盖
+# can be overridden at runtime via environment variables
 # export HEMOPI2_HOST=192.168.1.50
 ```
 
 ---
 
-## (b) 平衡资源与速度
+## (b) Balancing Resources and Speed
 
-### 1. CPU 先行，GPU 按重量排队
+### 1. CPU First, GPU Queued by Weight
 
-GPU 显存是 Pipeline 最稀缺的资源（49GB，但单模型可占 20GB+）。
+GPU VRAM is the scarcest resource in the pipeline (49GB, but a single model can occupy 20GB+).
 
-安排服务顺序的规则：
+Rules for ordering services:
 
-1. **CPU 服务先跑**——SoDoPE、TIPred 等 CPU 服务对 GPU 无竞争，快速出结果
-2. **GPU 服务由轻到重**——pLM4CPPs（~2GB）→ GraphCPP（~2GB）→ BepiPred3（~6GB）→ TemStaPro（~20GB）
-3. **同一时间只有一个 GPU 服务加载模型**——避免显存竞争导致模型加载 OOM
+1. **Run CPU services first** — CPU services such as SoDoPE and TIPred do not compete for the GPU and produce results quickly
+2. **GPU services from light to heavy** — pLM4CPPs (~2GB) → GraphCPP (~2GB) → BepiPred3 (~6GB) → TemStaPro (~20GB)
+3. **Only one GPU service loads a model at a time** — avoid model-loading OOM caused by VRAM contention
 
-### 2. 空闲资源利用（预打分）
+### 2. Using Idle Resources (Pre-scoring)
 
-当管线因 CPU 瓶颈（如 ToxinPred3 跑 16h）阻塞时，GPU 完全空闲。这时应该启动**预打分**——利用空闲 GPU 提前计算后续阶段的分数。
+When the pipeline is blocked by a CPU bottleneck (for example, ToxinPred3 running for 16h), the GPU sits completely idle. This is the time to launch **pre-scoring** — using the idle GPU to compute the scores of later stages in advance.
 
-核心模式：
+The core pattern:
 
 ```
-CPU 瓶颈服务（串行）  ←-- 管线等待
+CPU-bound service (serial)  ←-- pipeline waits
     ↓
-GPU 空闲 → 预打分脚本 → roundN_scores 表（幂等写入）
+GPU idle → pre-scoring script → roundN_scores table (idempotent writes)
     ↓
-CPU 瓶颈完成 → 主管线继续 → 检查到预打分数据已完成 → 跳过评分阶段
+CPU bottleneck completes → main pipeline continues → sees that pre-scored data is complete → skips the scoring stage
 ```
 
-预打分的"浪费"（部分候选最终被淘汰，预打分数据废弃）远小于"GPU 空闲等待"的损失。
+The "waste" of pre-scoring (some candidates are ultimately eliminated and their pre-scored data is discarded) is far smaller than the loss of "GPU idling while waiting".
 
-### 3. 并发数不是越大越好
+### 3. More Concurrency Is Not Always Better
 
-并发数存在两个硬约束：
+Concurrency has two hard constraints:
 
-- **显存上限**：单个 GPU 服务在同一时间加载一个模型。Semaphore(N) 导致 N 个请求排队，不增加显存压力（模型已加载），但请求堆积过多会导致超时。N 的经验值：`timeout / 单请求耗时 × 0.8`。
-- **线程安全**：sklearn 的 C 扩展（`ExtraTreesClassifier`、`RandomForest`）在多线程下挂起。Semaphore(1) 或 Semaphore(2) 是安全上限。多容器 = 多进程 = 安全。
+- **VRAM ceiling**: a single GPU service loads one model at a time. Semaphore(N) causes N requests to queue up; this does not increase VRAM pressure (the model is already loaded), but too many piled-up requests cause timeouts. Rule of thumb for N: `timeout / per-request duration × 0.8`.
+- **Thread safety**: sklearn's C extensions (`ExtraTreesClassifier`, `RandomForest`) hang under multithreading. Semaphore(1) or Semaphore(2) is the safe upper bound. Multiple containers = multiple processes = safe.
 
-### 4. 多实例破解服务端单线程限制
+### 4. Multiple Instances Break the Server-Side Single-Thread Limit
 
-对于线程不安全的服务（ToxinPred3），单进程 Semaphore(1) 的吞吐太低。解法：部署多个 Docker 容器实例，每个实例独立进程，客户端按候选块分配（round-robin 或分片）。
+For services that are not thread-safe (ToxinPred3), the throughput of a single process with Semaphore(1) is too low. The solution: deploy multiple Docker container instances, each with its own process, and have the client distribute candidate chunks (round-robin or sharding).
 
 ```python
-# 多实例 = 多进程 = 物理隔离的 sklearn = 安全
+# multiple instances = multiple processes = physically isolated sklearn = safe
 TOXIN_INSTANCES = ["toxinpred3", "toxinpred3-2", "toxinpred3-3"]
 for idx, inst in enumerate(TOXIN_INSTANCES):
     start = idx * per_instance
-    # 每个实例负责独立的候选子集
+    # each instance handles an independent subset of candidates
     instance_batches.append((inst, all_candidates[start:end]))
 ```
 
-每个实例内部仍然使用 Semaphore(2) 保守控制。这样吞吐等于 `N_实例 × 单实例吞吐`。
+Each instance still uses Semaphore(2) internally as a conservative control. Throughput then equals `N_instances × single-instance throughput`.
 
-### 5. 按需启动服务
+### 5. On-Demand Service Startup
 
-启动所有 16 个服务会浪费 GPU 显存（PyTorch CUDA context 占 ~GB 级）。每个 round 只启动需要的服务：
+Starting all 16 services wastes GPU VRAM (a PyTorch CUDA context occupies GBs). Each round starts only the services it needs:
 
-- Round 1: anoxpepred + algpred2（2 个）
-- Round 2: toxinpred3 × 3 + hemopi2 + mhcflurry（5 个）
-- Round 3: bepipred3 + temstapro + sodope + plm4cpps + graphcpp（5 个）
+- Round 1: anoxpepred + algpred2 (2 services)
+- Round 2: toxinpred3 × 3 + hemopi2 + mhcflurry (5 services)
+- Round 3: bepipred3 + temstapro + sodope + plm4cpps + graphcpp (5 services)
 
-Docker Compose 的 `--profile` 机制天然支持。`s4_service_map.py` 记录了每个 round 的依赖。
+Docker Compose's `--profile` mechanism supports this natively. `s4_service_map.py` records the dependencies of each round.
 
 ---
 
-## (c) 分批保存、容灾性、鲁棒性
+## (c) Batch Persistence, Disaster Tolerance, and Robustness
 
-### 1. 永不全部收集在内存中
+### 1. Never Collect Everything in Memory
 
-这是管线最核心的数据安全原则。
+This is the pipeline's most central data-safety principle.
 
-每批数据打分完成后**立即写入数据库**，不积累。写入使用 `ON CONFLICT DO UPDATE`（幂等），同一行可被不同轮次写入安全更新。
+After each batch is scored, **write it to the database immediately**; never accumulate. Writes use `ON CONFLICT DO UPDATE` (idempotent), so the same row can be safely updated by different rounds.
 
 ```python
-# ❌ 错误：所有分数收集在内存，最后一锤子写入
+# ❌ Wrong: all scores collected in memory, written in one final shot
 results = []
 for chunk in chunks:
     scores = await score_chunk(chunk)
     results.extend(scores)
-db.write_all(results)  # 跑了 16h 后崩溃 → 全部丢失
+db.write_all(results)  # crashes after 16h of running → everything lost
 
-# ✅ 正确：每批打完立即写入
+# ✅ Correct: write immediately after each batch is scored
 for chunk in chunks:
     scores = await score_chunk(chunk)
-    db.insert_scores(scores)  # ON CONFLICT DO UPDATE，幂等
+    db.insert_scores(scores)  # ON CONFLICT DO UPDATE, idempotent
 ```
 
-### 2. 先持久快数据
+### 2. Persist Fast Data First
 
-耗时差异大的多个服务并行时，快的先出结果、先落地。慢的服务即使崩溃，快的服务结果不丢。
+When several services with very different durations run in parallel, the fast ones produce results first and land them first. Even if a slow service crashes, the fast services' results are not lost.
 
-例如 Round 2 的安全筛检：
-1. HemoPI2 / MHCflurry（~分钟级）→ **立即写入 140 万行**
-2. ToxinPred3（~16 小时）→ 每 200 条写一次
+For example, the safety screening in Round 2:
+1. HemoPI2 / MHCflurry (~minutes) → **write 1.4 million rows immediately**
+2. ToxinPred3 (~16 hours) → write once every 200 sequences
 
-只要 HemoPI2/MHCflurry 写入了，后续 ToxinPred3 全部重跑也只损失 16h，不损失已经完成的 hemo/mhc 数据。
+As long as HemoPI2/MHCflurry have written their results, rerunning all of ToxinPred3 costs only 16h and does not lose the completed hemo/mhc data.
 
-### 3. 幂等写入（ON CONFLICT DO UPDATE）
+### 3. Idempotent Writes (ON CONFLICT DO UPDATE)
 
-所有 `insert_*` 方法使用 `INSERT ... ON CONFLICT (candidate_id) DO UPDATE SET ...`。这意味着：
+All `insert_*` methods use `INSERT ... ON CONFLICT (candidate_id) DO UPDATE SET ...`. This means:
 
-- 同一候选可被多次写入
-- 不同轮次写入不同字段互不覆盖
-- 重复执行不会产生重复行
+- The same candidate can be written multiple times
+- Different rounds writing different fields do not overwrite each other
+- Repeated execution does not produce duplicate rows
 
-这是预打分、断点续跑、崩溃恢复的基础。
+This is the foundation for pre-scoring, checkpointed resumption, and crash recovery.
 
 ### 4. Checkpoint + Resume
 
-每阶段写 checkpoint，记录 `round`、`step`、`status`、`processed_items`。脚本启动时先检查：
+Each stage writes a checkpoint recording `round`, `step`, `status`, and `processed_items`. At startup the script first checks:
 
 ```python
 if get_checkpoint(round, step) == "done":
-    log("已跳过（上次已完成）")
-    continue  # 或根据 processed_items 决定从哪里继续
+    log("skipped (it was completed last time)")
+    continue  # or decide where to resume from based on processed_items
 ```
 
-Checkpoint 支持两种恢复粒度：
-- 服务级恢复（跳过已完成的服务）
-- 候选级恢复（从上次处理的 candidate_id + 1 继续）
+Checkpoints support two recovery granularities:
+- Service-level recovery (skip services already completed)
+- Candidate-level recovery (resume from the last processed candidate_id + 1)
 
-### 5. Snapshot 破单写锁
+### 5. Snapshot to Break the Single-Writer Lock
 
-DuckDB 同一时刻只允许一个写连接。如果 Round 2 持有写锁，Round 3 预打分脚本无法读 pipeline.db。
+DuckDB allows only one write connection at a time. If Round 2 holds the write lock, the Round 3 pre-scoring script cannot read pipeline.db.
 
-解法：创建 snapshot：
+The solution: create a snapshot:
 
 ```python
 import shutil
 snapshot = pipeline_db.with_name(f"pipeline_{ts}.db")
 shutil.copy2(pipeline_db, snapshot)
-# 从 snapshot 读取（独立文件，无锁）
-# 写入 precompute.db（独立文件，不与 Round 2 竞争）
+# read from the snapshot (separate file, no lock)
+# write to precompute.db (separate file, no contention with Round 2)
 ```
 
-预打分结果写入**独立的 precompute.db**，Round 2 完成后通过 `--merge` 合并回 pipeline.db。
+Pre-scoring results are written to a **separate precompute.db**, and after Round 2 completes they are merged back into pipeline.db with `--merge`.
 
-### 6. 最小损失窗口
+### 6. Minimizing the Loss Window
 
-Mini-batch 大小决定崩溃时的最大数据丢失量。合理选择：
+Mini-batch size determines the maximum amount of data lost on a crash. Reasonable choices:
 
-| 服务 | Mini-batch | 最大丢失 | 考量 |
-|------|-----------|---------|------|
-| ToxinPred3 | 200 条 | ~3 分钟 | 单条 ~1s，200 条刚好一批 gather |
-| HemoPI2 | 一次全部 | 0（写入后才继续） | 极快，无需分 mini-batch |
-| 深度评分 | 1000 条 | ~2 分钟 | batch 天然边界 |
+| Service | Mini-batch | Max loss | Consideration |
+|---------|------------|----------|---------------|
+| ToxinPred3 | 200 sequences | ~3 minutes | ~1s per sequence; 200 sequences is exactly one gather batch |
+| HemoPI2 | All at once | 0 (continue only after writing) | Extremely fast, no need to split into mini-batches |
+| Deep scoring | 1000 sequences | ~2 minutes | Batch is a natural boundary |
 
-原则：mini-batch 大小 = 你愿意在崩溃时重新计算的最大工作量。
+Principle: mini-batch size = the maximum amount of work you are willing to recompute after a crash.
 
-### 7. Exception 宽容
+### 7. Tolerance for Exceptions
 
-单个请求失败**不中断整体流程**。在 asyncio.gather 的返回值中检查 Exception 实例，遇到失败对应字段写 NULL 继续。等所有评分完成后，如果需要可以重试 NULL 项。
+A single failed request **does not interrupt the overall flow**. Check the values returned by asyncio.gather for Exception instances; on failure, write NULL for the corresponding field and continue. After all scoring is done, NULL entries can be retried if needed.
 
 ```python
 scored = await asyncio.gather(*tasks, return_exceptions=True)
 for c, s in zip(mini, scored):
     if isinstance(s, Exception):
-        continue  # 写 NULL，不阻塞
-    # 正常处理
+        continue  # write NULL, do not block
+    # normal handling
 ```
 
-### 8. 分离数据库
+### 8. Separate Databases
 
-不同阶段使用独立的 DuckDB 文件，避免锁竞争：
+Different stages use separate DuckDB files to avoid lock contention:
 
-| 数据库 | 用途 | 谁写入 |
-|--------|------|--------|
-| `pipeline.db` | 主管线状态 | Round 1-7 顺序执行 |
-| `precompute.db` | 预打分暂存 | 预打分脚本（与 Round 2 并行） |
-| (snapshot) | 只读快照 | cp 命令创建，被预打分读取 |
+| Database | Purpose | Who writes |
+|----------|---------|------------|
+| `pipeline.db` | Main pipeline state | Round 1-7 executing in sequence |
+| `precompute.db` | Pre-scoring staging | Pre-scoring script (in parallel with Round 2) |
+| (snapshot) | Read-only snapshot | Created by a cp command, read by pre-scoring |
 
-主管线按顺序执行时 `pipeline.db` 足够。只有需要在 CPU 瓶颈期并行预打分时才需要分离数据库。
-
----
-
-## 原则的优先级
-
-当原则之间冲突时，按此优先级裁决：
-
-1. **数据不丢 > 速度** —— 宁可慢，不可丢。分批写入 > 一次写入性能更好但存在数据损失风险的方案
-2. **幂等 > 特殊优化** —— 让写入可重复执行比"高性能但需小心处理边界"更安全
-3. **显式配置 > 隐式假设** —— Semaphore 值、batch 大小、threshold 在代码头部显式声明
-4. **简单正确 > 复杂高效** —— 顺序执行但正确的流程 > 并行但可能出错的设计
+When the main pipeline runs in sequence, `pipeline.db` is sufficient. Separate databases are needed only when pre-scoring must run in parallel during a CPU bottleneck.
 
 ---
 
-*本文档随管线经验持续更新。每条原则背后都有一次线上事故或长达数小时的调试作为代价。*
+## Priority of the Principles
+
+When principles conflict, settle it by this priority:
+
+1. **No data loss > speed** — better slow than lost. Batch writes > a faster single-write scheme that carries a risk of data loss
+2. **Idempotency > special-case optimization** — making writes repeatable is safer than "high performance but requires careful handling of edge cases"
+3. **Explicit configuration > implicit assumptions** — Semaphore values, batch sizes, and thresholds are declared explicitly at the top of the code
+4. **Simple and correct > complex and efficient** — a sequential but correct flow > a parallel design that may go wrong
+
+---
+
+*This document is continuously updated as pipeline experience accumulates. Behind every principle is a production incident or hours of debugging paid as the price.*

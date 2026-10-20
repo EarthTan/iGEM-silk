@@ -1,34 +1,36 @@
-# Round 4：枚举 + Construct 级评分 — 报告
+> **English** | [中文](README.zh.md)
 
-**时间**: 2026-05-17 20:51:06
-**耗时**: 434 秒
+# Round 4: Enumeration + Construct-Level Scoring — Report
 
-## 评分权重
+**Time**: 2026-05-17 20:51:06
+**Duration**: 434 seconds
 
-| 维度 | 权重 | 说明 |
+## Scoring Weights
+
+| Dimension | Weight | Description |
 |------|------|------|
-| 肽综合分（Round 3） | 0.4 | 7 服务加权综合分 |
-| SoDoPE 溶解度 | 0.25 | Construct 级全长评分 |
-| **Construct AnOxPePred** | 0.2 | **新增**：全长融合蛋白抗氧化评分 |
-| **Construct BepiPred3** | 0.1 | **新增**：全长融合蛋白 B 细胞表位 |
-| TemStaPro 热稳定性 | 0.05 | — |
+| Peptide composite score (Round 3) | 0.4 | 7-service weighted composite score |
+| SoDoPE solubility | 0.25 | full-length construct-level scoring |
+| **Construct AnOxPePred** | 0.2 | **new**: antioxidant score of the full-length fusion protein |
+| **Construct BepiPred3** | 0.1 | **new**: B-cell epitope of the full-length fusion protein |
+| TemStaPro thermal stability | 0.05 | — |
 
-## 双通道枚举
+## Dual-Channel Enumeration
 
-| 通道 | 肽数 | Linker | 位置 | Construct 数 | 输出数 |
+| Channel | Peptides | Linker | Positions | Constructs | Output count |
 |------|------|--------|------|-------------|--------|
 | Top | 40 | 2 | 3 | 240 | 90 |
 | Bottom | 10 | 2 | 3 | 60 | 60 |
 
-## 活性变化比
+## Activity Change Ratio
 
-AnOxPePred 活性下降警告（变化比 < 0.8）: 230 个
+AnOxPePred activity drop warnings (change ratio < 0.8): 230
 
-变化比 > 1.0 = 融合后活性增强 | ≈ 1.0 = 不受 scaffold 影响 | < 0.8 = 显著下降
+Change ratio > 1.0 = activity increased after fusion | ≈ 1.0 = unaffected by the scaffold | < 0.8 = significant drop
 
-## Top 分组摘要
+## Top Group Summary
 
-| 排名 | 肽 | Linker | N/C/Both 分 | 组最高分 |
+| Rank | Peptide | Linker | N/C/Both scores | Best score in group |
 |------|------|--------|-------------|----------|
 |  1 | pep_977590   | Flex_GGGGSx2              | Both=0.5940 | C=0.5765 | N=0.5912 | 0.5940 |
 |  2 | pep_977590   | Flex_GGGGSx1              | Both=0.5928 | C=0.5788 | N=0.5902 | 0.5928 |
@@ -61,15 +63,15 @@ AnOxPePred 活性下降警告（变化比 < 0.8）: 230 个
 | 29 | pep_216524   | Flex_GGGGSx2              | Both=0.5670 | C=0.5663 | N=0.5622 | 0.5670 |
 | 30 | pep_216524   | Flex_GGGGSx1              | Both=0.5615 | C=0.5667 | N=0.5567 | 0.5667 |
 
-## 分数分布
+## Score Distributions
 
-- **综合分**: n=300, mean=0.5362, max=0.5940
+- **Composite score**: n=300, mean=0.5362, max=0.5940
 - **SoDoPE**: n=300, mean=0.6731
 - **Construct AnOxPePred**: n=300, mean=0.3096
 
-## 输出
+## Output
 
 - `final/constructs_top.csv` — Top 90 constructs
 - `final/constructs_bottom.csv` — Bottom 60 constructs
-- `final/all_constructs.fasta` — 150 条 → Round 5 3D 预测
-- `final/context_effect.csv` — 游离 vs 融合活性变化
+- `final/all_constructs.fasta` — 150 entries → Round 5 3D prediction
+- `final/context_effect.csv` — change in activity, free peptide vs fused

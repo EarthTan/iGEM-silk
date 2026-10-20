@@ -1,262 +1,264 @@
+> **English** | [中文](PLAN.zh.md)
+
 # Stages3 Pipeline Plan: From Billions to Candidates
 
-> 版本: v1.0 — 2026-05-15
-> 数据源: uniprot_all_2021_04.fa (102G, 225,619,586 条) + mgy_clusters_2022_05.fa (120G, ~624,000,000 条)
-> 总入口: ~8.5 亿序列
-> 目标: 从 8.5 亿原始序列到 Top 候选功能肽段
+> Version: v1.0 — 2026-05-15
+> Data sources: uniprot_all_2021_04.fa (102G, 225,619,586 sequences) + mgy_clusters_2022_05.fa (120G, ~624,000,000 sequences)
+> Total input: ~850 million sequences
+> Goal: from 850 million raw sequences to the top candidate functional peptides
 
 ---
 
-## 一、核心理念：差异化驱动筛选
+## 1. Core Idea: Differentiation-Driven Screening
 
-### 上一轮的教训
+### Lessons from the Previous Round
 
-在 stages2 的执行中，我们使用了固定权重方案——AnOxPePred 永远是 0.50，BepiPred 永远是 0.20，依此类推。这个方案有一个根本问题：
+In the stages2 run we used a fixed weighting scheme—AnOxPePred was always 0.50, BepiPred was always 0.20, and so on. This scheme has a fundamental problem:
 
-当某个分数的分布区间很窄（比如所有候选肽的 SASA 分数都集中在 0.55-0.65，σ ≈ 0.03）时，给它再高的权重也没有意义——它拉不开差距，只是在给排序增加噪音。相反，如果另一个分数天然散得很开（比如 AnOxPePred 从 0.1 到 0.9，σ ≈ 0.20），它才是真正的区分信号。
+When a score's distribution range is very narrow (for example, the SASA scores of all candidate peptides are concentrated between 0.55 and 0.65, σ ≈ 0.03), giving it an even higher weight is pointless—it cannot separate the candidates and only adds noise to the ranking. Conversely, if another score naturally spreads out widely (for example, AnOxPePred from 0.1 to 0.9, σ ≈ 0.20), that is the real discriminative signal.
 
-### 方差感知权重（Variance-Aware Weighting）
+### Variance-Aware Weighting
 
-Stages3 的核心创新：**先跑分，看分布，再定权**。不是事先拍脑袋决定哪个模型重要，而是让数据自己说话。
+The core innovation of stages3: **score first, look at the distribution, then set the weights**. Rather than deciding in advance which model matters, let the data speak for itself.
 
-流程如下：
+The flow is as follows:
 
 ```
-Stage 1（轻量筛选）→ 通过者进入 Stage 2
-Stage 2 跑全量 7+ 个服务的分数
+Stage 1 (lightweight screening) → passers advance to Stage 2
+Stage 2 scores the full set across 7+ services
    ↓
-分析每个服务的分数分布（均值、标准差、百分位数）
+Analyze the score distribution of each service (mean, standard deviation, percentiles)
    ↓
-权重 = 各服务标准差的归一化值（σ_i / Σσ_j）
+Weight = the normalized value of each service's standard deviation (σ_i / Σσ_j)
    ↓
-加权合成最终排名
+Weighted combination for the final ranking
 ```
 
-这样做的好处：
-- **自动降噪**：区分度差的服务自动获得低权重
-- **动态适应**：换一批数据、换一组候选肽，权重自动调整
-- **可解释**：权重的变化直接告诉你当前批次中什么信号最有用
-- **规避过拟合**：不是人工调参去找"最佳权重"，而是从数据中自然产生
+The benefits of doing this:
+- **Automatic noise reduction**: services with poor discriminative power automatically receive low weights
+- **Dynamic adaptation**: change the dataset or the candidate peptide set and the weights adjust automatically
+- **Interpretability**: changes in the weights directly tell you which signal is most useful in the current batch
+- **Avoids overfitting**: instead of manually tuning parameters to find the "best weights", they arise naturally from the data
 
-### 差异化优先原则
+### The Differentiation-First Principle
 
-整个漏斗的每一层都应以此原则设计：
+Every layer of the funnel should be designed according to this principle:
 
-1. 先问：这一层的筛选信号能否有效拉开差距？
-2. 如果不能 → 考虑合并、降权、或跳过这一层
-3. 如果能 → 给它足够的权重让它发挥作用
-4. 定期检查每一层的分布变化，防止筛选后期出现信号饱和
+1. First ask: can the screening signal at this layer effectively separate the candidates?
+2. If not → consider merging, down-weighting, or skipping this layer
+3. If yes → give it enough weight to do its job
+4. Periodically check the distribution shift at each layer to prevent signal saturation in the later screening stages
 
 ---
 
-## 二、数据源总览
+## 2. Data Source Overview
 
-| 数据库 | 文件 | 大小 | 估计序列数 | 特点 |
+| Database | File | Size | Estimated sequences | Characteristics |
 |--------|------|------|-----------|------|
-| UniProt 全集 | `uniprot_all_2021_04.fa` | 102G | 225,619,586 | Swiss-Prot + TrEMBL，含大量全长蛋白 |
-| MGnify 簇 | `mgy_clusters_2022_05.fa` | 120G | ~624,000,000 | 宏基因组蛋白簇，天然功能肽段富集 |
-| **合计** | | **222G** | **~8.5 亿** | |
+| UniProt complete set | `uniprot_all_2021_04.fa` | 102G | 225,619,586 | Swiss-Prot + TrEMBL, contains many full-length proteins |
+| MGnify clusters | `mgy_clusters_2022_05.fa` | 120G | ~624,000,000 | Metagenomic protein clusters, naturally enriched in functional peptides |
+| **Total** | | **222G** | **~850 million** | |
 
-### 数据质量预期
+### Expected Data Quality
 
-- **UniProt**: 已注释和自动注释蛋白的混合体。Swiss-Prot 部分经过人工审核，质量高但比例小（~1-2%）；TrEMBL 为自动注释，有大量全长蛋白和假设蛋白。
-- **MGnify**: 宏基因组数据，含大量未知功能的预测蛋白。短序列比例可能较高，天然肽段和功能域的来源丰富。
+- **UniProt**: a mixture of annotated and automatically annotated proteins. The Swiss-Prot portion is manually reviewed, high quality but small (~1-2%); TrEMBL is automatically annotated and contains many full-length proteins and hypothetical proteins.
+- **MGnify**: metagenomic data containing many predicted proteins of unknown function. The proportion of short sequences may be higher, and it is a rich source of natural peptides and functional domains.
 
 ---
 
-## 三、六阶段漏斗设计
+## 3. Six-Stage Funnel Design
 
-### Stage 0: 数据预处理
+### Stage 0: Data Preprocessing
 
-**目标**: 从原始 FASTA 到候选肽段池
+**Goal**: from raw FASTA to a candidate peptide pool
 
-| 步骤 | 操作 | 预期效果 | 估算后数量 |
+| Step | Operation | Expected effect | Estimated count afterward |
 |------|------|---------|-----------|
-| 0a | CD-HIT 去冗余（90% 相似度聚类） | 去掉高度相似的冗余序列 | ~2-3 亿 |
-| 0b | 长度筛选（3-30 aa） | 只保留短肽可预测的范围 | ~3000 万 - 1 亿 |
-| 0c | 标准氨基酸筛选 | 去掉含非标准 AA 的序列 | ~略减 |
-| 0d | 写入数据库 | 统一存储，带元数据 | — |
+| 0a | CD-HIT redundancy removal (90% similarity clustering) | Remove highly similar redundant sequences | ~200-300 million |
+| 0b | Length filter (3-30 aa) | Keep only the range in which short peptides are predictable | ~30 million - 100 million |
+| 0c | Standard amino acid filter | Remove sequences containing non-standard AAs | ~slight reduction |
+| 0d | Write to the database | Unified storage with metadata | — |
 
-**说明**: CD-HIT 的参数需要根据数据特征做实验确定。对于短肽（3-30 aa），90% 的聚类阈值可能太松（短序列本身差异就不大），可能需要提高到 95% 甚至 100%（仅去掉完全重复的序列）。这部分需要在预处理时做参数扫描。
+**Note**: CD-HIT parameters need to be determined experimentally based on the data characteristics. For short peptides (3-30 aa), a 90% clustering threshold may be too loose (short sequences differ little to begin with) and may need to be raised to 95% or even 100% (removing only exact duplicate sequences). This part requires a parameter sweep during preprocessing.
 
-**输出**: `candidates` 表（数据库），含序列、长度、来源、原始 ID 等字段。
+**Output**: the `candidates` table (database), with fields for sequence, length, source, original ID, etc.
 
-### Stage 1: 轻量初筛
+### Stage 1: Lightweight Primary Screening
 
-**目标**: 用最轻量的 2 个服务快速砍掉不合格候选
+**Goal**: use the two lightest services to quickly cut out unqualified candidates
 
-| 服务 | 类型 | 筛选方式 | 预计通过率 |
+| Service | Type | Screening method | Expected pass rate |
 |------|------|---------|-----------|
-| AnOxPePred | 抗氧化预测 | 硬阈值过滤（原始分数 > 0.3） | ~30-50% |
-| AlgPred2 | 过敏原预测 | 硬阈值排除（分数 ≥ 0.30 淘汰） | ~80-90% |
+| AnOxPePred | Antioxidant prediction | Hard threshold filter (raw score > 0.3) | ~30-50% |
+| AlgPred2 | Allergen prediction | Hard threshold exclusion (score ≥ 0.30 eliminated) | ~80-90% |
 
-**设计理由**: AnOxPePred 是我们最核心的信号——抗氧化能力是功能筛选的第一道关。它在上一轮中也展现出了最好的区分度。AlgPred2 做绝对排除：只要是预测过敏原就直接淘汰，不参与后续评分。
+**Design rationale**: AnOxPePred is our most central signal—antioxidant capacity is the first gate of functional screening. It also showed the best discriminative power in the previous round. AlgPred2 provides absolute exclusion: anything predicted to be an allergen is eliminated outright and does not participate in subsequent scoring.
 
-**并发策略**: 每条候选肽并发调用两个服务，以最慢的为准。无依赖关系。
+**Concurrency strategy**: each candidate peptide calls both services concurrently, and the slower one determines completion. There are no dependencies.
 
-**输出**: `stage1_passed` 表（通过者），`stage1_failed` 表（淘汰者记录原因）。
+**Output**: the `stage1_passed` table (passers) and the `stage1_failed` table (eliminated candidates with reasons).
 
-### Stage 2: 全量评分 + 差异化定权
+### Stage 2: Full Scoring + Differentiation-Based Weighting
 
-**目标**: 对通过初筛的候选肽进行全维度评分，根据分布自动定权
+**Goal**: score the candidate peptides that passed primary screening across all dimensions, and set weights automatically based on the distributions
 
-**参与服务（按功能分组）**:
+**Services involved (grouped by function)**:
 
-| 服务 | 组 | 维度 | 预期区分度 |
+| Service | Group | Dimension | Expected discriminative power |
 |------|-----|------|-----------|
-| AnOxPePred | 功能 | 抗氧化 | ★★★★★ |
-| BepiPred-3.0 | 功能 | B 细胞表位 | ★★★ |
-| pLM4CPPs | 功能 | 细胞穿透 | ★★★ |
-| GraphCPP | 功能 | 细胞穿透（GNN） | ★★ |
-| TemStaPro | 功能 | 热稳定性 | ★★ |
-| SoDoPE | 功能 | 溶解度 | ★★ |
-| MHCflurry | 安全性 | MHC-I 结合（反向） | ★★★ |
-| ToxinPred3 | 安全性 | 毒性（绝对排除） | — |
-| HemoPI2 | 安全性 | 溶血性（绝对排除） | — |
+| AnOxPePred | Function | Antioxidant | ★★★★★ |
+| BepiPred-3.0 | Function | B-cell epitope | ★★★ |
+| pLM4CPPs | Function | Cell penetration | ★★★ |
+| GraphCPP | Function | Cell penetration (GNN) | ★★ |
+| TemStaPro | Function | Thermal stability | ★★ |
+| SoDoPE | Function | Solubility | ★★ |
+| MHCflurry | Safety | MHC-I binding (inverse) | ★★★ |
+| ToxinPred3 | Safety | Toxicity (absolute exclusion) | — |
+| HemoPI2 | Safety | Hemolysis (absolute exclusion) | — |
 
-**差异化定权流程**:
+**Differentiation-based weighting flow**:
 
-1. 先用所有服务对 Stage 1 通过者评分
-2. 收集每个服务的分数向量，计算标准差 σ
-3. 计算原始权重: `w_i_raw = σ_i`
-4. 归一化: `w_i = w_i_raw / Σw_j_raw`
-5. 应用权重计算综合得分: `composite = Σ(w_i × score_i_normalized)`
-6. 根据综合得分排名，取 Top N
+1. First score the Stage 1 passers with all services
+2. Collect each service's score vector and compute the standard deviation σ
+3. Compute the raw weights: `w_i_raw = σ_i`
+4. Normalize: `w_i = w_i_raw / Σw_j_raw`
+5. Apply the weights to compute the composite score: `composite = Σ(w_i × score_i_normalized)`
+6. Rank by composite score and take the Top N
 
-**对绝对排除项的处理**: ToxinPred3 和 HemoPI2 的预测结果不参与权重计算——它们是硬性淘汰条件，不是评分维度。候选肽如果被判定为有毒或溶血，直接淘汰，不计入排名。
+**Handling absolute exclusions**: ToxinPred3 and HemoPI2 predictions do not participate in the weight computation—they are hard elimination criteria, not scoring dimensions. If a candidate peptide is judged toxic or hemolytic, it is eliminated immediately and excluded from the ranking.
 
-**输出**: `stage2_scores` 表（所有分数和最终排名），`excluded_toxic` 表和 `excluded_hemolytic` 表。
+**Output**: the `stage2_scores` table (all scores and the final ranking), plus the `excluded_toxic` and `excluded_hemolytic` tables.
 
-### Stage 3: 构造枚举
+### Stage 3: Construct Enumeration
 
-将 Stage 2 的 Top 候选肽与丝蛋白骨架组装为全 construct，枚举 3 个融合位置（N 端 / 内部插入 / C 端）和 2 种连接子（柔性 / 刚性）。
+Assemble the Top candidate peptides from Stage 2 with the silk protein scaffold into full constructs, enumerating 3 fusion positions (N-terminus / internal insertion / C-terminus) and 2 linkers (flexible / rigid).
 
-对每个 construct 运行 SoDoPE（溶解度）和 TemStaPro（热稳定性）预测。
+Run SoDoPE (solubility) and TemStaPro (thermal stability) predictions on each construct.
 
-**输出**: `constructs` 表（含序列、位置、连接子、SoDoPE/TemStaPro 分数）。
+**Output**: the `constructs` table (including sequence, position, linker, and SoDoPE/TemStaPro scores).
 
-### Stage 4: 3D 结构预测
+### Stage 4: 3D Structure Prediction
 
-对 Top constructs 进行 3D 结构预测:
+Run 3D structure prediction on the top constructs:
 
-| 服务 | 角色 | 策略 |
+| Service | Role | Strategy |
 |------|------|------|
-| ESMFold | 备选 |默认不使用 |
-| OmegaFold | 主力  | 所有 construct 优先使用|
-| AlphaFold3 / PEP-FOLD4 | 保留 | 当前轮次暂不启用 |
+| ESMFold | Fallback | Not used by default |
+| OmegaFold | Primary | Preferred for all constructs |
+| AlphaFold3 / PEP-FOLD4 | Reserved | Not enabled in the current round |
 
-**关键约束**: 单机单 GPU，128G 内存。ESMFold 和 OmegaFold 必须串行推理。预计每个 construct 约 2-6 分钟。
+**Key constraint**: a single machine with a single GPU and 128G of memory. ESMFold and OmegaFold must run inference serially. Expect about 2-6 minutes per construct.
 
-**输出**: PDB 文件（按 construct 命名存入 `output3/pdb/`），`plddt_scores` 表。
+**Output**: PDB files (named by construct and stored in `output3/pdb/`), and the `plddt_scores` table.
 
-### Stage 5: PDB 评估
+### Stage 5: PDB Evaluation
 
-对生成的 3D 结构进行表面特性评估:
+Evaluate the surface properties of the generated 3D structures:
 
-| 服务 | 评估维度 |
+| Service | Evaluation dimension |
 |------|---------|
-| SASA (FreeSASA) | 肽段区域溶剂可及性 |
-| Aggrescan3D | 表面聚集倾向 |
+| SASA (FreeSASA) | Solvent accessibility of the peptide region |
+| Aggrescan3D | Surface aggregation propensity |
 
-SASA 分数在 stages2 中展现了优秀的区分度（σ ≈ 0.098），是本阶段的核心信号。
+The SASA score showed excellent discriminative power in stages2 (σ ≈ 0.098) and is the core signal of this stage.
 
-**输出**: `pdb_eval` 表，含 SASA、Aggrescan3D、pLDDT 等分数。
+**Output**: the `pdb_eval` table, containing SASA, Aggrescan3D, pLDDT, and other scores.
 
-### Stage 6: 最终排名
+### Stage 6: Final Ranking
 
-结合 Stage 2（功能评分）、Stage 3（溶解性/稳定性）、Stage 5（结构评分）的所有信号，进行最终加权排名。
+Combine all signals from Stage 2 (functional scores), Stage 3 (solubility/stability), and Stage 5 (structural scores) for the final weighted ranking.
 
-**最终权重也是方差感知的**——对所有可用的分数维度重新计算分布，确定最终合成权重。
+**The final weights are also variance-aware**—recompute the distributions over all available score dimensions to determine the final composite weights.
 
-**输出**: `final_ranking` 表，Top 10 / Top 20 候选构造，以及完整输出包。
+**Output**: the `final_ranking` table, the Top 10 / Top 20 candidate constructs, and the complete output package.
 
 ---
 
-## 四、方差感知权重的完整工作流程
+## 4. Complete Workflow of Variance-Aware Weighting
 
-这是 stages3 与 stages2 最本质的区别，值得详细说明：
+This is the most fundamental difference between stages3 and stages2 and deserves a detailed explanation:
 
 ```
-第 1 轮（Stage 2 内部）:
-  对所有候选跑全量 7+ 服务
-  → 计算每个服务的 σ
-  → 权重 = σ_i / Σσ_j
-  → 加权排名 → 取 Top N
+Round 1 (inside Stage 2):
+  Run the full set of 7+ services on all candidates
+  → compute σ for each service
+  → weight = σ_i / Σσ_j
+  → weighted ranking → take Top N
 
-第 2 轮（Stage 6 最终排名）:
-  对所有可用分数（功能 + 溶解性 + 结构）
-  → 重新计算 σ
-  → 再次权重归一化
-  → 最终排名
+Round 2 (Stage 6 final ranking):
+  Over all available scores (function + solubility + structure)
+  → recompute σ
+  → normalize the weights again
+  → final ranking
 ```
 
-**为什么分两轮而不是一次到位？**
+**Why two rounds instead of doing it all at once?**
 
-因为 Stage 2 和 Stage 5 的信号维度不同——Stage 2 是序列级别的分数，Stage 5 是结构级别的分数。两者的分布特征可能完全不同。分两轮计算，每一轮各自使用方差感知权重，最终合成时再做一次统一归一化。
+Because Stage 2 and Stage 5 operate on different signal dimensions—Stage 2 produces sequence-level scores and Stage 5 produces structure-level scores. Their distribution characteristics may be completely different. Computing in two rounds lets each round use variance-aware weighting, with one final unified normalization at combination time.
 
-### 潜在风险与缓解
+### Potential Risks and Mitigations
 
-| 风险 | 缓解方案 |
+| Risk | Mitigation |
 |------|---------|
-| 某个服务完全失去区分度（σ ≈ 0） | 自动获得接近 0 的权重，等同于跳过该服务 |
-| 某个服务的极端值主导权重 | 先做 winsorization（截尾处理），去掉上下 1% 极端值后再算 σ |
-| 不同批次的分布差异大 | 如果数据量够大（百万级），分布是稳定的；小批次可以考虑 bootstrap 置信区间 |
-| 绝对排除项和评分项的交互 | 绝对排除先于权重计算执行，不参与分布分析 |
+| A service completely loses its discriminative power (σ ≈ 0) | It automatically receives a weight near 0, equivalent to skipping that service |
+| Extreme values in one service dominate the weights | Apply winsorization (trimming) first: remove the top and bottom 1% extreme values before computing σ |
+| Large distribution differences between batches | If the data volume is large enough (millions), the distribution is stable; for small batches, consider bootstrap confidence intervals |
+| Interaction between absolute exclusions and scored items | Absolute exclusions are executed before the weight computation and do not participate in distribution analysis |
 
 ---
 
-## 五、时间估算
+## 5. Time Estimates
 
-假设单机 128G 内存，RTX 3090（24G），SSD 存储：
+Assuming a single machine with 128G of memory, an RTX 3090 (24G), and SSD storage:
 
-| 阶段 | 预计耗时 | 瓶颈 | 备注 |
+| Stage | Estimated time | Bottleneck | Notes |
 |------|---------|------|------|
-| Stage 0 (CD-HIT) | 2-5 天 | CPU + 内存 | 取决于 CD-HIT 参数，和是否用 32 线程 |
-| Stage 0 (3-30aa 筛选) | 2-4 小时 | I/O | 单次顺序扫描 |
-| Stage 1 (2 services) | 2-5 天 | CPU | 百万级约 347s → 数亿级约 2-5 天 |
-| Stage 2 (7 services) | 5-10 天 | CPU + 网络 | 全量评分，最重的一轮 |
-| Stage 3 (枚举+评分) | 1-2 天 | CPU | 只对 Top N（万级） |
-| Stage 4 (3D 结构) | 3-10 天 | GPU | 单 GPU 串行推理，300-500 constructs |
-| Stage 5 (PDB 评估) | 0.5-1 天 | CPU | 轻量计算 |
-| **整体** | **~2-4 周** | | |
+| Stage 0 (CD-HIT) | 2-5 days | CPU + memory | Depends on the CD-HIT parameters and whether 32 threads are used |
+| Stage 0 (3-30aa filter) | 2-4 hours | I/O | A single sequential scan |
+| Stage 1 (2 services) | 2-5 days | CPU | ~347s at the million scale → 2-5 days at the hundreds-of-millions scale |
+| Stage 2 (7 services) | 5-10 days | CPU + network | Full scoring, the heaviest round |
+| Stage 3 (enumeration + scoring) | 1-2 days | CPU | Only for the Top N (tens of thousands) |
+| Stage 4 (3D structure) | 3-10 days | GPU | Serial inference on a single GPU, 300-500 constructs |
+| Stage 5 (PDB evaluation) | 0.5-1 day | CPU | Lightweight computation |
+| **Overall** | **~2-4 weeks** | | |
 
-时间估算的误差主要来自 Stage 1-2 的实际通过率和 Stage 4 的 construct 数量。建议在每个阶段完成后记录实际耗时，用于后续轮次的规划。
+Errors in the time estimate mainly come from the actual pass rates of Stage 1-2 and the number of constructs in Stage 4. It is recommended to record the actual elapsed time after each stage for planning subsequent rounds.
 
 ---
 
-## 六、输出规划
+## 6. Output Plan
 
-结果输出到 `output3/`，沿用 stages2 的输出风格但扩展为数据库驱动：
+Results are output to `output3/`, following stages2's output style but extended to be database-driven:
 
 ```
 output3/
-├── STATUS.md              ← 全局进度指针（实时更新）
-├── README.md              ← 最终报告
-├── final/                 ← 最终输出包
-│   ├── top10.csv          ← Top 10 候选
-│   ├── top20.csv          ← Top 20 候选
-│   ├── score_distribution.json  ← 所有分数的分布统计
-│   └── weight_report.json ← 方差感知权重的最终赋值
-├── pdb/                   ← 3D 结构文件
+├── STATUS.md              ← Global progress pointer (updated in real time)
+├── README.md              ← Final report
+├── final/                 ← Final output package
+│   ├── top10.csv          ← Top 10 candidates
+│   ├── top20.csv          ← Top 20 candidates
+│   ├── score_distribution.json  ← Distribution statistics for all scores
+│   └── weight_report.json ← Final assignment of variance-aware weights
+├── pdb/                   ← 3D structure files
 │   └── <construct_id>/
 │       ├── construct.fasta
-│       ├── <method>.pdb   ← 对应 PDB 文件
+│       ├── <method>.pdb   ← Corresponding PDB file
 │       └── scores.json
-└── reports/               ← 各阶段详细报告
+└── reports/               ← Detailed reports for each stage
     ├── stage0_report.md
     ├── stage1_report.md
     ├── ...
     └── stage6_report.md
 ```
 
-**数据库文件** `output3/pipeline.db`（DuckDB 格式）包含所有中间数据和最终结果，通过 db_schema 中定义的接口访问。
+The **database file** `output3/pipeline.db` (DuckDB format) contains all intermediate data and final results, accessed through the interfaces defined in db_schema.
 
 ---
 
-## 七、下一步行动
+## 7. Next Steps
 
-1. 安装 CD-HIT，对两个数据库做抽样分析，确定最佳聚类参数
-2. 搭建 DuckDB 数据库实例，创建 schema
-3. 编写 Stage 0 预处理器（CD-HIT wrapper + 长度筛选）
-4. 基于 stages2 的已有脚本重构 Stage 1-2（数据库读写 + 方差权重计算）
-5. 顺序推进 Stage 3-6
+1. Install CD-HIT, run sampling analysis on the two databases, and determine the best clustering parameters
+2. Set up a DuckDB database instance and create the schema
+3. Write the Stage 0 preprocessor (CD-HIT wrapper + length filter)
+4. Refactor Stage 1-2 based on the existing stages2 scripts (database reads and writes + variance weight computation)
+5. Advance Stage 3-6 in order

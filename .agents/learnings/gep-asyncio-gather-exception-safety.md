@@ -1,5 +1,5 @@
 ---
-name: asyncio.gather 异常传播陷阱与任务隔离 v1.0
+name: asyncio.gather Exception Propagation Pitfalls and Task Isolation v1.0
 author: Claude Code
 created: 2026-05-15
 version: 1.0.0
@@ -7,82 +7,84 @@ tags: [asyncio, python, exception-handling, gather, concurrency, robustness]
 validated: true
 ---
 
-# Gene Capsule: asyncio.gather 异常传播陷阱与任务隔离
+> **English** | [中文](gep-asyncio-gather-exception-safety.zh.md)
+
+# Gene Capsule: asyncio.gather Exception Propagation Pitfalls and Task Isolation
 
 ## Experience
 
-**问题描述**: 在异步处理 90 个 construct 的 3D 结构预测任务时，使用 `asyncio.gather(*tasks)` 未设置 `return_exceptions=True`。当单个 construct 的任何一个协程抛出未捕获异常时，所有 90 个正在运行或等待的任务被立即取消，整个运行崩溃。
+**Problem description**: While asynchronously processing 3D structure prediction tasks for 90 constructs, `asyncio.gather(*tasks)` was used without `return_exceptions=True`. When any single coroutine for one construct raised an uncaught exception, all 90 running or waiting tasks were cancelled immediately and the whole run crashed.
 
-**错误现象**:
+**Error symptoms**:
 ```
-❌ 程序中断，无任何 construct 完成
-Traceback... (某个 construct 的某种异常)
-asyncio.gather 返回异常，程序退出
+❌ program aborted, no construct completed
+Traceback... (some exception from some construct)
+asyncio.gather returns the exception, program exits
 ```
 
-**根因**: `asyncio.gather()` 默认行为：当其中任一 task 抛出异常时，立即抛出该异常，并自动取消所有其他未完成的任务（通过 `task.cancel()`）。这是 asyncio 的设计决策——但在大规模批量任务中，这意味着一个任务的失败会连带摧毁全部工作。
+**Root cause**: `asyncio.gather()`'s default behavior: when any task raises an exception, it immediately raises that exception and automatically cancels all other unfinished tasks (via `task.cancel()`). This is an asyncio design decision—but in large-scale batch tasks it means one task's failure destroys all the work with it.
 
-### 解决方案
+### Solution
 
-**双层隔离策略**:
+**Two-layer isolation strategy**:
 
-第一层：外层 `asyncio.gather(return_exceptions=True)`
+Layer one: the outer `asyncio.gather(return_exceptions=True)`
 
 ```python
-# 将所有异常转为返回值，不会传播
+# Turn all exceptions into return values; they are not propagated
 tasks = [process_one(c) for c in constructs]
 results = await asyncio.gather(*tasks, return_exceptions=True)
 
-# 事后检查结果
+# Check the results afterwards
 for i, result in enumerate(results):
     if isinstance(result, Exception):
-        log(f"   ❌ {constructs[i]['construct_id']} 异常: {result}")
+        log(f"   ❌ {constructs[i]['construct_id']} exception: {result}")
     else:
-        # 正常处理 result
+        # process result normally
         pass
 ```
 
-第二层：内层每个任务独立 try/except 包装
+Layer two: wrap each inner task in its own try/except
 
 ```python
 async def safe_process_one(c: dict) -> dict | None:
     try:
         return await process_one(c)
     except Exception as e:
-        log(f"  ❌ {c.get('construct_id', '???')} 异常: {e}")
+        log(f"  ❌ {c.get('construct_id', '???')} exception: {e}")
         import traceback
         log(f"     {traceback.format_exc()}")
-        return None  # 返回 None 而不是异常
+        return None  # return None instead of the exception
 
 tasks = [safe_process_one(c) for c in constructs]
 await asyncio.gather(*tasks, return_exceptions=True)
 ```
 
-| 层级 | 保护范围 | 效果 |
+| Layer | Scope of protection | Effect |
 |------|----------|------|
-| 外层 `return_exceptions=True` | 全部任务 | 阻止 task.cancel() 传播 |
-| 内层 try/except | 单个 construct 级别 | 提供详细日志 + 优雅降级 |
+| Outer `return_exceptions=True` | All tasks | Prevents task.cancel() from propagating |
+| Inner try/except | Individual construct level | Detailed logging + graceful degradation |
 
-### 演化对比
+### Evolution Comparison
 
-| 版本 | 代码 | 结果 |
+| Version | Code | Result |
 |------|------|------|
-| ❌ 裸 gather | `asyncio.gather(*tasks)` | 1 个失败 → 全部 90 个被取消 |
-| ⚠️ 仅 return_exceptions | `asyncio.gather(*tasks, return_exceptions=True)` | 异常仍会打乱结果与 task 的对齐 |
-| ✅ 双层隔离 | try/except 包装 + return_exceptions | 优雅处理单个失败，其余 89 个正常运行 |
+| ❌ bare gather | `asyncio.gather(*tasks)` | 1 failure → all 90 cancelled |
+| ⚠️ return_exceptions only | `asyncio.gather(*tasks, return_exceptions=True)` | Exceptions still scramble the alignment between results and tasks |
+| ✅ two-layer isolation | try/except wrapper + return_exceptions | Handles a single failure gracefully; the other 89 run normally |
 
 ### Environment Fingerprint
 
-- **任务域**: 批量异步任务处理（N ≥ 10），任务间相互独立
-- **输入特征**: 每个任务耗时较长（分钟级），且任务数量多
-- **约束条件**: 任务间无依赖，允许部分失败
-- **触发模式**: 任意批量 `asyncio.gather` 调用
-- **不适用**: 任务间有依赖关系的 DAG 执行（应使用 `asyncio.TaskGroup` 或 `asyncio.as_completed`）
+- **Task domain**: Batch asynchronous task processing (N ≥ 10), tasks independent of one another
+- **Input characteristics**: Each task takes a long time (minutes) and there are many tasks
+- **Constraints**: No dependencies between tasks; partial failure is acceptable
+- **Trigger pattern**: Any batched `asyncio.gather` call
+- **Not applicable**: DAG execution where tasks depend on each other (use `asyncio.TaskGroup` or `asyncio.as_completed` instead)
 
 ### Audit Record
 
-- **验证方式**: 构造测试 — 在 90 个任务中故意让第 2 个抛出异常
-  - 裸 gather: 第 2 个崩溃 → 全部 90 个任务被取消
-  - 双层隔离: 第 2 个记录异常返回 None，其余 89 个正常运行
-- **生产确认**: 修复后 Round 5 完成 90/90，即使中间有单任务超时也未影响整体
-- **局限性**: try/except 仅在协程内部有效，如果异常发生在 `__init__` 或 `__aenter__` 中仍需额外处理
+- **Validation method**: A constructed test—deliberately let the 2nd of 90 tasks raise an exception
+  - bare gather: the 2nd crashes → all 90 tasks are cancelled
+  - two-layer isolation: the 2nd logs the exception and returns None; the other 89 run normally
+- **Production confirmation**: After the fix, Round 5 completed 90/90; even with an individual task timeout in the middle, the overall run was unaffected
+- **Limitations**: try/except is only effective inside the coroutine; if an exception occurs in `__init__` or `__aenter__`, extra handling is still needed

@@ -1,32 +1,34 @@
-## 整体方案
+> **English** | [中文](how-to-use-saas.zh.md)
+
+## Overall Design
 
 ```
-输入: FASTA序列 + 功能肽序列
-  → ESMFold API（或本地） → PDB文件
-  → FreeSASA → 逐残基SASA值
-  → 输出: JSON报告
+Input: FASTA sequence + functional peptide sequence
+  → ESMFold API (or local) → PDB file
+  → FreeSASA → per-residue SASA values
+  → Output: JSON report
 ```
 
-技术栈：**FastAPI + FreeSASA + Biopython**，Docker 打包，单容器微服务。
+Tech stack: **FastAPI + FreeSASA + Biopython**, packaged with Docker, single-container microservice.
 
 ------
 
-## 目录结构
+## Directory Structure
 
 ```
 sasa-service/
 ├── Dockerfile
 ├── requirements.txt
 ├── app/
-│   ├── main.py          # FastAPI 入口
-│   ├── esm_fold.py      # 结构预测模块
-│   ├── sasa_calc.py     # SASA 计算核心
-│   └── models.py        # Pydantic 数据模型
+│   ├── main.py          # FastAPI entry point
+│   ├── esm_fold.py      # Structure prediction module
+│   ├── sasa_calc.py     # SASA calculation core
+│   └── models.py        # Pydantic data models
 ```
 
 ------
 
-## 代码实现
+## Code Implementation
 
 ### `models.py`
 
@@ -35,27 +37,27 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class SASARequest(BaseModel):
-    full_sequence: str          # 全长融合蛋白 FASTA 序列
-    peptide_sequence: str       # 功能肽序列
+    full_sequence: str          # Full-length fusion protein FASTA sequence
+    peptide_sequence: str       # Functional peptide sequence
     chain_id: str = "A"
-    pdb_content: Optional[str] = None  # 可选：直接传 PDB 文本，跳过结构预测
+    pdb_content: Optional[str] = None  # Optional: pass PDB text directly to skip structure prediction
 
 class ResidueSASA(BaseModel):
     residue_id: int
     residue_name: str
     sasa: float                 # Å²
-    relative_sasa: float        # 0~1，相对于标准暴露值的比例
-    is_exposed: bool            # 相对 SASA > 0.25 视为暴露
+    relative_sasa: float        # 0~1, ratio relative to the standard exposure value
+    is_exposed: bool            # relative SASA > 0.25 is considered exposed
 
 class SASAResponse(BaseModel):
     peptide_sequence: str
     peptide_start: int
     peptide_end: int
-    total_sasa: float           # 功能肽区域总 SASA Å²
-    mean_relative_sasa: float   # 平均相对暴露度
-    exposure_ratio: float       # 暴露残基占比
+    total_sasa: float           # Total SASA of the functional peptide region, Å²
+    mean_relative_sasa: float   # Mean relative exposure
+    exposure_ratio: float       # Fraction of exposed residues
     residues: List[ResidueSASA]
-    pdb_content: str            # 返回使用的 PDB（便于前端可视化）
+    pdb_content: str            # The PDB that was used (for frontend visualization)
     warning: Optional[str] = None
 ```
 
@@ -71,11 +73,11 @@ ESMFOLD_API = "https://api.esmatlas.com/foldSequence/v1/pdb/"
 
 async def predict_structure(sequence: str) -> str:
     """
-    调用 ESMFold 公开 API，返回 PDB 文本字符串。
-    本地部署时替换 URL 为 localhost:8080 即可。
+    Call the public ESMFold API and return the PDB text string.
+    For local deployment, just replace the URL with localhost:8080.
     """
     if len(sequence) > 400:
-        raise ValueError("序列过长（>400aa），ESMFold 公开API限制，建议截断或本地部署")
+        raise ValueError("Sequence too long (>400 aa); this is a limit of the public ESMFold API — truncate the sequence or deploy locally")
     
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
@@ -84,10 +86,10 @@ async def predict_structure(sequence: str) -> str:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         resp.raise_for_status()
-        return resp.text  # PDB 格式字符串
+        return resp.text  # PDB format string
 ```
 
-> 本地部署 ESMFold 时，换成 `http://localhost:8080` 的 docker 服务即可，接口格式相同。
+> For a local ESMFold deployment, just switch to the docker service at `http://localhost:8080`; the interface format is the same.
 
 ------
 
@@ -102,7 +104,7 @@ from Bio import PDB
 from Bio.PDB import PDBIO, Select
 from io import StringIO
 
-# 标准最大 SASA 参考值（Å²），用于计算相对暴露度
+# Standard maximum SASA reference values (Å²), used to compute relative exposure
 MAX_SASA = {
     "ALA": 121, "ARG": 265, "ASN": 187, "ASP": 187, "CYS": 148,
     "GLN": 214, "GLU": 214, "GLY": 97,  "HIS": 216, "ILE": 195,
@@ -117,21 +119,21 @@ class _PeptideSelect(Select):
         return res.id[1] in self.ids
 
 def locate_peptide(full_seq: str, peptide_seq: str):
-    """返回所有匹配位置（1-indexed），支持多拷贝"""
+    """Return all match positions (1-indexed); supports multiple copies"""
     return [(m.start() + 1, m.end()) for m in re.finditer(peptide_seq, full_seq)]
 
 def calc_sasa(pdb_text: str, full_sequence: str, peptide_sequence: str, chain_id: str):
-    # ── 1. 定位功能肽 ──────────────────────────────────────
+    # ── 1. Locate the functional peptide ───────────────────
     positions = locate_peptide(full_sequence, peptide_sequence)
     if not positions:
-        raise ValueError(f"功能肽 '{peptide_sequence}' 未在序列中找到")
+        raise ValueError(f"Functional peptide '{peptide_sequence}' not found in the sequence")
     
-    # 取第一个位置（多拷贝时可扩展为循环）
+    # Take the first position (extend to a loop when there are multiple copies)
     pep_start, pep_end = positions[0]
     pep_residue_ids = list(range(pep_start, pep_end + 1))
-    warning = f"功能肽出现 {len(positions)} 次，当前分析第一个" if len(positions) > 1 else None
+    warning = f"Functional peptide occurs {len(positions)} times; analyzing the first one" if len(positions) > 1 else None
 
-    # ── 2. 解析 PDB ───────────────────────────────────────
+    # ── 2. Parse the PDB ──────────────────────────────────
     with tempfile.NamedTemporaryFile(suffix=".pdb", mode="w", delete=False) as f:
         f.write(pdb_text)
         tmp_path = f.name
@@ -141,11 +143,11 @@ def calc_sasa(pdb_text: str, full_sequence: str, peptide_sequence: str, chain_id
         structure = parser.get_structure("fusion", tmp_path)
         chain = structure[0][chain_id]
 
-        # ── 3. FreeSASA 计算全蛋白 SASA ───────────────────
+        # ── 3. Compute whole-protein SASA with FreeSASA ─────
         fs_struct = freesasa.Structure(tmp_path)
         fs_result = freesasa.calc(fs_struct)
 
-        # ── 4. 逐残基提取功能肽 SASA ──────────────────────
+        # ── 4. Extract functional peptide SASA per residue ──
         residues_out = []
         total_sasa = 0.0
 
@@ -176,7 +178,7 @@ def calc_sasa(pdb_text: str, full_sequence: str, peptide_sequence: str, chain_id
     finally:
         import os; os.unlink(tmp_path)
 
-    # ── 5. 汇总统计 ───────────────────────────────────────
+    # ── 5. Aggregate statistics ───────────────────────────
     rel_sasas = [r["relative_sasa"] for r in residues_out]
     mean_rel  = float(np.mean(rel_sasas)) if rel_sasas else 0.0
     exp_ratio = sum(r["is_exposed"] for r in residues_out) / len(residues_out) if residues_out else 0.0
@@ -209,7 +211,7 @@ app = FastAPI(title="SASA Microservice", version="1.0")
 @app.post("/analyze", response_model=SASAResponse)
 async def analyze(req: SASARequest):
     try:
-        # 如果没传 PDB，先做结构预测
+        # If no PDB was passed in, run structure prediction first
         pdb_text = req.pdb_content or await predict_structure(req.full_sequence)
         result   = calc_sasa(pdb_text, req.full_sequence, req.peptide_sequence, req.chain_id)
         return SASAResponse(**result)
@@ -244,7 +246,7 @@ pydantic
 ```dockerfile
 FROM python:3.11-slim
 
-# freesasa 需要编译依赖
+# freesasa needs build dependencies
 RUN apt-get update && apt-get install -y gcc libxml2-dev && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /service
@@ -257,14 +259,14 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ------
 
-## 启动与调用
+## Startup and Invocation
 
 ```bash
-# 构建并启动
+# Build and start
 docker build -t sasa-service .
 docker run -p 8000:8000 sasa-service
 
-# 调用示例
+# Example call
 curl -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
   -d '{
@@ -273,7 +275,7 @@ curl -X POST http://localhost:8000/analyze \
   }'
 ```
 
-返回：
+Returns:
 
 ```json
 {
@@ -294,12 +296,12 @@ curl -X POST http://localhost:8000/analyze \
 
 ------
 
-## 关键指标怎么解读
+## How to Interpret the Key Metrics
 
-| 指标                 | 含义                    | 你们的判断逻辑             |
-| -------------------- | ----------------------- | -------------------------- |
-| `mean_relative_sasa` | 功能肽平均暴露度（0~1） | > 0.3 认为暴露较好         |
-| `exposure_ratio`     | 暴露残基占比            | > 0.6 说明大多数残基在表面 |
-| `total_sasa`         | 绝对暴露面积 Å²         | 用于横向比较不同设计方案   |
+| Metric               | Meaning                                        | Your decision logic                          |
+| -------------------- | ---------------------------------------------- | -------------------------------------------- |
+| `mean_relative_sasa` | Mean exposure of the functional peptide (0~1)  | > 0.3 is considered good exposure            |
+| `exposure_ratio`     | Fraction of exposed residues                   | > 0.6 means most residues are on the surface |
+| `total_sasa`         | Absolute exposed area in Å²                    | Used to compare different designs side by side |
 
-这三个数字可以直接进入你们构建体比较的表格，作为"结构兼容性评分"的量化依据。
+These three numbers can go straight into your construct comparison table as the quantitative basis for a "structural compatibility score".

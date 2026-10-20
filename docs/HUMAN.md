@@ -1,17 +1,19 @@
+> **English** | [中文](HUMAN.zh.md)
+
 # HUMAN.md
 
-本文档主要记录本项目在**除了我们的核心业务pipeline流水线之外**，可以研究者手动使用的工具和方法。
+This document mainly records the tools and methods that researchers can use manually in this project, **outside our core business pipeline**.
 
-这类工具/方法的使用有如下特征：
+The use of such tools/methods has the following characteristics:
 
-- **基于人类视角的方法**。这些工具是提供给人类使用的，是按照人类的思维使用的，可能包含一些人类的读取操作信息方式，思维方式。比如，一个网站上通过UI交互的工具。反例是，一个只能被脚本和代码执行的工具。
-- **小量比较**。由于研究人员数量有限，精力有限， 因此必然只能对最终机器筛选结果的部分进行精细的合成生物学研究。这些工具帮助研究人员更快更敏捷的使用生物学的思维来研究肽。
+- **Methods from a human perspective**. These tools are provided for human use and are used in a human way of thinking; they may embody how humans read operational information and how they think. For example, a tool on a website that is operated through a UI. The counterexample is a tool that can only be executed by scripts and code.
+- **Small-scale comparison**. Because the number of researchers is limited and their time is limited, they can inevitably conduct detailed synthetic biology research only on part of the final machine-screening results. These tools help researchers study peptides faster and more nimbly using biological thinking.
 
 
 
 # TOOLS
 
-### 功能肽设计：
+### Functional peptide design:
 
-- Binding ddG对功能肽关键残基做单点突变扫描（alanine scanning），找出活性关键位点，用于后期优化阶段
-- GROMACS MD  模拟其在溶液中运动的轨迹，从中分析其稳定性，暴露性
+- Binding ddG performs single-point mutation scanning (alanine scanning) on the key residues of a functional peptide to identify the critical activity sites, for use in the later optimization stage
+- GROMACS MD simulates the trajectory of the peptide moving in solution, from which its stability and exposure can be analyzed

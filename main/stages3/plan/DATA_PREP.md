@@ -1,100 +1,102 @@
-# Stages3 数据预处理方案
+> **English** | [中文](DATA_PREP.zh.md)
 
-> 版本: v1.0 — 2026-05-15
-> 数据源: uniprot_all_2021_04.fa (102G) + mgy_clusters_2022_05.fa (120G)
-> 入口: ~5 亿序列
+# Stages3 Data Preprocessing Plan
+
+> Version: v1.0 — 2026-05-15
+> Data sources: uniprot_all_2021_04.fa (102G) + mgy_clusters_2022_05.fa (120G)
+> Input: ~500 million sequences
 
 ---
 
-## 一、数据源深度分析
+## 1. In-Depth Analysis of the Data Sources
 
-### UniProt 全集 (uniprot_all_2021_04.fa)
+### UniProt Complete Set (uniprot_all_2021_04.fa)
 
-**大小**: 102G，225,619,586 条序列
-**格式**: 标准 UniProt FASTA，header 行包含：
+**Size**: 102G, 225,619,586 sequences
+**Format**: standard UniProt FASTA; the header line contains:
 ```
 >sp|ID|ENTRY_NAME Description OS=species OX=id GN=gene
 ```
-**序列长度分布预估**: UniProt 的全长蛋白为主，大部分序列长度在 100-500 aa 之间。这意味着经过 3-30 aa 的短肽筛选后，绝大多数序列会被过滤掉。
+**Estimated sequence length distribution**: UniProt is dominated by full-length proteins, and most sequences are between 100 and 500 aa long. This means that after the 3-30 aa short-peptide filter, the vast majority of sequences will be filtered out.
 
-**UniProt 的利用价值**:
-- Swiss-Prot 部分（很小比例）提供了高质量的手动注释功能肽
-- TrEMBL 中的小开放阅读框（small ORFs / SEPs）是隐藏的肽段宝藏
-- 部分已注释的抗菌肽、抗氧化蛋白本身就是候选
+**Why UniProt is valuable**:
+- The Swiss-Prot portion (a very small fraction) provides high-quality manually annotated functional peptides
+- Small open reading frames (small ORFs / SEPs) in TrEMBL are a hidden treasure trove of peptides
+- Some annotated antimicrobial peptides and antioxidant proteins are themselves candidates
 
-### MGnify 簇 (mgy_clusters_2022_05.fa)
+### MGnify Clusters (mgy_clusters_2022_05.fa)
 
-**大小**: 120G，~624,000,000 条序列（基于行数估算，1,247,593,728 行 × 50% header 密度）
-**格式**: 简化的 header 行：
+**Size**: 120G, ~624,000,000 sequences (estimated from the line count, 1,247,593,728 lines × 50% header density)
+**Format**: simplified header lines:
 ```
 >MGYP000000077819
 >MGYP000000184299 FL=1
 ```
-**特点**: 宏基因组数据，包含大量功能未知的预测蛋白。部分序列带有 `FL=1` 标记（全长）。
-**序列长度分布**: 样本中观察到从几十到几百 aa 不等，短序列的比例可能高于 UniProt。
+**Characteristics**: metagenomic data containing a large number of predicted proteins of unknown function. Some sequences carry the `FL=1` flag (full length).
+**Sequence length distribution**: samples show lengths ranging from tens to hundreds of aa, and the proportion of short sequences may be higher than in UniProt.
 
-**MGnify 的利用价值**:
-- 宏基因组来源意味着更高的序列多样性
-- 未培养微生物中可能隐藏着全新的功能肽家族
-- 短序列簇（无法映射到已知全长蛋白的）可能是独立的功能域
+**Why MGnify is valuable**:
+- A metagenomic origin means greater sequence diversity
+- Entirely new families of functional peptides may be hidden in uncultured microorganisms
+- Short-sequence clusters (those that cannot be mapped to known full-length proteins) may be independent functional domains
 
 ---
 
-## 二、CD-HIT 去冗余策略
+## 2. CD-HIT Redundancy Removal Strategy
 
-### 什么是 CD-HIT
+### What CD-HIT Is
 
-CD-HIT 是一个广泛使用的序列聚类工具。它的工作原理：
+CD-HIT is a widely used sequence clustering tool. It works as follows:
 
-1. 将所有序列按长度排序（从长到短）
-2. 取最长序列作为第一簇的代表
-3. 对每条后续序列，与已有代表序列比较
-4. 如果相似度超过阈值，归入该簇；否则创建新簇
-5. 输出：簇代表序列列表（最长的那个）和聚类信息
+1. Sort all sequences by length (from longest to shortest)
+2. Take the longest sequence as the representative of the first cluster
+3. For each subsequent sequence, compare it against the existing representative sequences
+4. If the similarity exceeds the threshold, assign it to that cluster; otherwise create a new cluster
+5. Output: the list of cluster representative sequences (the longest one) and the clustering information
 
-### 参数选择与挑战
+### Parameter Choices and Challenges
 
-对于短肽（3-30 aa）去冗余，需要特别注意：
+For deduplicating short peptides (3-30 aa), pay special attention to the following:
 
-| 参数 | 建议值 | 理由 |
+| Parameter | Suggested value | Rationale |
 |------|--------|------|
-| `-c` (相似度阈值) | 0.95 - 1.00 | 短序列本身信息量少，90% 的阈值会把功能不同的短肽聚到一起 |
-| `-n` (word size) | 5 | 短序列需要更短的 word 来匹配 |
-| `-d` (描述长度) | 0 | 不截断描述 |
-| `-p` (并行) | 32 线程 | 充分利用多核 CPU |
-| `-M` (内存限制) | 0 (不限制) | 128G 内存足够 |
+| `-c` (similarity threshold) | 0.95 - 1.00 | Short sequences carry little information themselves; a 90% threshold would cluster functionally different short peptides together |
+| `-n` (word size) | 5 | Short sequences need shorter words to match |
+| `-d` (description length) | 0 | Do not truncate descriptions |
+| `-p` (parallel) | 32 threads | Make full use of the multi-core CPU |
+| `-M` (memory limit) | 0 (unlimited) | 128G of memory is enough |
 
-**关键问题**: CD-HIT 对短序列的聚类效果需要在真实数据上验证。我们需要：
-1. 从两个数据库中各抽取 10 万条序列
-2. 用不同 `-c` 参数（0.90, 0.95, 0.98, 1.00）做对比
-3. 观察聚类后代表序列的比例和序列多样性损失
-4. 确定最优参数组合
+**Key issue**: CD-HIT's clustering behavior on short sequences must be validated on real data. We need to:
+1. Sample 100k sequences from each of the two databases
+2. Compare different `-c` values (0.90, 0.95, 0.98, 1.00)
+3. Observe the fraction of representative sequences after clustering and the loss of sequence diversity
+4. Determine the optimal parameter combination
 
-如果 CD-HIT 对短肽效果不好（过度聚类），备选方案是直接做 100% 精确去重（去掉完全相同的序列），然后用 MMseqs2 做更敏感的聚类。
+If CD-HIT performs poorly on short peptides (over-clustering), the fallback is to do 100% exact deduplication first (remove identical sequences) and then use MMseqs2 for more sensitive clustering.
 
-### 执行顺序
+### Execution Order
 
 ```
-原始 FASTA
+Raw FASTA
   ↓
-Step 1: 提取所有 3-30 aa 的序列（减少 CD-HIT 的输入量）
+Step 1: Extract all 3-30 aa sequences (reduces the CD-HIT input volume)
   ↓
-Step 2: CD-HIT 聚类去冗余
+Step 2: CD-HIT clustering for redundancy removal
   ↓
-Step 3: 第二次 3-30 aa 筛选（CD-HIT 选出的代表序列可能超过 30 aa）
+Step 3: Second 3-30 aa filter (representative sequences chosen by CD-HIT may exceed 30 aa)
   ↓
-Step 4: 非标准氨基酸过滤（只保留 20 种标准氨基酸）
+Step 4: Non-standard amino acid filter (keep only the 20 standard amino acids)
   ↓
-输出: 候选肽段池
+Output: candidate peptide pool
 ```
 
-## 三、 3-30 aa 长度筛选
+## 3. The 3-30 aa Length Filter
 
-### 为什么是 3-30 aa
+### Why 3-30 aa
 
-这是由我们使用的机器学习模型共同决定的：
+This is jointly determined by the machine learning models we use:
 
-| 服务 | 输入长度下限 | 输入长度上限 |
+| Service | Lower input length bound | Upper input length bound |
 |------|------------|------------|
 | AnOxPePred | 3 aa | 50 aa |
 | BepiPred-3.0 | 5 aa | 50 aa |
@@ -104,119 +106,119 @@ Step 4: 非标准氨基酸过滤（只保留 20 种标准氨基酸）
 | HemoPI2 | 5 aa | 50 aa |
 | MHCflurry | 8 aa | 14 aa |
 
-以 **3-30 aa** 作为统一筛选范围，确保所有模型都能处理。
+We use **3-30 aa** as the unified filter range to ensure that every model can handle the input.
 
-### 实现方式
+### Implementation
 
 ```
-遍历 FASTA 文件:
-  1. 读取 header
-  2. 读取序列（可能跨多行）
-  3. 合并所有行，去空白，去换行符
-  4. 检查长度:
-     - len(sequence) < 3 → 丢弃
-     - len(sequence) > 30 → 丢弃 (太长的序列可能存在有价值的短片段，这里先严格按长度筛选)
-     - 符合条件 → 写入输出文件
+Iterate over the FASTA file:
+  1. Read the header
+  2. Read the sequence (may span multiple lines)
+  3. Concatenate all lines, strip whitespace and newline characters
+  4. Check the length:
+     - len(sequence) < 3 → discard
+     - len(sequence) > 30 → discard (longer sequences may contain valuable short fragments; for now filter strictly by length)
+     - meets the criteria → write to the output file
 ```
 
-### 预估通过率
+### Estimated Pass Rate
 
-这是关键的不确定因素。基于 UniProt 已知的蛋白长度分布：
-- 全长蛋白占绝大多数（>100 aa）
-- 3-30 aa 的短开放阅读框（sORFs）和肽段占极小比例（估计 <1-5%）
+This is the key uncertainty. Based on the known protein length distribution in UniProt:
+- Full-length proteins make up the vast majority (>100 aa)
+- Short open reading frames (sORFs) and peptides of 3-30 aa account for a very small fraction (estimated <1-5%)
 
-保守估计：
-- UniProt 通过率: ~1-3%（~200-600 万条）
-- MGnify 通过率: ~10-20%（宏基因组中有更多短序列）
-- 合计通过: **~3000 万 - 1 亿条**
+Conservative estimate:
+- UniProt pass rate: ~1-3% (~2-6 million)
+- MGnify pass rate: ~10-20% (metagenomes contain more short sequences)
+- Total passing: **~30 million - 100 million**
 
-### 并行化策略
+### Parallelization Strategy
 
-220G 的 FASTA 文件无法放入内存，必须流式处理：
+A 220G FASTA file cannot be loaded into memory and must be processed as a stream:
 
-| 方法 | 优点 | 缺点 |
+| Method | Pros | Cons |
 |------|------|------|
-| 单线程顺序扫描 | 内存占用极小 | 慢（220G 扫描约 1-2 小时） |
-| 按文件头分割（parallel --pipe） | 快、无 I/O 瓶颈 | 分割点可能在序列中间 |
-| 按块读取 + 多线程处理 | 可控性好 | 需要处理跨块的序列边界 |
+| Single-threaded sequential scan | Minimal memory footprint | Slow (~1-2 hours for a 220G scan) |
+| Split by file offset (`parallel --pipe`) | Fast, no I/O bottleneck | Split points may fall in the middle of a sequence |
+| Block reads + multi-threaded processing | Good controllability | Must handle sequence boundaries across blocks |
 
-推荐方案：用 `parallel --pipe --block-size 1G` 配合行安全的序列读取器，将 220G 文件分为 200+ 个 1G 块并行处理。
+Recommended approach: use `parallel --pipe --block-size 1G` together with a line-safe sequence reader to split the 220G file into 200+ 1G blocks and process them in parallel.
 
 ---
 
-## 四、中间存储格式
+## 4. Intermediate Storage Formats
 
-### Step 1: 原始筛选输出（FASTA 格式）
+### Step 1: Raw Filter Output (FASTA Format)
 
-预处理后的候选肽段池仍保留 FASTA 格式，但 header 统一标准化：
+The preprocessed candidate peptide pool stays in FASTA format, but the headers are standardized:
 
 ```
 >uniprot|sp|P48347-2|14310_ARATH|sequence|MENEREKQVYLAK
 >mgy|MGYP000000077819|sequence|MFPTHPFSGVTVPVS
 ```
 
-统一格式便于追溯来源和调试。
+A unified format makes provenance tracking and debugging easier.
 
-### Step 2: 写入数据库
+### Step 2: Writing to the Database
 
-标准化 FASTA 解析后写入 DuckDB `candidates` 表：
+After standardized FASTA parsing, records are written to the DuckDB `candidates` table:
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |------|------|------|
-| candidate_id | BIGINT | 自增主键 |
-| source | VARCHAR | "uniprot" 或 "mgy" |
-| source_id | VARCHAR | 原始 FASTA header 中的 ID |
-| header | VARCHAR | 完整的原始 header |
-| sequence | VARCHAR | 氨基酸序列 |
-| length | SMALLINT | 序列长度 |
-| is_standard_aa | BOOLEAN | 是否只含标准氨基酸 |
-| original_cluster_id | VARCHAR | CD-HIT 分配的簇 ID（可选） |
+| candidate_id | BIGINT | Auto-increment primary key |
+| source | VARCHAR | "uniprot" or "mgy" |
+| source_id | VARCHAR | ID from the original FASTA header |
+| header | VARCHAR | Full original header |
+| sequence | VARCHAR | Amino acid sequence |
+| length | SMALLINT | Sequence length |
+| is_standard_aa | BOOLEAN | Whether it contains only standard amino acids |
+| original_cluster_id | VARCHAR | Cluster ID assigned by CD-HIT (optional) |
 
-### Step 3: 统计报告
+### Step 3: Statistical Report
 
-预处理完成后生成一份数据概览报告，包含：
-- 各数据源的原始序列数
-- 各长度分段的序列数（3-5, 6-10, 11-15, 16-20, 21-25, 26-30 aa）
-- CD-HIT 聚类后的序列数和簇数
-- 非标准氨基酸序列的占比
+After preprocessing completes, a data overview report is generated, containing:
+- The number of raw sequences per data source
+- The number of sequences per length bin (3-5, 6-10, 11-15, 16-20, 21-25, 26-30 aa)
+- The number of sequences and clusters after CD-HIT clustering
+- The proportion of sequences with non-standard amino acids
 
 ---
 
-## 五、预期数据缩减
+## 5. Expected Data Reduction
 
-| 步骤 | 操作 | 输入 | 输出 | 缩减率 |
+| Step | Operation | Input | Output | Reduction rate |
 |------|------|------|------|--------|
-| — | 原始序列 | ~5 亿 | ~5 亿 | — |
-| 0a | 3-30 aa 筛选 | ~5 亿 | ~3000 万 - 1 亿 | 80-94% |
-| 0b | CD-HIT 去冗余 | ~3000 万 - 1 亿 | ~2000 万 - 6000 万 | 30-40% |
-| 0c | 标准 AA 筛选 | ~2000 万 - 6000 万 | ~1900 万 - 5700 万 | ~5% |
-| **合计** | | **~5 亿** | **~2000 万 - 6000 万** | **88-96%** |
+| — | Raw sequences | ~500 million | ~500 million | — |
+| 0a | 3-30 aa filter | ~500 million | ~30 million - 100 million | 80-94% |
+| 0b | CD-HIT redundancy removal | ~30 million - 100 million | ~20 million - 60 million | 30-40% |
+| 0c | Standard AA filter | ~20 million - 60 million | ~19 million - 57 million | ~5% |
+| **Total** | | **~500 million** | **~20 million - 60 million** | **88-96%** |
 
-最终进入 Stage 1 的候选肽段预计在 **2000 万到 6000 万** 级别。
+The number of candidate peptides that finally enter Stage 1 is expected to be on the order of **20 million to 60 million**.
 
 ---
 
-## 六、备选方案与风险评估
+## 6. Alternatives and Risk Assessment
 
-### CD-HIT 对短肽效果不佳
+### CD-HIT Performs Poorly on Short Peptides
 
-**风险**: CD-HIT 对短序列（尤其是 <15 aa）的聚类准确度可能会下降，因为短序列的 k-mer 统计信息少。
+**Risk**: CD-HIT's clustering accuracy may degrade for short sequences (especially <15 aa), because short sequences carry little k-mer statistical information.
 
-**备选 1**: MMseqs2（更快、更敏感，尤其适合短序列聚类）
-**备选 2**: 仅做 100% 精确去重（完全相同的序列去掉），不做相似度聚类
-**备选 3**: 先用 Linclust（MMseqs2 的子功能）做快速聚类，再用 CD-HIT 精细聚类
+**Alternative 1**: MMseqs2 (faster and more sensitive, especially suited to short-sequence clustering)
+**Alternative 2**: exact 100% deduplication only (remove completely identical sequences) without similarity clustering
+**Alternative 3**: use Linclust (an MMseqs2 subcommand) for fast clustering first, then CD-HIT for fine clustering
 
-### 内存不足
+### Insufficient Memory
 
-**风险**: CD-HIT 将所有序列索引放在内存中。3000 万条 3-30 aa 序列的索引需要估算内存。
+**Risk**: CD-HIT keeps the index of all sequences in memory. The memory needed for an index of 30 million 3-30 aa sequences must be estimated.
 
-**缓解方案**:
-- 先按长度分桶（3-10, 11-20, 21-30 aa），每个桶单独聚类
-- 每个桶的内存需求独立，避免一次性加载所有序列
-- 如果内存仍不足，进一步分桶或改用 MMseqs2
+**Mitigation**:
+- First bucket by length (3-10, 11-20, 21-30 aa) and cluster each bucket separately
+- Each bucket's memory requirement is independent, avoiding loading all sequences at once
+- If memory is still insufficient, bucket further or switch to MMseqs2
 
-### 来源追踪丢失
+### Loss of Source Tracking
 
-**风险**: 经过多轮筛选后，最终候选肽无法追溯到原始数据库和原始序列。
+**Risk**: after multiple rounds of filtering, the final candidate peptides can no longer be traced back to the original database and original sequence.
 
-**缓解方案**: 始终保留 `source` 和 `source_id` 字段。在最终报告中包含每个候选肽的完整来源路径。
+**Mitigation**: always keep the `source` and `source_id` fields. Include the full provenance path of each candidate peptide in the final report.

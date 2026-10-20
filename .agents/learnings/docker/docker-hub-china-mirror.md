@@ -1,5 +1,5 @@
 ---
-name: Docker Hub 国内不可达 v1.0
+name: Docker Hub Unreachable in China v1.0
 author: Claude Code
 created: 2026-05-13
 version: 1.0.0
@@ -7,19 +7,21 @@ tags: [docker, china, network, registry-mirror, iGEM-silk]
 validated: true
 ---
 
-# Gene Capsule: Docker Hub 国内不可达
+> **English** | [中文](docker-hub-china-mirror.zh.md)
+
+# Gene Capsule: Docker Hub Unreachable in China
 
 ## Experience
 
-**问题类型**: 网络不可达导致 Docker 镜像拉取失败——`registry-1.docker.io` 在中国大陆大部分网络环境不可达。
+**Problem type**: Network unreachability causes Docker image pulls to fail—`registry-1.docker.io` is unreachable from most networks in mainland China.
 
-**核心策略**: 配置 Docker Hub 镜像加速器（registry mirror）。
+**Core strategy**: Configure a Docker Hub registry mirror.
 
-**关键参数**: `registry-mirrors` 配置
+**Key parameters**: The `registry-mirrors` configuration
 
-`registry-1.docker.io` 在中国大陆大部分网络环境不可达。`docker pull`、`docker compose build`（拉取基础镜像）均会超时。
+`registry-1.docker.io` is unreachable from most networks in mainland China. `docker pull` and `docker compose build` (pulling base images) both time out.
 
-### 配置
+### Configuration
 
 ```json
 {
@@ -27,31 +29,31 @@ validated: true
 }
 ```
 
-写入 `/etc/docker/daemon.json` 并重启 Docker：
+Write it to `/etc/docker/daemon.json` and restart Docker:
 
 ```bash
 sudo systemctl restart docker
 ```
 
-### 注意
+### Note
 
-修改 daemon.json 需要 sudo 权限，应在部署前告知用户准备。
+Modifying daemon.json requires sudo privileges; tell the user to prepare for this before deployment.
 
 ## Environment Fingerprint
 
-- **任务域**: Docker 镜像拉取
-- **输入特征**: 位于中国大陆网络环境
-- **约束条件**: 需要 sudo 权限修改 daemon.json
-- **不适用**: 海外网络环境或已配置其他代理/VPN
+- **Task domain**: Docker image pulls
+- **Input characteristics**: Located on a mainland China network
+- **Constraints**: sudo privileges are required to modify daemon.json
+- **Not applicable**: Overseas networks, or environments with another proxy/VPN already configured
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk 15 个服务全量构建，DaoCloud 镜像加速器可用
-- **失败案例**: 未配置镜像加速器时 `docker compose build` 全部因 `registry-1.docker.io` 不可达而超时
-- **修复验证**: 配置后 `docker pull python:3.11-slim` 成功
+- **Validation method**: Full build of 15 iGEM-silk services; the DaoCloud registry mirror works
+- **Failure case**: Without the registry mirror configured, every `docker compose build` timed out because `registry-1.docker.io` was unreachable
+- **Fix validation**: After configuring it, `docker pull python:3.11-slim` succeeded
 
 ## Usage
 
-- **触发条件**: `docker pull` 或 `docker compose build` 报 `dial tcp: connect: connection timed out` 到 `registry-1.docker.io`
-- **调用方式**: 写入 daemon.json → 重启 Docker → 重试拉取
-- **注意事项**: 镜像加速器可能有延迟，最新 tag 可能未同步
+- **Trigger conditions**: `docker pull` or `docker compose build` reports `dial tcp: connect: connection timed out` to `registry-1.docker.io`
+- **How to invoke**: Write to daemon.json → restart Docker → retry the pull
+- **Caveats**: The registry mirror may lag; the newest tags may not be synced

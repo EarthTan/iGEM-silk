@@ -1,234 +1,236 @@
-# MHCflurry 等位基因支持
+> **English** | [中文](allele_support.zh.md)
 
-## 概述
+# MHCflurry Allele Support
 
-本文档详细列出了MHCflurry支持的MHC I类等位基因，包括人类、小鼠、恒河猴、黑猩猩等物种的等位基因。MHCflurry 2.0支持超过150种MHC I类等位基因。
+## Overview
 
-## 人类HLA等位基因
+This document lists in detail the MHC class I alleles supported by MHCflurry, including alleles from humans, mice, rhesus macaques, chimpanzees, and other species. MHCflurry 2.0 supports more than 150 MHC class I alleles.
 
-### HLA-A等位基因
+## Human HLA Alleles
 
-MHCflurry支持以下HLA-A等位基因：
+### HLA-A Alleles
 
-| 等位基因 | 人群频率 | 地理分布 | 描述 |
+MHCflurry supports the following HLA-A alleles:
+
+| Allele | Population frequency | Geographic distribution | Description |
 |----------|----------|----------|------|
-| HLA-A*02:01 | ~50% (白种人) | 全球 | 全球最常见的HLA等位基因 |
-| HLA-A*01:01 | ~25% (欧洲) | 欧洲、北美 | 欧洲人群常见 |
-| HLA-A*03:01 | ~15% (全球) | 全球 | 全球分布广泛 |
-| HLA-A*11:01 | ~15% (亚洲) | 亚洲、大洋洲 | 亚洲人群常见 |
-| HLA-A*24:02 | ~30% (亚洲) | 亚洲、美洲 | 亚洲人群最常见 |
-| HLA-A*26:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-A*29:02 | ~5% (欧洲) | 欧洲、非洲 | 欧洲人群中等频率 |
-| HLA-A*30:01 | ~5% (非洲) | 非洲、中东 | 非洲人群常见 |
-| HLA-A*31:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-A*32:01 | ~5% (欧洲) | 欧洲 | 欧洲人群中等频率 |
-| HLA-A*33:01 | ~5% (亚洲) | 亚洲 | 亚洲人群中等频率 |
-| HLA-A*34:01 | ~2% (非洲) | 非洲 | 非洲人群低频 |
-| HLA-A*36:01 | ~2% (非洲) | 非洲 | 非洲人群低频 |
-| HLA-A*66:01 | ~2% (全球) | 全球 | 低频 |
-| HLA-A*68:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-A*68:02 | ~3% (全球) | 全球 | 低频 |
-| HLA-A*69:01 | ~1% (全球) | 全球 | 罕见 |
-| HLA-A*74:01 | ~2% (非洲) | 非洲 | 非洲人群低频 |
+| HLA-A*02:01 | ~50% (Caucasians) | Global | The most common HLA allele worldwide |
+| HLA-A*01:01 | ~25% (Europe) | Europe, North America | Common in European populations |
+| HLA-A*03:01 | ~15% (global) | Global | Widely distributed worldwide |
+| HLA-A*11:01 | ~15% (Asia) | Asia, Oceania | Common in Asian populations |
+| HLA-A*24:02 | ~30% (Asia) | Asia, Americas | The most common in Asian populations |
+| HLA-A*26:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-A*29:02 | ~5% (Europe) | Europe, Africa | Moderate frequency in European populations |
+| HLA-A*30:01 | ~5% (Africa) | Africa, Middle East | Common in African populations |
+| HLA-A*31:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-A*32:01 | ~5% (Europe) | Europe | Moderate frequency in European populations |
+| HLA-A*33:01 | ~5% (Asia) | Asia | Moderate frequency in Asian populations |
+| HLA-A*34:01 | ~2% (Africa) | Africa | Low frequency in African populations |
+| HLA-A*36:01 | ~2% (Africa) | Africa | Low frequency in African populations |
+| HLA-A*66:01 | ~2% (global) | Global | Low frequency |
+| HLA-A*68:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-A*68:02 | ~3% (global) | Global | Low frequency |
+| HLA-A*69:01 | ~1% (global) | Global | Rare |
+| HLA-A*74:01 | ~2% (Africa) | Africa | Low frequency in African populations |
 
-### HLA-B等位基因
+### HLA-B Alleles
 
-| 等位基因 | 人群频率 | 地理分布 | 描述 |
+| Allele | Population frequency | Geographic distribution | Description |
 |----------|----------|----------|------|
-| HLA-B*07:02 | ~15% (全球) | 全球 | 全球常见 |
-| HLA-B*08:01 | ~15% (欧洲) | 欧洲、大洋洲 | 欧洲人群常见 |
-| HLA-B*15:01 | ~10% (全球) | 全球 | 全球分布 |
-| HLA-B*35:01 | ~10% (地中海) | 地中海、中东 | 地中海地区常见 |
-| HLA-B*40:01 | ~10% (亚洲) | 亚洲 | 亚洲人群常见 |
-| HLA-B*44:02 | ~10% (欧洲) | 欧洲 | 欧洲人群常见 |
-| HLA-B*44:03 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-B*45:01 | ~5% (非洲) | 非洲 | 非洲人群常见 |
-| HLA-B*46:01 | ~5% (亚洲) | 亚洲 | 亚洲人群特有 |
-| HLA-B*49:01 | ~3% (全球) | 全球 | 低频 |
-| HLA-B*50:01 | ~3% (中东) | 中东、地中海 | 中东地区常见 |
-| HLA-B*51:01 | ~10% (亚洲) | 亚洲、中东 | 亚洲人群常见 |
-| HLA-B*52:01 | ~5% (亚洲) | 亚洲 | 亚洲人群中等频率 |
-| HLA-B*53:01 | ~5% (非洲) | 非洲 | 非洲人群常见 |
-| HLA-B*54:01 | ~5% (亚洲) | 亚洲 | 亚洲人群中等频率 |
-| HLA-B*55:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-B*56:01 | ~3% (全球) | 全球 | 低频 |
-| HLA-B*57:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-B*58:01 | ~5% (亚洲、非洲) | 亚洲、非洲 | 亚洲和非洲人群常见 |
+| HLA-B*07:02 | ~15% (global) | Global | Common worldwide |
+| HLA-B*08:01 | ~15% (Europe) | Europe, Oceania | Common in European populations |
+| HLA-B*15:01 | ~10% (global) | Global | Distributed worldwide |
+| HLA-B*35:01 | ~10% (Mediterranean) | Mediterranean, Middle East | Common in the Mediterranean region |
+| HLA-B*40:01 | ~10% (Asia) | Asia | Common in Asian populations |
+| HLA-B*44:02 | ~10% (Europe) | Europe | Common in European populations |
+| HLA-B*44:03 | ~5% (global) | Global | Moderate frequency |
+| HLA-B*45:01 | ~5% (Africa) | Africa | Common in African populations |
+| HLA-B*46:01 | ~5% (Asia) | Asia | Specific to Asian populations |
+| HLA-B*49:01 | ~3% (global) | Global | Low frequency |
+| HLA-B*50:01 | ~3% (Middle East) | Middle East, Mediterranean | Common in the Middle East |
+| HLA-B*51:01 | ~10% (Asia) | Asia, Middle East | Common in Asian populations |
+| HLA-B*52:01 | ~5% (Asia) | Asia | Moderate frequency in Asian populations |
+| HLA-B*53:01 | ~5% (Africa) | Africa | Common in African populations |
+| HLA-B*54:01 | ~5% (Asia) | Asia | Moderate frequency in Asian populations |
+| HLA-B*55:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-B*56:01 | ~3% (global) | Global | Low frequency |
+| HLA-B*57:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-B*58:01 | ~5% (Asia, Africa) | Asia, Africa | Common in Asian and African populations |
 
-### HLA-C等位基因
+### HLA-C Alleles
 
-| 等位基因 | 人群频率 | 地理分布 | 描述 |
+| Allele | Population frequency | Geographic distribution | Description |
 |----------|----------|----------|------|
-| HLA-C*07:02 | ~30% (全球) | 全球 | 全球最常见的HLA-C等位基因 |
-| HLA-C*04:01 | ~15% (欧洲) | 欧洲、北美 | 欧洲人群常见 |
-| HLA-C*05:01 | ~10% (中东) | 中东、地中海 | 中东地区常见 |
-| HLA-C*06:02 | ~10% (亚洲) | 亚洲 | 亚洲人群常见 |
-| HLA-C*01:02 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-C*02:02 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-C*03:03 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-C*03:04 | ~5% (亚洲) | 亚洲 | 亚洲人群中等频率 |
-| HLA-C*08:01 | ~5% (全球) | 全球 | 中等频率 |
-| HLA-C*12:02 | ~5% (亚洲) | 亚洲 | 亚洲人群中等频率 |
-| HLA-C*12:03 | ~3% (全球) | 全球 | 低频 |
-| HLA-C*14:02 | ~3% (全球) | 全球 | 低频 |
-| HLA-C*15:02 | ~3% (亚洲) | 亚洲 | 亚洲人群低频 |
-| HLA-C*16:01 | ~3% (全球) | 全球 | 低频 |
+| HLA-C*07:02 | ~30% (global) | Global | The most common HLA-C allele worldwide |
+| HLA-C*04:01 | ~15% (Europe) | Europe, North America | Common in European populations |
+| HLA-C*05:01 | ~10% (Middle East) | Middle East, Mediterranean | Common in the Middle East |
+| HLA-C*06:02 | ~10% (Asia) | Asia | Common in Asian populations |
+| HLA-C*01:02 | ~5% (global) | Global | Moderate frequency |
+| HLA-C*02:02 | ~5% (global) | Global | Moderate frequency |
+| HLA-C*03:03 | ~5% (global) | Global | Moderate frequency |
+| HLA-C*03:04 | ~5% (Asia) | Asia | Moderate frequency in Asian populations |
+| HLA-C*08:01 | ~5% (global) | Global | Moderate frequency |
+| HLA-C*12:02 | ~5% (Asia) | Asia | Moderate frequency in Asian populations |
+| HLA-C*12:03 | ~3% (global) | Global | Low frequency |
+| HLA-C*14:02 | ~3% (global) | Global | Low frequency |
+| HLA-C*15:02 | ~3% (Asia) | Asia | Low frequency in Asian populations |
+| HLA-C*16:01 | ~3% (global) | Global | Low frequency |
 
-## 小鼠等位基因 (H-2)
+## Mouse Alleles (H-2)
 
-MHCflurry支持以下小鼠MHC I类等位基因：
+MHCflurry supports the following mouse MHC class I alleles:
 
-### H-2等位基因
+### H-2 Alleles
 
-| 等位基因 | 小鼠品系 | 描述 |
+| Allele | Mouse strain | Description |
 |----------|----------|------|
-| H-2-Kb | C57BL/6, C57BL/10 | 最常用的小鼠等位基因 |
-| H-2-Db | C57BL/6, C57BL/10 | C57BL/6品系常见 |
-| H-2-Kd | BALB/c, DBA/2 | BALB/c品系常见 |
-| H-2-Dd | BALB/c, DBA/2 | BALB/c品系常见 |
-| H-2-Ld | BALB/c, DBA/2 | BALB/c品系常见 |
-| H-2-Kk | C3H, AKR | C3H品系常见 |
-| H-2-Dk | C3H, AKR | C3H品系常见 |
-| H-2-Kq | DBA/1 | DBA/1品系特有 |
-| H-2-Dq | DBA/1 | DBA/1品系特有 |
+| H-2-Kb | C57BL/6, C57BL/10 | The most commonly used mouse allele |
+| H-2-Db | C57BL/6, C57BL/10 | Common in the C57BL/6 strain |
+| H-2-Kd | BALB/c, DBA/2 | Common in the BALB/c strain |
+| H-2-Dd | BALB/c, DBA/2 | Common in the BALB/c strain |
+| H-2-Ld | BALB/c, DBA/2 | Common in the BALB/c strain |
+| H-2-Kk | C3H, AKR | Common in the C3H strain |
+| H-2-Dk | C3H, AKR | Common in the C3H strain |
+| H-2-Kq | DBA/1 | Specific to the DBA/1 strain |
+| H-2-Dq | DBA/1 | Specific to the DBA/1 strain |
 
-## 非人类灵长类等位基因
+## Non-Human Primate Alleles
 
-### 恒河猴 (Mamu)
+### Rhesus Macaque (Mamu)
 
-| 等位基因 | 描述 |
+| Allele | Description |
 |----------|------|
-| Mamu-A1*001 | 恒河猴常见等位基因 |
-| Mamu-A1*002 | 恒河猴常见等位基因 |
-| Mamu-A1*008 | 恒河猴常见等位基因 |
-| Mamu-A1*011 | 恒河猴常见等位基因 |
-| Mamu-A1*019 | 恒河猴常见等位基因 |
-| Mamu-B*001 | 恒河猴B位点等位基因 |
-| Mamu-B*003 | 恒河猴B位点等位基因 |
-| Mamu-B*004 | 恒河猴B位点等位基因 |
-| Mamu-B*008 | 恒河猴B位点等位基因 |
-| Mamu-B*017 | 恒河猴B位点等位基因 |
+| Mamu-A1*001 | Common rhesus macaque allele |
+| Mamu-A1*002 | Common rhesus macaque allele |
+| Mamu-A1*008 | Common rhesus macaque allele |
+| Mamu-A1*011 | Common rhesus macaque allele |
+| Mamu-A1*019 | Common rhesus macaque allele |
+| Mamu-B*001 | Rhesus macaque B-locus allele |
+| Mamu-B*003 | Rhesus macaque B-locus allele |
+| Mamu-B*004 | Rhesus macaque B-locus allele |
+| Mamu-B*008 | Rhesus macaque B-locus allele |
+| Mamu-B*017 | Rhesus macaque B-locus allele |
 
-### 黑猩猩 (Patr)
+### Chimpanzee (Patr)
 
-| 等位基因 | 描述 |
+| Allele | Description |
 |----------|------|
-| Patr-A*0101 | 黑猩猩常见等位基因 |
-| Patr-A*0201 | 黑猩猩常见等位基因 |
-| Patr-A*0301 | 黑猩猩常见等位基因 |
-| Patr-A*0401 | 黑猩猩常见等位基因 |
-| Patr-B*0101 | 黑猩猩B位点等位基因 |
-| Patr-B*0301 | 黑猩猩B位点等位基因 |
-| Patr-B*0401 | 黑猩猩B位点等位基因 |
-| Patr-B*0501 | 黑猩猩B位点等位基因 |
+| Patr-A*0101 | Common chimpanzee allele |
+| Patr-A*0201 | Common chimpanzee allele |
+| Patr-A*0301 | Common chimpanzee allele |
+| Patr-A*0401 | Common chimpanzee allele |
+| Patr-B*0101 | Chimpanzee B-locus allele |
+| Patr-B*0301 | Chimpanzee B-locus allele |
+| Patr-B*0401 | Chimpanzee B-locus allele |
+| Patr-B*0501 | Chimpanzee B-locus allele |
 
-## 等位基因命名规范
+## Allele Naming Conventions
 
-### HLA命名规则
+### HLA Naming Rules
 
-HLA等位基因命名遵循以下规则：
+HLA allele naming follows these rules:
 ```
-HLA-[基因座]*[等位基因组]:[等位基因]
+HLA-[locus]*[allele group]:[allele]
 ```
 
-示例：
-- `HLA-A*02:01`: HLA-A基因座，02等位基因组，01等位基因
-- `HLA-B*07:02`: HLA-B基因座，07等位基因组，02等位基因
-- `HLA-C*07:02`: HLA-C基因座，07等位基因组，02等位基因
+Examples:
+- `HLA-A*02:01`: HLA-A locus, allele group 02, allele 01
+- `HLA-B*07:02`: HLA-B locus, allele group 07, allele 02
+- `HLA-C*07:02`: HLA-C locus, allele group 07, allele 02
 
-### 非人类等位基因命名
+### Non-Human Allele Naming
 
-- 小鼠: `H-2-[基因座][等位基因]` (如 `H-2-Kb`)
-- 恒河猴: `Mamu-[基因座]*[等位基因]` (如 `Mamu-A1*001`)
-- 黑猩猩: `Patr-[基因座]*[等位基因]` (如 `Patr-A*0101`)
+- Mouse: `H-2-[locus][allele]` (e.g. `H-2-Kb`)
+- Rhesus macaque: `Mamu-[locus]*[allele]` (e.g. `Mamu-A1*001`)
+- Chimpanzee: `Patr-[locus]*[allele]` (e.g. `Patr-A*0101`)
 
-## 等位基因选择指南
+## Allele Selection Guide
 
-### 基于人群频率选择
+### Selection Based on Population Frequency
 
-#### 全球覆盖
-选择全球最常见的等位基因以最大化人群覆盖率：
+#### Global coverage
+Choose the most common alleles worldwide to maximize population coverage:
 ```python
 global_alleles = [
-    "HLA-A*02:01",  # 全球最常见
-    "HLA-A*01:01",  # 欧洲常见
-    "HLA-A*03:01",  # 全球分布
-    "HLA-A*24:02",  # 亚洲最常见
-    "HLA-B*07:02",  # 全球常见
-    "HLA-B*08:01",  # 欧洲常见
-    "HLA-B*15:01",  # 全球分布
-    "HLA-C*07:02",  # 全球最常见
+    "HLA-A*02:01",  # most common worldwide
+    "HLA-A*01:01",  # common in Europe
+    "HLA-A*03:01",  # distributed worldwide
+    "HLA-A*24:02",  # most common in Asia
+    "HLA-B*07:02",  # common worldwide
+    "HLA-B*08:01",  # common in Europe
+    "HLA-B*15:01",  # distributed worldwide
+    "HLA-C*07:02",  # most common worldwide
 ]
 ```
 
-#### 亚洲人群
+#### Asian populations
 ```python
 asian_alleles = [
     "HLA-A*02:01",
-    "HLA-A*11:01",  # 亚洲常见
-    "HLA-A*24:02",  # 亚洲最常见
-    "HLA-A*33:01",  # 亚洲中等频率
-    "HLA-B*40:01",  # 亚洲常见
-    "HLA-B*46:01",  # 亚洲特有
-    "HLA-B*51:01",  # 亚洲常见
-    "HLA-B*52:01",  # 亚洲中等频率
-    "HLA-C*06:02",  # 亚洲常见
-    "HLA-C*12:02",  # 亚洲中等频率
+    "HLA-A*11:01",  # common in Asia
+    "HLA-A*24:02",  # most common in Asia
+    "HLA-A*33:01",  # moderate frequency in Asia
+    "HLA-B*40:01",  # common in Asia
+    "HLA-B*46:01",  # specific to Asia
+    "HLA-B*51:01",  # common in Asia
+    "HLA-B*52:01",  # moderate frequency in Asia
+    "HLA-C*06:02",  # common in Asia
+    "HLA-C*12:02",  # moderate frequency in Asia
 ]
 ```
 
-#### 欧洲人群
+#### European populations
 ```python
 european_alleles = [
     "HLA-A*02:01",
-    "HLA-A*01:01",  # 欧洲常见
+    "HLA-A*01:01",  # common in Europe
     "HLA-A*03:01",
     "HLA-A*11:01",
     "HLA-B*07:02",
-    "HLA-B*08:01",  # 欧洲常见
+    "HLA-B*08:01",  # common in Europe
     "HLA-B*15:01",
-    "HLA-B*44:02",  # 欧洲常见
+    "HLA-B*44:02",  # common in Europe
     "HLA-C*07:02",
-    "HLA-C*04:01",  # 欧洲常见
+    "HLA-C*04:01",  # common in Europe
 ]
 ```
 
-#### 非洲人群
+#### African populations
 ```python
 african_alleles = [
     "HLA-A*02:01",
-    "HLA-A*30:01",  # 非洲常见
-    "HLA-A*34:01",  # 非洲低频
-    "HLA-A*36:01",  # 非洲低频
-    "HLA-A*74:01",  # 非洲低频
-    "HLA-B*45:01",  # 非洲常见
-    "HLA-B*53:01",  # 非洲常见
-    "HLA-B*58:01",  # 非洲常见
+    "HLA-A*30:01",  # common in Africa
+    "HLA-A*34:01",  # low frequency in Africa
+    "HLA-A*36:01",  # low frequency in Africa
+    "HLA-A*74:01",  # low frequency in Africa
+    "HLA-B*45:01",  # common in Africa
+    "HLA-B*53:01",  # common in Africa
+    "HLA-B*58:01",  # common in Africa
     "HLA-C*07:02",
     "HLA-C*04:01",
 ]
 ```
 
-### 基于应用场景选择
+### Selection Based on Application Scenario
 
-#### 疫苗设计
-选择人群覆盖率高的常见等位基因：
+#### Vaccine design
+Choose common alleles with high population coverage:
 ```python
 vaccine_alleles = [
-    "HLA-A*02:01",  # 全球50%覆盖率
-    "HLA-A*01:01",  # 欧洲25%覆盖率
-    "HLA-A*03:01",  # 全球15%覆盖率
-    "HLA-A*24:02",  # 亚洲30%覆盖率
-    "HLA-B*07:02",  # 全球15%覆盖率
-    "HLA-C*07:02",  # 全球30%覆盖率
+    "HLA-A*02:01",  # 50% global coverage
+    "HLA-A*01:01",  # 25% European coverage
+    "HLA-A*03:01",  # 15% global coverage
+    "HLA-A*24:02",  # 30% Asian coverage
+    "HLA-B*07:02",  # 15% global coverage
+    "HLA-C*07:02",  # 30% global coverage
 ]
 ```
 
-#### 肿瘤新抗原预测
-使用患者特异性HLA分型结果：
+#### Tumor neoantigen prediction
+Use patient-specific HLA typing results:
 ```python
 patient_alleles = [
-    "HLA-A*02:01",  # 患者HLA型别
+    "HLA-A*02:01",  # patient HLA type
     "HLA-A*24:02",
     "HLA-B*07:02",
     "HLA-B*40:01",
@@ -237,26 +239,26 @@ patient_alleles = [
 ]
 ```
 
-#### 基础研究
-使用研究领域常用的等位基因：
+#### Basic research
+Use alleles commonly used in the research field:
 ```python
 research_alleles = [
-    "HLA-A*02:01",  # 最常研究的等位基因
-    "HLA-B*07:02",  # 结构研究常用
-    "H-2-Kb",       # 小鼠模型常用
-    "H-2-Db",       # 小鼠模型常用
+    "HLA-A*02:01",  # most studied allele
+    "HLA-B*07:02",  # commonly used in structural studies
+    "H-2-Kb",       # commonly used in mouse models
+    "H-2-Db",       # commonly used in mouse models
 ]
 ```
 
-## 等位基因验证
+## Allele Validation
 
-### 检查等位基因支持
+### Checking Allele Support
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
 def check_allele_support(alleles_to_check):
-    """检查等位基因是否被MHCflurry支持"""
+    """Check whether alleles are supported by MHCflurry"""
     predictor = Class1AffinityPredictor.load()
     supported_alleles = predictor.supported_alleles
     
@@ -271,44 +273,44 @@ def check_allele_support(alleles_to_check):
     
     return supported, unsupported
 
-# 示例使用
+# Example usage
 test_alleles = [
     "HLA-A*02:01",
     "HLA-B*07:02",
     "HLA-C*07:02",
     "H-2-Kb",
     "Mamu-A1*001",
-    "HLA-UNKNOWN",  # 不存在的等位基因
+    "HLA-UNKNOWN",  # non-existent allele
 ]
 
 supported, unsupported = check_allele_support(test_alleles)
 
-print(f"支持的等位基因 ({len(supported)}):")
+print(f"Supported alleles ({len(supported)}):")
 for allele in supported:
     print(f"  ✓ {allele}")
 
-print(f"\n不支持的等位基因 ({len(unsupported)}):")
+print(f"\nUnsupported alleles ({len(unsupported)}):")
 for allele in unsupported:
     print(f"  ✗ {allele}")
 ```
 
-### 等位基因格式验证
+### Allele Format Validation
 
 ```python
 import re
 
 def validate_allele_format(allele):
-    """验证等位基因格式"""
-    # HLA格式: HLA-[A|B|C]*\d{2}:\d{2}
+    """Validate the allele format"""
+    # HLA format: HLA-[A|B|C]*\d{2}:\d{2}
     hla_pattern = r'^HLA-[ABC]\*\d{2}:\d{2}$'
     
-    # H-2格式: H-2-[K|D|L][b|d|k|q]
+    # H-2 format: H-2-[K|D|L][b|d|k|q]
     h2_pattern = r'^H-2-[KDL][bdkq]$'
     
-    # Mamu格式: Mamu-[AB]\d*\*\d{3}
+    # Mamu format: Mamu-[AB]\d*\*\d{3}
     mamu_pattern = r'^Mamu-[AB]\d*\*\d{3}$'
     
-    # Patr格式: Patr-[AB]\*\d{4}
+    # Patr format: Patr-[AB]\*\d{4}
     patr_pattern = r'^Patr-[AB]\*\d{4}$'
     
     patterns = [hla_pattern, h2_pattern, mamu_pattern, patr_pattern]
@@ -319,38 +321,38 @@ def validate_allele_format(allele):
     
     return False
 
-# 示例使用
+# Example usage
 alleles_to_validate = [
-    "HLA-A*02:01",    # 有效
-    "HLA-B*07:02",    # 有效
-    "H-2-Kb",         # 有效
-    "Mamu-A1*001",    # 有效
-    "HLA-A02:01",     # 无效（缺少*）
-    "HLA-A*2:01",     # 无效（数字位数不足）
-    "UNKNOWN",        # 无效
+    "HLA-A*02:01",    # valid
+    "HLA-B*07:02",    # valid
+    "H-2-Kb",         # valid
+    "Mamu-A1*001",    # valid
+    "HLA-A02:01",     # invalid (missing *)
+    "HLA-A*2:01",     # invalid (not enough digits)
+    "UNKNOWN",        # invalid
 ]
 
 for allele in alleles_to_validate:
     is_valid = validate_allele_format(allele)
-    print(f"{allele}: {'有效' if is_valid else '无效'}")
+    print(f"{allele}: {'valid' if is_valid else 'invalid'}")
 ```
 
-## 获取完整等位基因列表
+## Getting the Full Allele List
 
-### 程序化获取
+### Programmatic Retrieval
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
 def get_all_supported_alleles(category=None):
-    """获取所有支持的等位基因，可按类别筛选"""
+    """Get all supported alleles, optionally filtered by category"""
     predictor = Class1AffinityPredictor.load()
     all_alleles = predictor.supported_alleles
     
     if category is None:
         return all_alleles
     
-    # 按类别筛选
+    # Filter by category
     categorized = {
         "HLA-A": [a for a in all_alleles if a.startswith("HLA-A")],
         "

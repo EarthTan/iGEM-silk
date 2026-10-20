@@ -1,28 +1,30 @@
-# API 已知坑 & 处理方式
+> **English** | [中文](quirks.zh.md)
 
-所有偏离模板标准行为的服务特性，以及 Pipeline 开发中遇到过的 bug。
+# Known API Pitfalls & How to Handle Them
 
----
-
-## 1. SASA：Batch 响应评分在最顶层，不在 `result.score`
-
-**现象**：SASA 单条端点返回 `{"success": true, "result": {"score": 0.76, ...}}`，但 Batch 端点返回 `{"success": true, "results": [{"peptide_id": "con_001", "score": 0.76, ...}]}`。Batch 结果里的 `score` 在顶层，**不是** `results[].result.score`。
-
-**影响范围**：所有调用 `predict_pdb_batch("sasa", ...)` 的代码。
-
-**处理方式**：解析 batch 结果时按 `r.get("score")` 取值，不是 `r["result"]["score"]`。
-
-**验证**：`main/client.py` 的 `predict_pdb_batch` 返回原始 JSON，调用方自行适配。
+Every service behavior that deviates from the template standard, plus the bugs encountered during pipeline development.
 
 ---
 
-## 2. SASA：缺少 `sequence` 参数返回 score=0
+## 1. SASA: batch response score is at the top level, not in `result.score`
 
-**现象**：SASA 需要知道功能肽的序列才能定位到 PDB 中的特定区域。不传 `sequence` 时，返回 `score=0.0`、`label="no_target"`。
+**Symptom**: The SASA single endpoint returns `{"success": true, "result": {"score": 0.76, ...}}`, but the Batch endpoint returns `{"success": true, "results": [{"peptide_id": "con_001", "score": 0.76, ...}]}`. The `score` in batch results is at the top level, **not** `results[].result.score`.
 
-**原因**：SASA 服务在 `score_pdb()` 中先用 FreeSASA 计算全结构逐残基 SASA，然后用 `sequence` 在 Biopython 解析的残基列表中定位肽区域，最后只统计肽区域的平均相对 SASA。没有 `sequence` 就无法定位，默认返回 0。
+**Scope of impact**: All code that calls `predict_pdb_batch("sasa", ...)`.
 
-**处理方式**：调用 SASA 时必须在请求中包含 `sequence` 字段：
+**Handling**: When parsing batch results, read the value via `r.get("score")`, not `r["result"]["score"]`.
+
+**Verification**: `predict_pdb_batch` in `main/client.py` returns the raw JSON, and the caller adapts it.
+
+---
+
+## 2. SASA: missing `sequence` parameter returns score=0
+
+**Symptom**: SASA needs to know the functional peptide's sequence in order to locate the specific region in the PDB. When `sequence` is not passed, it returns `score=0.0`, `label="no_target"`.
+
+**Cause**: In `score_pdb()`, the SASA service first uses FreeSASA to compute per-residue SASA for the whole structure, then uses `sequence` to locate the peptide region in the residue list parsed by Biopython, and finally reports only the mean relative SASA of the peptide region. Without `sequence` it cannot locate the region and defaults to returning 0.
+
+**Handling**: When calling SASA, the request must include the `sequence` field:
 ```json
 {
   "pdb_content": "ATOM      1  N   ...",
@@ -31,101 +33,101 @@
 }
 ```
 
-**验证**：调用 SASA `/predict/batch` 并传入 `sequence`，确认 `score > 0`。
+**Verification**: Call SASA `/predict/batch` with `sequence` included and confirm `score > 0`.
 
 ---
 
-## 3. OmegaFold：阻塞事件循环，必须 Semaphore(1)
+## 3. OmegaFold: blocks the event loop, Semaphore(1) is mandatory
 
-**现象**：OmegaFold 的 `self.model(input_data)` 是同步 PyTorch CUDA 调用，在 `async def` 内会阻塞 uvicorn 事件循环。高于 1 的并发会导致请求排队超时或服务崩溃。
+**Symptom**: OmegaFold's `self.model(input_data)` is a synchronous PyTorch CUDA call, which blocks uvicorn's event loop inside `async def`. Concurrency above 1 causes request queue timeouts or service crashes.
 
-**处理方式**：客户端必须使用 `asyncio.Semaphore(1)` 串行化请求，每个请求设置 `timeout=14400`（4 小时，虽然实际只需 90-120s）。
+**Handling**: Clients must serialize requests with `asyncio.Semaphore(1)`, and set `timeout=14400` per request (4 hours, although only 90-120s is actually needed).
 
-**影响**：OmegaFold 是全管线吞吐量瓶颈（~120s/construct，强制串行）。
-
----
-
-## 4. ToxinPred3：sklearn 线程不安全
-
-**现象**：ToxinPred3 使用 sklearn ExtraTreesClassifier，其 C 扩展在并发请求时会挂起。高并发导致 socket 连接堆积，服务无法响应。
-
-**处理方式**：
-- 客户端并发限制到 Semaphore(2)
-- 每次只发送单条序列（batch_size=1）
-- 使用 socket 级别超时（httpx timeout=180s）
-- 备选方案：5 次连续超时后调用 `POST /restart` 重启服务
-
-**验证**：服务自身声明 `recommended_batch_size = 50`，但实际 pipeline 经验表明 batch_size=1 + Sem(2) 最稳定。
+**Impact**: OmegaFold is the throughput bottleneck of the whole pipeline (~120s/construct, forced serialization).
 
 ---
 
-## 5. Waveflow：路径含工具名 `/predict/{tool}`
+## 4. ToxinPred3: sklearn is not thread-safe
 
-**现象**：Waveflow 的路由模式与其他结构服务不同：
-- `POST /predict/esmfold`（不是 `/predict`）
+**Symptom**: ToxinPred3 uses sklearn's ExtraTreesClassifier, whose C extension hangs under concurrent requests. High concurrency causes socket connections to pile up and the service stops responding.
+
+**Handling**:
+- Restrict client concurrency to Semaphore(2)
+- Send only a single sequence at a time (batch_size=1)
+- Use socket-level timeouts (httpx timeout=180s)
+- Fallback: after 5 consecutive timeouts, call `POST /restart` to restart the service
+
+**Verification**: The service itself declares `recommended_batch_size = 50`, but actual pipeline experience shows that batch_size=1 + Sem(2) is the most stable.
+
+---
+
+## 5. Waveflow: path contains the tool name `/predict/{tool}`
+
+**Symptom**: Waveflow's routing pattern differs from other structure services:
+- `POST /predict/esmfold` (not `/predict`)
 - `POST /predict/batch/omegafold`
 - `POST /predict/async/alphafold3`
-- `GET /status/{job_id}` / `GET /result/{job_id}` — 这些是标准异步模式
+- `GET /status/{job_id}` / `GET /result/{job_id}` — these follow the standard async pattern
 
-同时兼容 `POST /predict`（使用 `WAVEFLOW_DEFAULT_TOOL` 环境变量，默认 `esmfold`）。
+It is also compatible with `POST /predict` (using the `WAVEFLOW_DEFAULT_TOOL` environment variable, default `esmfold`).
 
-**处理方式**：直接调用 Waveflow 时注意 URL 路径格式。通过 `ServiceClient.predict_structure_async()` 调用时，指定服务名 `waveflow`，client 会自动拼接路径。
-
----
-
-## 6. TemStaPro：GPU OOM 风险
-
-**现象**：TemStaPro 两阶段架构——先 ProtT5-XL 编码（~11GB GPU），再 30 个 MLP 分类器并行推理。内部 `Semaphore(10)` 限制同时运行 10 组 × 30 MLP = 300 分类器，但仍可能在批量过大时导致 GPU OOM。
-
-**处理方式**：
-- 客户端并发限制到 Semaphore(2-5)
-- 超时设为 300-600s
-- 如遇到 OOM，重启容器并降低并发
+**Handling**: Pay attention to the URL path format when calling Waveflow directly. When calling via `ServiceClient.predict_structure_async()`, specify the service name `waveflow` and the client will assemble the path automatically.
 
 ---
 
-## 7. Aggrescan3D：每请求启 Docker 子进程
+## 6. TemStaPro: GPU OOM risk
 
-**现象**：Aggrescan3D 在 Python 2.7 micromamba 容器内运行，每个预测通过 subprocess 启动独立进程。首次调用冷启动慢（~10s），并发过高会耗尽系统资源。
+**Symptom**: TemStaPro has a two-stage architecture — first ProtT5-XL encoding (~11GB GPU), then parallel inference by 30 MLP classifiers. An internal `Semaphore(10)` limits it to 10 groups × 30 MLPs = 300 classifiers running at once, but an overly large batch can still cause GPU OOM.
 
-**处理方式**：
-- 服务端内部 `Semaphore(2)` 限制同时运行的子进程数
-- 客户端 `timeout=900s`（可配 `A3D_TIMEOUT` 环境变量）
-- 批量发送 50 个/批，利用批处理减少冷启动开销
+**Handling**:
+- Restrict client concurrency to Semaphore(2-5)
+- Set the timeout to 300-600s
+- If OOM occurs, restart the container and lower concurrency
 
 ---
 
-## 8. SASA 单条 vs Batch 响应结构不一致
+## 7. Aggrescan3D: starts a Docker subprocess per request
 
-| 端点 | 响应结构 |
-|------|----------|
+**Symptom**: Aggrescan3D runs inside a Python 2.7 micromamba container, and each prediction launches a separate process via subprocess. The first call has a slow cold start (~10s), and excessive concurrency exhausts system resources.
+
+**Handling**:
+- An internal `Semaphore(2)` limits the number of subprocesses running at once
+- Client `timeout=900s` (configurable via the `A3D_TIMEOUT` environment variable)
+- Send 50 per batch to reduce cold-start overhead through batching
+
+---
+
+## 8. SASA single vs Batch response structure inconsistency
+
+| Endpoint | Response structure |
+|----------|--------------------|
 | `POST /predict` | `{"success": true, "peptide_id": "...", "result": {"score": 0.76, "label": "exposed", "details": {...}}}` |
 | `POST /predict/batch` | `{"success": true, "results": [{"peptide_id": "...", "score": 0.76, "label": "exposed", "details": {...}}]}` |
 
-注意 batch 结果没有 `result` 嵌套层。这是 PDB 服务模板的设计，FASTA 服务模板两端都使用 `result` 嵌套。
+Note that batch results have no `result` nesting layer. This is the design of the PDB service template; the FASTA service template uses `result` nesting on both endpoints.
 
 ---
 
-## 9. BetaFold / ESMFold：pLDDT 在丝绸融合蛋白上偏低
+## 9. BetaFold / ESMFold: pLDDT is low on silk fusion proteins
 
-**现象**：ESMFold 对丝绸重复序列的 pLDDT < 0.30，不可用于下游 SASA/A3D 分析。OmegaFold pLDDT ~0.41 是可用的。
+**Symptom**: ESMFold gives pLDDT < 0.30 for silk repeat sequences, so it cannot be used for downstream SASA/A3D analysis. OmegaFold's pLDDT ~0.41 is usable.
 
-**原因**：ESM-2 训练数据中缺乏类似丝绸重复序列的结构。
+**Cause**: ESM-2's training data lacks structures resembling silk repeat sequences.
 
-**处理方式**：对丝绸融合蛋白优先使用 OmegaFold。ESMFold 只作为替补。
-
----
-
-## 10. Docker Bridge IP 非 127.0.0.1
-
-**现象**：通过 `127.0.0.1:PORT`（docker-proxy）访问容器时，长 HTTP 请求可能出现 httpx keep-alive 挂起。这是 docker-proxy 的已知问题。
-
-**处理方式**：使用 `docker inspect` 获取容器 bridge IP，直接连接。已实现于 `s4_docker_utils.py` 的 `detect_bridge_ip()`。
+**Handling**: Prefer OmegaFold for silk fusion proteins. Use ESMFold only as a substitute.
 
 ---
 
-## 11. asyncio.gather 异常安全
+## 10. Docker Bridge IP, not 127.0.0.1
 
-**现象**：`asyncio.gather(*tasks)` 不带 `return_exceptions=True` 时，任一任务失败会取消所有其他任务。
+**Symptom**: When accessing containers via `127.0.0.1:PORT` (docker-proxy), long HTTP requests may hit httpx keep-alive hangs. This is a known docker-proxy issue.
 
-**处理方式**：批量处理时始终使用 `return_exceptions=True`，逐任务检查异常。
+**Handling**: Use `docker inspect` to get the container's bridge IP and connect directly. Already implemented in `detect_bridge_ip()` in `s4_docker_utils.py`.
+
+---
+
+## 11. asyncio.gather exception safety
+
+**Symptom**: `asyncio.gather(*tasks)` without `return_exceptions=True` cancels all other tasks when any one task fails.
+
+**Handling**: Always use `return_exceptions=True` in batch processing and check exceptions task by task.

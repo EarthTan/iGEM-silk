@@ -1,47 +1,49 @@
-# AlgPred2 CLI 详细用法
+> **English** | [中文](cli_usage.zh.md)
 
-## CLI 参数说明
+# AlgPred2 CLI Detailed Usage
+
+## CLI Parameter Description
 
 ```
 algpred2 [-h] -i INPUT [-o OUTPUT] [-t THRESHOLD] [-m {1,2}] [-d {1,2}]
 ```
 
-| 参数 | 全称 | 说明 | 默认值 |
+| Parameter | Long form | Description | Default value |
 | --- | --- | --- | --- |
-| `-i` | `--input` | 输入文件 (FASTA 或每行一条序列的文本) | **必需** |
-| `-o` | `--output` | 输出 CSV 文件 | outfile.csv |
-| `-t` | `--threshold` | 阈值 (0-1) | 0.3 |
-| `-m` | `--model` | 模型: 1=Allergen, 2=Non-Allergen | 1 |
-| `-d` | `--display` | 显示: 1=Allergen, 2=所有肽 | 1 |
+| `-i` | `--input` | Input file (FASTA or text with one sequence per line) | **Required** |
+| `-o` | `--output` | Output CSV file | outfile.csv |
+| `-t` | `--threshold` | Threshold (0-1) | 0.3 |
+| `-m` | `--model` | Model: 1=Allergen, 2=Non-Allergen | 1 |
+| `-d` | `--display` | Display: 1=Allergen, 2=all peptides | 1 |
 
-## 调用方式
+## Invocation Methods
 
-由于 shebang 路径问题，推荐使用以下方式调用：
+Because of the shebang path issue, the following invocation methods are recommended:
 
-### 方式 1: 使用 uv run（推荐）
+### Method 1: Use uv run (recommended)
 
 ```bash
-# 文本输入
+# Text input
 uv run algpred2 -i ./input.txt -o ./output.csv -m 1 -d 2
 
-# FASTA 输入
+# FASTA input
 uv run algpred2 -i ./input.fasta -o ./output.csv -m 1 -d 2
 ```
 
-### 方式 2: Python import（备选）
+### Method 2: Python import (alternative)
 
 ```python
 from algpred2.python_scripts.algpred2 import main
 import sys
 
-# 设置参数
+# Set the arguments
 sys.argv = ['algpred2', '-i', './input.txt', '-o', './output.csv', '-m', '1', '-d', '2']
 main()
 ```
 
-## 输入格式
+## Input Format
 
-### 文本格式（每行一条序列）
+### Text format (one sequence per line)
 
 ```
 ACDEFGHI
@@ -49,7 +51,7 @@ KKLLKLLKL
 ACDEFGHIKLMNPQRSTVWY
 ```
 
-### FASTA 格式
+### FASTA format
 
 ```
 >SEQ_001
@@ -58,18 +60,18 @@ ATCGATCGA
 GCTAGCTAG
 ```
 
-## 输出格式
+## Output Format
 
-CSV 文件，包含以下列：
+A CSV file containing the following columns:
 
-| 列名 | 说明 | 示例 |
+| Column name | Description | Example |
 | --- | --- | --- |
-| ID | 序列标识符 | Seq_1, SEQ_001 |
-| Sequence | 肽序列 | ACDEFGHI |
-| ML_Score | 机器学习评分 (0-1) | 0.264 |
-| Prediction | 预测结果 | Allergen / Non-Allergen |
+| ID | Sequence identifier | Seq_1, SEQ_001 |
+| Sequence | Peptide sequence | ACDEFGHI |
+| ML_Score | Machine learning score (0-1) | 0.264 |
+| Prediction | Prediction result | Allergen / Non-Allergen |
 
-## 示例输出
+## Example Output
 
 ```csv
 ID,Sequence,ML_Score,Prediction
@@ -77,26 +79,26 @@ Seq_1,ACDEFGHI,0.264,Non-Allergen
 Seq_2,KKLLKLLKL,0.367,Allergen
 ```
 
-## 批量处理
+## Batch Processing
 
-### 处理多条序列
+### Processing Multiple Sequences
 
 ```bash
-# 准备输入文件（每行一条序列）
+# Prepare the input file (one sequence per line)
 echo -e "ACDEFGHI\nKKLLKLLKL\nMKWVTFISLLFLFSSAYSR" > sequences.txt
 
-# 运行预测
+# Run the prediction
 uv run algpred2 -i ./sequences.txt -o ./batch_results.csv -m 1 -d 2
 ```
 
-### 处理 FASTA 文件
+### Processing a FASTA File
 
 ```bash
 uv run algpred2 -i ./test_peptides.fasta -o ./fasta_results.csv -m 1 -d 2
 ```
 
-## 注意事项
+## Notes
 
-1. **阈值调整**: 默认阈值 0.3 较宽松，可根据需求调整为更保守的 0.5 或更高
-2. **模型选择**: `-m 1` 预测过敏原，`-m 2` 预测非过敏原
-3. **显示模式**: `-d 2` 显示所有肽结果，`-d 1` 仅显示预测为过敏原的肽
+1. **Threshold adjustment**: the default threshold 0.3 is fairly lenient; it can be adjusted to a more conservative 0.5 or higher as needed
+2. **Model selection**: `-m 1` predicts allergens, `-m 2` predicts non-allergens
+3. **Display mode**: `-d 2` shows results for all peptides, `-d 1` shows only peptides predicted as allergens

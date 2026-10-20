@@ -1,20 +1,22 @@
-# AnOxPePred 技术参考文档
+> **English** | [中文](anoxpepred_guide.zh.md)
 
-> 模型来源: [TobiasHeOl/AnOxPePred](https://github.com/TobiasHeOl/AnOxPePred)
+# AnOxPePred Technical Reference
 
-## 概述
+> Model source: [TobiasHeOl/AnOxPePred](https://github.com/TobiasHeOl/AnOxPePred)
 
-AnOxPePred (Antioxidant Peptide Predictor) 是基于 CNN 深度学习的抗氧化肽预测工具。它使用预训练的卷积神经网络评估肽序列的抗氧化潜力，支持两种机制：
+## Overview
 
-- **FRS (Free Radical Scavenging)**：自由基清除能力
-- **Chel (Metal Chelation)**：金属离子螯合能力
+AnOxPePred (Antioxidant Peptide Predictor) is an antioxidant peptide prediction tool based on CNN deep learning. It uses a pretrained convolutional neural network to assess the antioxidant potential of peptide sequences and supports two mechanisms:
 
-## 模型架构
+- **FRS (Free Radical Scavenging)**: free radical scavenging capacity
+- **Chel (Metal Chelation)**: metal ion chelation capacity
 
-### CNN 网络结构
+## Model Architecture
+
+### CNN Network Structure
 
 ```
-输入: 30×20 One-hot 编码矩阵 (居中填充 'X')
+Input: 30×20 one-hot encoding matrix (centered padding with 'X')
   ↓
 Conv1D(filters=128, kernel_size=3, strides=1, activation=elu, padding='same')
   ↓
@@ -27,9 +29,9 @@ Dense(256, activation=elu) → Dropout(0.15)
 Dense(2, activation=sigmoid) → [FRS_score, Chel_score]
 ```
 
-### 模型参数
+### Model Parameters
 
-| 层 | 参数形状 | 参数数量 |
+| Layer | Parameter shape | Parameter count |
 |----|---------|---------|
 | Conv1D kernel | [3, 20, 128] | 7,680 |
 | Conv1D bias | [128] | 128 |
@@ -38,96 +40,96 @@ Dense(2, activation=sigmoid) → [FRS_score, Chel_score]
 | Dense2 kernel | [256, 2] | 512 |
 | Dense2 bias | [2] | 2 |
 
-- **损失函数**: Focal Loss (γ=3, α=0.25)，处理正负样本不平衡
-- **优化器**: Adam (learning_rate=0.00003)
-- **总参数量**: ~336K
+- **Loss function**: Focal Loss (γ=3, α=0.25), to handle positive/negative sample imbalance
+- **Optimizer**: Adam (learning_rate=0.00003)
+- **Total parameter count**: ~336K
 
-## 数据预处理
+## Data Preprocessing
 
-### 序列编码
-1. 转换为大写
-2. 序列长度超过 30 个氨基酸则截断
-3. **居中填充**：用 'X' 对称填充至 30 个氨基酸
-4. 使用 20 维 One-hot 编码矩阵表示每个氨基酸
+### Sequence Encoding
+1. Convert to uppercase
+2. Truncate if the sequence is longer than 30 amino acids
+3. **Centered padding**: symmetrically pad with 'X' to 30 amino acids
+4. Represent each amino acid with a 20-dimensional one-hot encoding matrix
 
-### 编码矩阵
-`anoxpepred_data/One-hot_encoding.txt` — 21 行 × 21 列的标准 One-hot 矩阵，包含 20 种标准氨基酸 + 'X' (全零向量)。
+### Encoding Matrix
+`anoxpepred_data/One-hot_encoding.txt` — a standard 21-row × 21-column one-hot matrix containing the 20 standard amino acids plus 'X' (an all-zero vector).
 
-## 预测机制
+## Prediction Mechanism
 
-### 双输出
-模型同时预测两个活性分数：
-- **FRS (自由基清除)**：输出层第 1 个神经元
-- **Chel (金属螯合)**：输出层第 2 个神经元
+### Dual Output
+The model predicts two activity scores simultaneously:
+- **FRS (free radical scavenging)**: the 1st neuron of the output layer
+- **Chel (metal chelation)**: the 2nd neuron of the output layer
 
-### 综合评分
+### Composite Score
 ```
 overall_score = FRS × 0.6 + Chel × 0.4
 ```
 
-### 分类阈值
-默认 0.5。原始论文使用基于 MCC 的最优阈值搜索 (`find_opt_thres`)。
+### Classification Threshold
+Default 0.5. The original paper uses an MCC-based optimal threshold search (`find_opt_thres`).
 
-## 双模式运行
+## Dual-Mode Operation
 
-### CNN 模式
-- 需求: TensorFlow ≥ 2.15, 模型权重文件
-- 准确率: ~87% (论文报告)
-- 特点: 使用预训练的 Conv1D 网络进行预测
+### CNN Mode
+- Requirements: TensorFlow ≥ 2.15, model weight files
+- Accuracy: ~87% (as reported in the paper)
+- Characteristics: uses the pretrained Conv1D network for prediction
 
-### 规则预测模式 (降级)
-- 需求: 仅 numpy/pandas
-- 准确率: ~72%
-- 特点: 基于氨基酸抗氧化活性权重进行启发式评分
-- 触发条件: TensorFlow 未安装 或 权重文件缺失/损坏
+### Rule-Based Prediction Mode (Fallback)
+- Requirements: numpy/pandas only
+- Accuracy: ~72%
+- Characteristics: heuristic scoring based on per-amino-acid antioxidant activity weights
+- Trigger condition: TensorFlow not installed, or weight files missing/corrupted
 
-### 规则预测氨基酸权重
+### Amino Acid Weights for Rule-Based Prediction
 
-| 氨基酸 | 权重 | 主要机制 |
+| Amino acid | Weight | Main mechanism |
 |--------|------|----------|
-| C (半胱氨酸) | 2.5 | FRS + Chel |
-| H (组氨酸) | 1.8 | Chel |
-| W (色氨酸) | 1.5 | FRS |
-| Y (酪氨酸) | 1.2 | FRS |
-| M (甲硫氨酸) | 1.0 | FRS |
-| F (苯丙氨酸) | 0.8 | FRS |
-| R (精氨酸) | 0.6 | — |
-| K (赖氨酸) | 0.5 | — |
+| C (cysteine) | 2.5 | FRS + Chel |
+| H (histidine) | 1.8 | Chel |
+| W (tryptophan) | 1.5 | FRS |
+| Y (tyrosine) | 1.2 | FRS |
+| M (methionine) | 1.0 | FRS |
+| F (phenylalanine) | 0.8 | FRS |
+| R (arginine) | 0.6 | — |
+| K (lysine) | 0.5 | — |
 
-## API 端点
+## API Endpoints
 
-启动服务 `python service.py` 后提供:
+Provided after starting the service with `python service.py`:
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |------|------|------|
-| GET | `/` | 服务信息 |
-| GET | `/health` | 健康检查 (返回 model_mode: cnn/rule) |
-| GET | `/info` | 工具元数据 |
-| POST | `/predict` | 单序列预测 |
-| POST | `/predict/batch` | 批量预测 |
+| GET | `/` | Service information |
+| GET | `/health` | Health check (returns model_mode: cnn/rule) |
+| GET | `/info` | Tool metadata |
+| POST | `/predict` | Single-sequence prediction |
+| POST | `/predict/batch` | Batch prediction |
 
-## 项目结构
+## Project Structure
 
 ```
 AnOxPePred/
-├── service.py                    # FastAPI 微服务入口
+├── service.py                    # FastAPI microservice entry point
 ├── tools/
-│   ├── anoxpepred_integration.py # 核心集成模块 (模型加载/预测)
-│   ├── AnOxPePred_funcs.py      # 原始论文代码 (参考实现)
+│   ├── anoxpepred_integration.py # Core integration module (model loading/prediction)
+│   ├── AnOxPePred_funcs.py      # Original paper code (reference implementation)
 │   └── __init__.py
 ├── anoxpepred_data/
-│   ├── AnOxPePred_v1.index       # TF checkpoint 索引
-│   ├── AnOxPePred_v1.data-00000-of-00001  # 模型权重
-│   └── One-hot_encoding.txt     # 氨基酸编码矩阵
+│   ├── AnOxPePred_v1.index       # TF checkpoint index
+│   ├── AnOxPePred_v1.data-00000-of-00001  # Model weights
+│   └── One-hot_encoding.txt     # Amino acid encoding matrix
 ├── references/
-│   ├── SKILL.md                  # Claude Code skill 定义
-│   └── anoxpepred_guide.md      # 本文档
+│   ├── SKILL.md                  # Claude Code skill definition
+│   └── anoxpepred_guide.md      # This document
 └── pyproject.toml
 ```
 
-## 参考文献
+## References
 
 1. **AnOxPePred: a tool for the prediction of antioxidant peptides** (2021)
-   - 作者: Tobias H. Olsen et al.
-   - 仓库: https://github.com/TobiasHeOl/AnOxPePred
-   - 期刊: Bioinformatics
+   - Authors: Tobias H. Olsen et al.
+   - Repository: https://github.com/TobiasHeOl/AnOxPePred
+   - Journal: Bioinformatics

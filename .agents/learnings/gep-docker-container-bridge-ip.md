@@ -1,5 +1,5 @@
 ---
-name: Docker 容器桥接 IP 直连绕过 docker-proxy 不稳定连接 v1.0
+name: Docker Container Bridge IP Direct Connection to Bypass Unstable docker-proxy Connections v1.0
 author: Claude Code
 created: 2026-05-15
 version: 1.0.0
@@ -7,34 +7,36 @@ tags: [docker, networking, bridge, proxy, httpx, connection-pool]
 validated: true
 ---
 
-# Gene Capsule: Docker 容器桥接 IP 直连绕过 docker-proxy 不稳定连接
+> **English** | [中文](gep-docker-container-bridge-ip.zh.md)
+
+# Gene Capsule: Docker Container Bridge IP Direct Connection to Bypass Unstable docker-proxy Connections
 
 ## Experience
 
-**问题描述**: 宿主机通过 `http://127.0.0.1:8204`（Docker 端口映射）连接 OmegaFold 容器时，httpx AsyncClient 出现间歇性连接池耗尽和请求挂死。同一时刻 `docker exec omegafold curl -s http://localhost:8204/health`（容器内）却正常响应。
+**Problem description**: When the host connected to the OmegaFold container via `http://127.0.0.1:8204` (Docker port mapping), the httpx AsyncClient intermittently exhausted its connection pool and hung on requests. At the same moment `docker exec omegafold curl -s http://localhost:8204/health` (inside the container) responded normally.
 
-**症状**:
-- httpx 抛出 `ConnectError`、`ReadTimeout` 等异常
-- 但服务容器内确认 healthy
-- 使用 curl 从宿主机偶尔成功、偶尔挂死
-- docker-proxy (dockerd) 是宿主机→容器之间的 NAT 代理
+**Symptoms**:
+- httpx raises exceptions such as `ConnectError`, `ReadTimeout`
+- Yet the service container is confirmed healthy
+- curl from the host sometimes succeeds, sometimes hangs
+- docker-proxy (dockerd) is the NAT proxy between host and container
 
-**根因**:
+**Root cause**:
 ```
-请求路径: httpx → 127.0.0.1:8204 → docker-proxy → 容器 eth0:8204 → OmegaFold
+Request path: httpx → 127.0.0.1:8204 → docker-proxy → container eth0:8204 → OmegaFold
 ```
-docker-proxy（dockerd 的用户态代理）在处理 httpx 的 HTTP/1.1 keep-alive 连接池时存在 bug：
-1. 长连接复用导致连接状态不同步
-2. 容器重启后（/restart 端点）docker-proxy 未清理旧的 TCP 连接
-3. 高并发场景下代理的 epoll 模型出现竞争条件
+docker-proxy (dockerd's userspace proxy) has bugs when handling httpx's HTTP/1.1 keep-alive connection pool:
+1. Long-connection reuse causes connection state to fall out of sync
+2. After a container restart (the /restart endpoint), docker-proxy does not clean up the old TCP connections
+3. Under high concurrency the proxy's epoll model hits race conditions
 
-**直接使用容器 bridge IP 绕过 docker-proxy**:
+**Connect directly to the container bridge IP to bypass docker-proxy**:
 
 ```python
 import subprocess, json, os
 
 def _fix_omegafold_docker_network():
-    """检测 OmegaFold 容器 bridge IP，设置 OMEGAFOLD_HOST 绕过 docker-proxy"""
+    """Detect the OmegaFold container bridge IP and set OMEGAFOLD_HOST to bypass docker-proxy"""
     try:
         result = subprocess.run(
             ["docker", "inspect", "omegafold",
@@ -49,48 +51,48 @@ def _fix_omegafold_docker_network():
                     os.environ["OMEGAFOLD_HOST"] = ip
                     return
     except Exception as e:
-        log(f"  ⚠ OmegaFold 网络检测失败: {e}")
+        log(f"  ⚠ OmegaFold network detection failed: {e}")
 ```
 
-之后 `service_url("omegafold")` 通过环境变量读到 bridge IP，直接走容器网络（Docker 内部 DNS），不再经过 docker-proxy。
+After that, `service_url("omegafold")` reads the bridge IP from the environment variable and goes directly over the container network (Docker's internal DNS), no longer passing through docker-proxy.
 
-**效果**: 从此时起到运行结束，OmegaFold 连接 100% 成功。
+**Effect**: From that point until the end of the run, OmegaFold connections succeeded 100% of the time.
 
-### 诊断方法
+### Diagnostic Method
 
-| 方法 | 命令 | 效果 |
+| Method | Command | Effect |
 |------|------|------|
-| 宿主机 curl | `curl -s http://127.0.0.1:8204/health` | ❌ 间歇挂死 |
-| 容器内 curl | `docker exec omegafold curl -s http://localhost:8204/health` | ✅ 总是正常 |
-| docker-proxy 状态 | `curl -s http://127.0.0.1:8204/health --connect-timeout 5` | 可复现问题 |
-| bridge IP 检测 | `docker inspect omegafold --format '{{json .NetworkSettings.Networks}}'` | 返回 bridge IP |
+| Host curl | `curl -s http://127.0.0.1:8204/health` | ❌ intermittent hangs |
+| In-container curl | `docker exec omegafold curl -s http://localhost:8204/health` | ✅ always normal |
+| docker-proxy status | `curl -s http://127.0.0.1:8204/health --connect-timeout 5` | Reproduces the problem |
+| bridge IP detection | `docker inspect omegafold --format '{{json .NetworkSettings.Networks}}'` | Returns the bridge IP |
 
-### 适用场景
+### Applicable Scenarios
 
-任何通过 docker-proxy（127.0.0.1:PORT 映射）访问容器服务时出现间歇性连接问题：
+Any intermittent connection problem when accessing container services through docker-proxy (127.0.0.1:PORT mapping):
 
-- httpx AsyncClient 连接池异常
-- 容器重启后连接未刷新
-- 宿主机 ↔ 容器通信在负载下不稳定
-- 容器频繁重启（/restart 端点）后问题加重
+- httpx AsyncClient connection pool anomalies
+- Connections not refreshed after a container restart
+- Host ↔ container communication unstable under load
+- The problem worsens after frequent container restarts (the /restart endpoint)
 
-### 不适用场景
+### Inapplicable Scenarios
 
-- Docker Compose 内部服务间通信（自动 DNS 解析，不经过 proxy）
-- 宿主机→容器的短连接、低并发访问（docker-proxy 正常场景下可用）
-- 使用 host 网络模式（`--network host`）的服务
+- Inter-service communication inside Docker Compose (automatic DNS resolution, does not go through the proxy)
+- Short-lived, low-concurrency host→container access (docker-proxy works in normal scenarios)
+- Services using host network mode (`--network host`)
 
-### 相关文件
+### Related Files
 
-- `main/stages2/round05_3d.py` — `_fix_omegafold_docker_network()` 实现
-- `main/config.py` — `service_url()` 环境变量覆盖逻辑
-- `.agents/learnings/microservice-host-binding.md` — 服务绑定策略（相关但不同层面）
+- `main/stages2/round05_3d.py` — the `_fix_omegafold_docker_network()` implementation
+- `main/config.py` — the `service_url()` environment variable override logic
+- `.agents/learnings/microservice-host-binding.md` — service binding strategy (related but a different layer)
 
-### 替代方案
+### Alternative
 
-如果容器 bridge network 不可用（非默认 bridge），可用 `docker inspect` 获取其他网络 IP，或使用 Docker DNS（容器名）直接访问：
+If the container's bridge network is unavailable (non-default bridge), you can use `docker inspect` to get the IP on another network, or access it directly via Docker DNS (container name):
 
 ```bash
-# 同 docker-compose 网络内可用容器名
+# The container name is usable within the same docker-compose network
 curl http://omegafold:8204/health
 ```

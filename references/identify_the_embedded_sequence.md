@@ -1,21 +1,23 @@
-这是一个**序列位置 → PDB 残基编号**的映射问题，逻辑很清晰，代码也不复杂。
+> **English** | [中文](identify_the_embedded_sequence.zh.md)
+
+This is a **sequence position → PDB residue number** mapping problem. The logic is very clear and the code is not complicated.
 
 ------
 
-## 核心逻辑
+## Core Logic
 
 ```
-全长 FASTA 序列
-  → 找功能肽的起止位置（字符串匹配）→ 得到 start_idx, end_idx
-  → AlphaFold/ESMFold 输出的 PDB 文件，残基编号默认就是 1-indexed 的序列位置
-  → 按残基编号过滤 PDB → 得到功能肽对应的 3D 坐标
+Full-length FASTA sequence
+  → find the start/end positions of the functional peptide (string matching) → get start_idx, end_idx
+  → in the PDB file output by AlphaFold/ESMFold, residue numbering is simply the 1-indexed sequence position
+  → filter the PDB by residue number → get the 3D coordinates corresponding to the functional peptide
 ```
 
-因为 ESMFold/AlphaFold 输出的 PDB 残基编号（`ATOM` 行的第 5/6 列）直接对应 FASTA 的位置，所以不需要额外对齐，找到序列位置就找到了结构位置。
+Because the residue numbering in the PDB output by ESMFold/AlphaFold (columns 5/6 of the `ATOM` records) directly corresponds to FASTA positions, no extra alignment is needed: once you find the sequence position, you have found the structural position.
 
 ------
 
-## 完整代码
+## Complete Code
 
 ```python
 import re
@@ -23,25 +25,25 @@ from Bio import PDB
 from Bio.PDB import PDBIO, Select
 import numpy as np
 
-# ─── 输入 ───────────────────────────────────────────────
+# ─── Input ──────────────────────────────────────────────
 FULL_SEQUENCE  = "MAAAAAGGAGAGAGAGAGAGAGAGYWDHINNPEVYFGGAGAGAGAGAGAGAGAGAAAAM"
-PEPTIDE_SEQ    = "YWDHINNPEVYF"     # 功能肽序列
-PDB_FILE       = "predicted.pdb"   # ESMFold/AlphaFold 输出
+PEPTIDE_SEQ    = "YWDHINNPEVYF"     # functional peptide sequence
+PDB_FILE       = "predicted.pdb"   # ESMFold/AlphaFold output
 CHAIN_ID       = "A"
 
-# ─── Step 1: 在全长序列中定位功能肽 ─────────────────────
+# ─── Step 1: Locate the functional peptide in the full-length sequence ──
 match = re.search(PEPTIDE_SEQ, FULL_SEQUENCE)
 if not match:
-    raise ValueError(f"功能肽 {PEPTIDE_SEQ} 在序列中未找到")
+    raise ValueError(f"Functional peptide {PEPTIDE_SEQ} not found in the sequence")
 
-# 转成 1-indexed（PDB 残基编号从 1 开始）
+# Convert to 1-indexed (PDB residue numbering starts at 1)
 pep_start = match.start() + 1
 pep_end   = match.end()       # inclusive
 pep_residue_ids = list(range(pep_start, pep_end + 1))
 
-print(f"功能肽位于序列第 {pep_start}–{pep_end} 位，共 {len(pep_residue_ids)} 个残基")
+print(f"Functional peptide is at sequence positions {pep_start}–{pep_end}, {len(pep_residue_ids)} residues in total")
 
-# ─── Step 2: 解析 PDB，提取功能肽残基 ───────────────────
+# ─── Step 2: Parse the PDB and extract the functional peptide residues ──
 parser   = PDB.PDBParser(QUIET=True)
 structure = parser.get_structure("fusion", PDB_FILE)
 model    = structure[0]
@@ -52,18 +54,18 @@ for res in chain:
     if res.id[1] in pep_residue_ids:
         peptide_residues.append(res)
 
-print(f"在 PDB 中找到 {len(peptide_residues)} 个对应残基")
+print(f"Found {len(peptide_residues)} matching residues in the PDB")
 
-# ─── Step 3: 计算 Cα 坐标（用于后续 SASA / 可视化）──────
+# ─── Step 3: Compute Cα coordinates (for later SASA / visualization) ──
 ca_coords = []
 for res in peptide_residues:
     if "CA" in res:
         ca_coords.append(res["CA"].get_vector().get_array())
-        print(f"  残基 {res.resname} {res.id[1]}: CA = {res['CA'].get_vector()}")
+        print(f"  Residue {res.resname} {res.id[1]}: CA = {res['CA'].get_vector()}")
 
 ca_coords = np.array(ca_coords)
 
-# ─── Step 4: 把功能肽区域单独保存为 PDB（供 A3D 等工具使用）
+# ─── Step 4: Save the functional peptide region as a separate PDB (for tools such as A3D)
 class PeptideSelect(Select):
     def accept_residue(self, res):
         return res.id[1] in pep_residue_ids
@@ -71,23 +73,23 @@ class PeptideSelect(Select):
 io = PDBIO()
 io.set_structure(structure)
 io.save("peptide_region.pdb", PeptideSelect())
-print("功能肽区域已保存为 peptide_region.pdb")
+print("Functional peptide region saved as peptide_region.pdb")
 ```
 
 ------
 
-## 拿到坐标之后，算 SASA（暴露性）
+## After Getting the Coordinates, Compute SASA (Exposure)
 
-这是你们真正要的指标，用 `freesasa` 库可以直接算：
+This is the metric you actually want, and the `freesasa` library computes it directly:
 
 ```python
 import freesasa
 
-# 对全长融合蛋白算 SASA
+# Compute SASA for the full-length fusion protein
 struct_fs = freesasa.Structure(PDB_FILE)
 result    = freesasa.calc(struct_fs)
 
-# 只看功能肽残基的 SASA
+# Look only at the SASA of the functional peptide residues
 total_peptide_sasa = 0
 per_residue = []
 
@@ -98,41 +100,41 @@ for res_id in pep_residue_ids:
     total_peptide_sasa += sasa_val
     per_residue.append((res_id, round(sasa_val, 2)))
 
-print(f"\n功能肽总 SASA: {total_peptide_sasa:.2f} Å²")
-print("逐残基 SASA:")
+print(f"\nTotal functional peptide SASA: {total_peptide_sasa:.2f} Å²")
+print("Per-residue SASA:")
 for rid, sval in per_residue:
     bar = "█" * int(sval / 10)
-    print(f"  残基 {rid:3d}: {sval:7.2f} Å²  {bar}")
+    print(f"  Residue {rid:3d}: {sval:7.2f} Å²  {bar}")
 ```
 
 ------
 
-## 输出示例
+## Example Output
 
 ```
-功能肽位于序列第 24–35 位，共 12 个残基
-在 PDB 中找到 12 个对应残基
-  残基 TYR 24: CA = <Vector 12.3, 5.1, 8.9>
-  残基 TRP 25: CA = <Vector 14.1, 5.8, 7.2>
+Functional peptide is at sequence positions 24–35, 12 residues in total
+Found 12 matching residues in the PDB
+  Residue TYR 24: CA = <Vector 12.3, 5.1, 8.9>
+  Residue TRP 25: CA = <Vector 14.1, 5.8, 7.2>
   ...
 
-功能肽总 SASA: 847.32 Å²
-逐残基 SASA:
-  残基  24:   92.10 Å²  █████████
-  残基  25:   43.50 Å²  ████
-  残基  26:  110.20 Å²  ███████████
+Total functional peptide SASA: 847.32 Å²
+Per-residue SASA:
+  Residue  24:   92.10 Å²  █████████
+  Residue  25:   43.50 Å²  ████
+  Residue  26:  110.20 Å²  ███████████
   ...
 ```
 
 ------
 
-## 一个需要注意的边界情况
+## One Edge Case to Watch Out For
 
-如果你们的功能肽序列在全长 FASTA 中**出现多次**（比如你们设计了多拷贝插入），`re.search` 只会找第一个。换成 `re.finditer` 就能拿到所有位置：
+If your functional peptide sequence **occurs multiple times** in the full-length FASTA (for example, you designed a multi-copy insertion), `re.search` only finds the first one. Switch to `re.finditer` to get all positions:
 
 ```python
 all_matches = [(m.start()+1, m.end()) for m in re.finditer(PEPTIDE_SEQ, FULL_SEQUENCE)]
-print(f"功能肽出现 {len(all_matches)} 次，位置：{all_matches}")
+print(f"Functional peptide occurs {len(all_matches)} times at positions: {all_matches}")
 ```
 
-这套逻辑可以直接插进你们的 P0 流程里——ESMFold 跑完之后，自动提取功能肽区域 SASA，输出一个数字用于构建体比较。
+This logic can be dropped straight into your P0 workflow — after ESMFold finishes, automatically extract the SASA of the functional peptide region and output a single number for construct comparison.

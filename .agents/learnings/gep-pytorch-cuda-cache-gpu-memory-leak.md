@@ -1,5 +1,5 @@
 ---
-name: PyTorch CUDA cache 残留进程占用 GPU 显存阻塞后续服务 v1.0
+name: Residual PyTorch CUDA Cache Process Occupying GPU Memory and Blocking Subsequent Services v1.0
 author: Claude Code
 created: 2026-05-18
 version: 1.0.0
@@ -7,54 +7,56 @@ tags: [pytorch, cuda, gpu-memory, memory-leak, cache, anoxpepred, esmfold]
 validated: true
 ---
 
-# Gene Capsule: PyTorch CUDA cache 残留进程占用 GPU 显存阻塞后续服务
+> **English** | [中文](gep-pytorch-cuda-cache-gpu-memory-leak.zh.md)
+
+# Gene Capsule: Residual PyTorch CUDA Cache Process Occupying GPU Memory and Blocking Subsequent Services
 
 ## Experience
 
-**问题描述**: AnOxPePred 微服务（PyTorch 模型）运行后退出，但其进程残留占用了约 **34.5GB GPU 显存**（`nvidia-smi` 显示 `python` 进程仍存在）。后续启动 ESMFold（需 ~17GB）时，尽管总显存 48GB 减去 34.5GB = 13.5GB 不足 17GB，但 **ESMFold 静默挂死**——不抛异常、不写日志，仅 `model_loaded=false`。
+**Problem description**: The AnOxPePred microservice (a PyTorch model) ran and exited, but its residual process held about **34.5GB of GPU memory** (`nvidia-smi` still showed the `python` process). When ESMFold (needing ~17GB) was started afterward, the free memory was 48GB total minus 34.5GB = 13.5GB, less than the 17GB required, and yet **ESMFold hung silently** — no exception, no log entry, only `model_loaded=false`.
 
-**症状**:
-- `nvidia-smi` 显示 48GB 显存中 34.5GB 被 `python` 进程占用（AnOxPePred）
-- 实际 AnOxPePred 容器已停止，但进程未释放 CUDA context
-- ESMFold `.cuda()` 调用静默失败（不抛出 `torch.cuda.OutOfMemoryError`）
-- 日志中 ESMFold 状态为 `model_loaded=false`，无错误堆栈
-- 重启 Docker 容器 **不释放显存**（因为进程属于 host PID namespace）
+**Symptoms**:
+- `nvidia-smi` showed 34.5GB of the 48GB occupied by a `python` process (AnOxPePred)
+- The AnOxPePred container had actually stopped, but the process had not released its CUDA context
+- The ESMFold `.cuda()` call failed silently (no `torch.cuda.OutOfMemoryError` raised)
+- In the logs the ESMFold state was `model_loaded=false`, with no error stack
+- Restarting the Docker container **does not release the GPU memory** (because the process belongs to the host PID namespace)
 
-**根因**: 两个层面：
+**Root cause**: Two levels:
 
-1. **PyTorch CUDA cache 分配器**: PyTorch 的 `torch.cuda` 使用内存缓存分配器（caching memory allocator），即使模型被删除、Python 对象被 GC，CUDA context 仍在进程中缓存已分配的显存，不立即返回给 OS。这是 PyTorch 的设计行为——减少 cudaMalloc 开销。
-2. **Docker 未隔离 GPU 进程**: 使用 `--gpus all` 和 `nvidia/cuda` 镜像时，容器内的 CUDA 进程在宿主机 `nvidia-smi` 中可见。容器停止后，如果进程未正确退出，CUDA context 持续占用显存。
+1. **PyTorch CUDA cache allocator**: PyTorch's `torch.cuda` uses a caching memory allocator; even after the model is deleted and the Python object is GC'd, the CUDA context still caches the allocated GPU memory inside the process and does not return it to the OS immediately. This is PyTorch's designed behavior — it reduces cudaMalloc overhead.
+2. **Docker does not isolate GPU processes**: With `--gpus all` and `nvidia/cuda` images, CUDA processes inside the container are visible in the host's `nvidia-smi`. After the container stops, if the process did not exit properly, the CUDA context keeps occupying GPU memory.
 
 ```python
-# AnOxPePred service.py — 问题根源
-model = YourPyTorchModel()  # 加载到 GPU，占用 ~10GB
-model.cuda()                # 实际显存分配
-# ... 推理 ...
-# 服务停止时：Python 进程未正确释放 CUDA context
-# PyTorch cache 分配器保留 ~34GB（含缓存 + 碎片化）
+# AnOxPePred service.py — root cause
+model = YourPyTorchModel()  # loaded onto the GPU, occupies ~10GB
+model.cuda()                # actual GPU memory allocation
+# ... inference ...
+# when the service stops: the Python process does not release the CUDA context correctly
+# the PyTorch cache allocator retains ~34GB (including cache + fragmentation)
 ```
 
-**注意**: 34.5GB 远大于模型实际参数大小（~10GB），因为 PyTorch cache 分配器会保留所有曾经分配过的显存块，包括中间激活值、梯度缓存等。
+**Note**: 34.5GB is far larger than the model's actual parameter size (~10GB), because the PyTorch cache allocator retains every GPU memory block ever allocated, including intermediate activations and gradient caches.
 
-### 解决方案
+### Solution
 
-**方案一：直接 kill 残留进程（本流程采用）**
+**Option 1: kill the residual process directly (adopted by this pipeline)**
 
 ```bash
-# 查找 AnOxPePred 容器对应的进程 PID
-ps aux | grep anoxpepred  # 或
-nvidia-smi                 # 查看占用显存的 PID
+# find the PID of the process corresponding to the AnOxPePred container
+ps aux | grep anoxpepred  # or
+nvidia-smi                 # check the PID occupying GPU memory
 
-# kill 进程（会释放 CUDA context）
+# kill the process (releases the CUDA context)
 kill -9 <PID>
-# 或清理所有残留
+# or clean up all leftovers
 ps aux | grep "python service.py" | grep -v grep | awk '{print $2}' | xargs kill -9
 ```
 
-**方案二：Docker 配置自动清理**
+**Option 2: Docker configuration for automatic cleanup**
 
 ```yaml
-# docker-compose.yml — 在服务定义中添加
+# docker-compose.yml — add to the service definition
 services:
   anoxpepred:
     deploy:
@@ -64,52 +66,52 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    # 关键：容器退出时杀死内部进程
+    # key: kill internal processes when the container exits
     stop_grace_period: 5s
-    init: true  # 使用 tini init 系统，确保僵尸进程被回收
+    init: true  # use the tini init system to ensure zombie processes are reaped
 ```
 
-**方案三：Python 层显存清理（辅助）**
+**Option 3: Python-level GPU memory cleanup (auxiliary)**
 
 ```python
 import torch
 import gc
 
 def cleanup_cuda():
-    """在服务关闭时尝试释放 CUDA 显存（不一定有效）"""
+    """Try to release CUDA GPU memory on service shutdown (not necessarily effective)"""
     gc.collect()
-    torch.cuda.empty_cache()     # 清空 PyTorch cache 分配器
-    torch.cuda.synchronize()     # 等待所有 CUDA 流完成
-    # 注意：empty_cache() 不一定将显存返回给 OS
+    torch.cuda.empty_cache()     # empty the PyTorch cache allocator
+    torch.cuda.synchronize()     # wait for all CUDA streams to complete
+    # note: empty_cache() does not necessarily return memory to the OS
 ```
 
-**方案四：进程级隔离（推荐）**
+**Option 4: process-level isolation (recommended)**
 
-最可靠的方案是确保每个 GPU 服务在独立的 Docker 容器中运行，通过 `docker stop` 和 `docker rm` 确保进程被 SIGKILL。使用 `init: true`（tini）确保容器内无残留子进程。
+The most reliable approach is to ensure every GPU service runs in its own Docker container, using `docker stop` and `docker rm` to guarantee the process is SIGKILLed. Use `init: true` (tini) to ensure no residual child processes remain inside the container.
 
-### 诊断流程
+### Diagnosis Procedure
 
-| 步骤 | 命令 | 发现 |
+| Step | Command | Finding |
 |------|------|------|
-| 1. 检查 GPU 显存 | `nvidia-smi` | 34.5GB 被 `python` 占用 |
-| 2. 确认进程身份 | `ps -p <PID> -o cmd=` | 判断是否属于已停止容器 |
-| 3. 检查容器状态 | `docker ps -a \| grep anoxpepred` | 容器已 Exited |
-| 4. 确认无法释放 | `docker stop` + `nvidia-smi` | 显存不释放 |
-| 5. 强制 kill | `kill -9 <PID>` + `nvidia-smi` | 显存释放 ✅ |
+| 1. Check GPU memory | `nvidia-smi` | 34.5GB occupied by `python` |
+| 2. Confirm process identity | `ps -p <PID> -o cmd=` | determine whether it belongs to a stopped container |
+| 3. Check container state | `docker ps -a \| grep anoxpepred` | container already Exited |
+| 4. Confirm it cannot be released | `docker stop` + `nvidia-smi` | memory not released |
+| 5. Force kill | `kill -9 <PID>` + `nvidia-smi` | memory released ✅ |
 
 ### Environment Fingerprint
 
-- **任务域**: GPU 微服务链式调用，Docker 容器管理
-- **输入特征**: PyTorch 模型，多服务共享 GPU，Docker 容器
-- **约束条件**: GPU 显存有限（48GB），服务需要按顺序启动和停止
-- **触发模式**: 停止 GPU 容器后未检查进程残留；多 GPU 服务在同一个 Docker Compose 项目中使用
-- **不适用**: CPU-only 服务；非 PyTorch 框架（TensorFlow 有类似问题但行为不同）；每个容器独占整卡（独享不会出现争用）
+- **Task domain**: Chained GPU microservice calls, Docker container management
+- **Input characteristics**: PyTorch models, multiple services sharing a GPU, Docker containers
+- **Constraints**: Limited GPU memory (48GB); services must be started and stopped in sequence
+- **Trigger pattern**: Not checking for residual processes after stopping a GPU container; multiple GPU services in the same Docker Compose project
+- **Not applicable**: CPU-only services; non-PyTorch frameworks (TensorFlow has a similar problem but different behavior); each container exclusively owning a whole card (no contention when exclusive)
 
-### 预防措施
+### Preventive Measures
 
-1. **按需启动 GPU 服务**: 在 stages2 中，AnOxPePred 用完就停，停后检查 `nvidia-smi` 确认显存释放
-2. **GPU 服务 serialized**: 不同时运行多个 GPU 密集型容器
-3. **首次启动 ESMFold/OmegaFold 前做显存检查**:
+1. **Start GPU services on demand**: In stages2, AnOxPePred is stopped once it is done being used, and `nvidia-smi` is checked after stopping to confirm the memory is released
+2. **GPU services serialized**: Do not run multiple GPU-intensive containers at the same time
+3. **Check GPU memory before starting ESMFold/OmegaFold for the first time**:
 
 ```python
 import subprocess, json
@@ -120,16 +122,16 @@ def check_gpu_memory():
         capture_output=True, text=True
     )
     free_mb = int(result.stdout.strip().split('\n')[0])
-    return free_mb  # 需要 > 18000 (17GB) 才启动 ESMFold
+    return free_mb  # requires > 18000 (17GB) before starting ESMFold
 ```
 
 ### Audit Record
 
-- **验证方式**: stages2 生产运行中排查解决
-- **测试用例**:
-  1. AnOxPePred 运行后 `nvidia-smi` → 34.5GB 占用
-  2. `docker stop anoxpepred` + `nvidia-smi` → 仍 34.5GB
-  3. `kill -9 <PID>` + `nvidia-smi` → 显存释放
-  4. 清理后 ESMFold 启动成功 → `model_loaded=true`
-- **成功率**: 100%
-- **局限性**: `torch.cuda.empty_cache()` 在 Python 层不能保证释放所有显存给 OS。最可靠的方式仍然是进程级 kill。
+- **Validation method**: Diagnosed and resolved during the stages2 production run
+- **Test cases**:
+  1. After AnOxPePred ran, `nvidia-smi` → 34.5GB occupied
+  2. `docker stop anoxpepred` + `nvidia-smi` → still 34.5GB
+  3. `kill -9 <PID>` + `nvidia-smi` → memory released
+  4. ESMFold started successfully after cleanup → `model_loaded=true`
+- **Success rate**: 100%
+- **Limitations**: `torch.cuda.empty_cache()` at the Python level cannot guarantee that all GPU memory is returned to the OS. Process-level kill remains the most reliable approach.

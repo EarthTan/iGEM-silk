@@ -1,45 +1,47 @@
-好，我把完整的本地部署 + FastAPI 微服务方案一次讲清楚。
+> **English** | [中文](how-to-use-Alphafolw.zh.md)
+
+OK, let me explain the complete local deployment + FastAPI microservice plan in one go.
 
 ------
 
-## 一、先理解硬件门槛
+## 1. First, Understand the Hardware Bar
 
-AlphaFlow 底层是 OpenFold（AlphaFold 的 PyTorch 复现），**强依赖 CUDA 11**，这是最大的坑。
+AlphaFlow is built on OpenFold (a PyTorch reimplementation of AlphaFold) and **depends heavily on CUDA 11**; this is the biggest pitfall.
 
-| 需求   | 要求                                           |
+| Requirement | Spec                                           |
 | ------ | ---------------------------------------------- |
-| GPU    | NVIDIA，显存建议 ≥ 16 GB（A100/V100/RTX3090+） |
-| CUDA   | **必须 11.x**（不是 12.x，会编译失败）         |
-| Python | **3.9**（不是 3.10/3.11）                      |
-| 内存   | ≥ 32 GB RAM（MSA 处理很吃内存）                |
+| GPU    | NVIDIA, ≥ 16 GB GPU memory recommended (A100/V100/RTX3090+) |
+| CUDA   | **Must be 11.x** (not 12.x — compilation will fail) |
+| Python | **3.9** (not 3.10/3.11)                        |
+| Memory | ≥ 32 GB RAM (MSA processing is very memory hungry) |
 
-如果本地没有符合条件的 GPU，**强烈建议用 ESMFlow 版本**（同一个仓库提供），它不需要 MSA，速度更快，对你们的探索性预测够用。
+If there is no qualifying GPU locally, **using the ESMFlow version is strongly recommended** (provided in the same repository); it does not need MSA, it is faster, and it is good enough for your exploratory predictions.
 
 ------
 
-## 二、选哪个模型权重
+## 2. Which Model Weights to Choose
 
-官方提供 6 类模型，结合你们项目需求：
+The official release provides 6 model categories; given your project's needs:
 
-| 模型                                 | 适用场景                           | 推荐度                 |
+| Model                                 | Use case                           | Recommendation                 |
 | ------------------------------------ | ---------------------------------- | ---------------------- |
-| AlphaFlow-PDB distilled              | 无 MD 数据，快速预测实验构象多样性 | ⭐⭐⭐ 入门用             |
-| **AlphaFlow-MD distilled**           | 模拟 300K 生理温度下的构象分布     | ⭐⭐⭐⭐ **推荐你们用**    |
-| AlphaFlow-MD+Templates 12l-distilled | 有已知结构时用，快 2.5x            | ⭐⭐⭐⭐⭐ 有参考结构时最优 |
-| ESMFlow-MD distilled                 | 无 GPU CUDA 11 / 快速验证          | ⭐⭐⭐ 备选               |
+| AlphaFlow-PDB distilled              | No MD data; quickly predict experimental conformational diversity | ⭐⭐⭐ for getting started             |
+| **AlphaFlow-MD distilled**           | Simulate the conformational distribution at physiological temperature, 300K | ⭐⭐⭐⭐ **recommended for you**    |
+| AlphaFlow-MD+Templates 12l-distilled | Use when a known structure exists; 2.5x faster | ⭐⭐⭐⭐⭐ best when a reference structure exists |
+| ESMFlow-MD distilled                 | No GPU with CUDA 11 / quick validation | ⭐⭐⭐ alternative               |
 
-你们做的是融合蛋白在生理条件下的动态暴露性评估，选 **AlphaFlow-MD distilled** 最对口。
+What you are doing is assessing the dynamic exposure of fusion proteins under physiological conditions, so **AlphaFlow-MD distilled** is the best fit.
 
 ------
 
-## 三、环境安装
+## 3. Environment Setup
 
 ```bash
-# 1. 创建隔离环境（Python 3.9 强制）
+# 1. Create an isolated environment (Python 3.9 is mandatory)
 conda create -n alphaflow python=3.9
 conda activate alphaflow
 
-# 2. 安装 CUDA 11（如果系统 CUDA 版本不对）
+# 2. Install CUDA 11 (if the system CUDA version is wrong)
 conda install nvidia/label/cuda-11.8.0::cuda
 conda install nvidia/label/cuda-11.8.0::cuda-cudart-dev
 conda install nvidia/label/cuda-11.8.0::libcusparse-dev
@@ -47,46 +49,46 @@ conda install nvidia/label/cuda-11.8.0::libcusolver-dev
 conda install nvidia/label/cuda-11.8.0::libcublas-dev
 ln -s $CONDA_PREFIX/lib/libcudart_static.a $CONDA_PREFIX/lib/libcudart.a
 
-# 3. 安装依赖
+# 3. Install dependencies
 pip install numpy==1.21.2 pandas==1.5.3
 pip install torch==1.12.1+cu113 -f https://download.pytorch.org/whl/torch_stable.html
 pip install biopython==1.79 dm-tree==0.1.6 modelcif==0.7 ml-collections==0.1.0 scipy==1.7.1 absl-py einops
 pip install pytorch_lightning==2.0.4 fair-esm mdtraj==1.9.9 wandb
 
-# 4. 安装 OpenFold（最耗时，需编译 CUDA kernel）
+# 4. Install OpenFold (the most time-consuming step; compiles CUDA kernels)
 CUDA_HOME=$CONDA_PREFIX pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@103d037'
 
-# 5. 克隆 AlphaFlow
+# 5. Clone AlphaFlow
 git clone https://github.com/bjing2016/alphaflow.git
 cd alphaflow
 
-# 6. 下载模型权重
+# 6. Download the model weights
 mkdir weights
 wget -P ./weights https://storage.googleapis.com/alphaflow/params/alphaflow_md_distilled_202402.pt
 ```
 
 ------
 
-## 四、原始 CLI 用法（微服务封装的基础）
+## 4. Original CLI Usage (the Basis for the Microservice Wrapper)
 
-运行推理的原始命令是：
+The original command to run inference is:
 
 ```bash
-# 需要先有 MSA（用 ColabFold 服务器生成）
+# You need an MSA first (generate it with the ColabFold server)
 python -m scripts.mmseqs_query --split input.csv --outdir ./msa
 
-# 运行预测
+# Run prediction
 python predict.py \
   --mode alphafold \
   --input_csv input.csv \
   --msa_dir ./msa \
   --weights ./weights/alphaflow_md_distilled_202402.pt \
-  --samples 50 \               # 生成构象数量
-  --noisy_first --no_diffusion \ # distilled 模型必须加这两个参数
+  --samples 50 \               # number of conformations to generate
+  --noisy_first --no_diffusion \ # these two flags are required for distilled models
   --outpdb ./output_pdbs
 ```
 
-输入 CSV 格式：
+Input CSV format:
 
 ```csv
 name,seqres
@@ -96,9 +98,9 @@ silk_fusion_B,MGAGAGRGGYGGLGSQGAGRGGLGGQGAGAAAAAAAAGGAGQGGYGGLGSQGAGRGGLGGQHHHKK
 
 ------
 
-## 五、FastAPI 微服务代码
+## 5. FastAPI Microservice Code
 
-整体架构是：HTTP 接收序列 → 写临时 CSV + MSA → 调用 predict.py → 返回 PDB zip 包。
+The overall architecture is: receive sequences over HTTP → write a temporary CSV + MSA → call predict.py → return a zip package of PDBs.
 
 ```python
 # alphaflow_service.py
@@ -112,34 +114,34 @@ from typing import List, Optional
 
 app = FastAPI(title="AlphaFlow Conformational Ensemble Service")
 
-# ---- 配置 ----
+# ---- Configuration ----
 WEIGHTS_PATH = "./weights/alphaflow_md_distilled_202402.pt"
-ALPHAFLOW_DIR = "./alphaflow"          # git clone 的目录
-WORK_DIR = Path("/tmp/alphaflow_jobs") # 每个 job 的临时目录
+ALPHAFLOW_DIR = "./alphaflow"          # the git clone directory
+WORK_DIR = Path("/tmp/alphaflow_jobs") # temporary directory for each job
 WORK_DIR.mkdir(exist_ok=True)
 
-# ---- 请求/响应模型 ----
+# ---- Request/response models ----
 class PredictRequest(BaseModel):
     sequences: List[dict]   # [{"name": "silk_A", "seqres": "MGAGA..."}]
-    n_samples: int = 50     # 生成构象数量，建议 20-100
-    mode: str = "alphafold" # "alphafold" 或 "esmfold"
+    n_samples: int = 50     # number of conformations to generate; 20-100 recommended
+    mode: str = "alphafold" # "alphafold" or "esmfold"
 
 class JobStatus(BaseModel):
     job_id: str
     status: str             # pending / running / done / failed
     message: Optional[str] = None
 
-# ---- 内存中记录 job 状态 ----
+# ---- In-memory job status ----
 jobs: dict[str, dict] = {}
 
-# ---- 主要逻辑 ----
+# ---- Main logic ----
 
 def run_prediction(job_id: str, request: PredictRequest):
     job_dir = WORK_DIR / job_id
     jobs[job_id]["status"] = "running"
     
     try:
-        # 1. 写 input CSV
+        # 1. Write the input CSV
         import pandas as pd
         df = pd.DataFrame(request.sequences)
         csv_path = job_dir / "input.csv"
@@ -149,7 +151,7 @@ def run_prediction(job_id: str, request: PredictRequest):
         out_dir = job_dir / "output_pdbs"
         out_dir.mkdir()
         
-        # 2. 生成 MSA（AlphaFlow 模式才需要）
+        # 2. Generate the MSA (only needed in AlphaFlow mode)
         if request.mode == "alphafold":
             msa_dir.mkdir()
             result = subprocess.run(
@@ -162,14 +164,14 @@ def run_prediction(job_id: str, request: PredictRequest):
             if result.returncode != 0:
                 raise RuntimeError(f"MSA generation failed:\n{result.stderr}")
         
-        # 3. 运行 AlphaFlow / ESMFlow 推理
+        # 3. Run AlphaFlow / ESMFlow inference
         cmd = [
             "python", "predict.py",
             "--mode", request.mode,
             "--input_csv", str(csv_path),
             "--weights", WEIGHTS_PATH,
             "--samples", str(request.n_samples),
-            "--noisy_first", "--no_diffusion",  # distilled 模型需要
+            "--noisy_first", "--no_diffusion",  # required for distilled models
             "--outpdb", str(out_dir)
         ]
         if request.mode == "alphafold":
@@ -182,7 +184,7 @@ def run_prediction(job_id: str, request: PredictRequest):
         if result.returncode != 0:
             raise RuntimeError(f"Prediction failed:\n{result.stderr}")
         
-        # 4. 打包 PDB 输出
+        # 4. Package the PDB outputs
         zip_path = job_dir / "ensemble.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
             for pdb_file in out_dir.glob("**/*.pdb"):
@@ -196,11 +198,11 @@ def run_prediction(job_id: str, request: PredictRequest):
         jobs[job_id]["message"] = str(e)
 
 
-# ---- API 端点 ----
+# ---- API endpoints ----
 
 @app.post("/predict", response_model=JobStatus)
 async def submit_job(request: PredictRequest, background_tasks: BackgroundTasks):
-    """提交构象预测任务，异步运行"""
+    """Submit a conformation prediction job; runs asynchronously"""
     job_id = str(uuid.uuid4())[:8]
     job_dir = WORK_DIR / job_id
     job_dir.mkdir()
@@ -213,7 +215,7 @@ async def submit_job(request: PredictRequest, background_tasks: BackgroundTasks)
 
 @app.get("/status/{job_id}", response_model=JobStatus)
 async def get_status(job_id: str):
-    """查询任务状态"""
+    """Query the job status"""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     job = jobs[job_id]
@@ -222,7 +224,7 @@ async def get_status(job_id: str):
 
 @app.get("/download/{job_id}")
 async def download_results(job_id: str):
-    """下载 PDB 构象集合 zip 包"""
+    """Download the zip package of the PDB conformational ensemble"""
     if job_id not in jobs or jobs[job_id]["status"] != "done":
         raise HTTPException(status_code=400, detail="Job not done or not found")
     zip_path = jobs[job_id]["zip_path"]
@@ -232,7 +234,7 @@ async def download_results(job_id: str):
 
 @app.delete("/cleanup/{job_id}")
 async def cleanup(job_id: str):
-    """删除临时文件"""
+    """Delete temporary files"""
     job_dir = WORK_DIR / job_id
     if job_dir.exists():
         shutil.rmtree(job_dir)
@@ -240,30 +242,30 @@ async def cleanup(job_id: str):
     return {"message": "cleaned up"}
 
 
-# ---- 启动 ----
+# ---- Startup ----
 # uvicorn alphaflow_service:app --host 0.0.0.0 --port 8001 --workers 1
 ```
 
 ------
 
-## 六、使用示例
+## 6. Usage Example
 
 ```python
 import requests, time, zipfile, io
 
 BASE = "http://localhost:8001"
 
-# 提交任务
+# Submit the job
 resp = requests.post(f"{BASE}/predict", json={
     "sequences": [
         {"name": "silk_GGX_insert",
          "seqres": "MGAGAGRGGYGGLGSQGAGRGGLGGQGAGAAAAAAAAGGAGQGGY"
-                   "HHHKKK"          # 插入的功能肽
+                   "HHHKKK"          # inserted functional peptide
                    "GLGSQGAGRGGLGGQ"},
         {"name": "silk_CTD_insert",
          "seqres": "MGAGAGRGGYGGLGSQGAGRGGLGGQGAGAAAAAAAAGGAGQGGY"
                    "GLGSQGAGRGGLGGQ"
-                   "HHHKKK"}         # 末端插入
+                   "HHHKKK"}         # terminal insertion
     ],
     "n_samples": 50,
     "mode": "alphafold"
@@ -271,7 +273,7 @@ resp = requests.post(f"{BASE}/predict", json={
 job_id = resp.json()["job_id"]
 print(f"Job submitted: {job_id}")
 
-# 轮询状态
+# Poll the status
 while True:
     status = requests.get(f"{BASE}/status/{job_id}").json()
     print(f"Status: {status['status']}")
@@ -279,7 +281,7 @@ while True:
         break
     time.sleep(30)
 
-# 下载并解压
+# Download and extract
 if status["status"] == "done":
     r = requests.get(f"{BASE}/download/{job_id}")
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
@@ -289,50 +291,50 @@ if status["status"] == "done":
 
 ------
 
-## 七、关于你们项目的具体建议
+## 7. Specific Advice for Your Project
 
-有两个实际问题需要提前想好：
+There are two practical questions you need to think through in advance:
 
-**1. ESMFlow 还是 AlphaFlow？**
+**1. ESMFlow or AlphaFlow?**
 
-如果 GPU 环境配置困难，先用 **ESMFlow-MD distilled**——它不需要 MSA 生成那步，把 `mode` 改成 `esmfold` 就行，速度快一倍，适合快速迭代筛选插入策略。等到 P0 筛出 2–3 个候选构建体之后，再用 AlphaFlow 做更精确的确认。
+If configuring the GPU environment is difficult, start with **ESMFlow-MD distilled** — it does not need the MSA generation step; just change `mode` to `esmfold`, and it is twice as fast, which suits rapid iteration over insertion strategies. Once P0 has narrowed things down to 2–3 candidate constructs, use AlphaFlow for a more precise confirmation.
 
-**2. 构象数量怎么选？**
+**2. How many conformations should you choose?**
 
-对你们的用途（统计功能肽 SASA 分布）：
+For your use case (computing the distribution of functional peptide SASA):
 
-- 快速筛选阶段：`n_samples=20`，每条序列约 5–10 分钟
-- 最终验证阶段：`n_samples=100`，统计结果更可靠
+- Rapid screening stage: `n_samples=20`, about 5–10 minutes per sequence
+- Final validation stage: `n_samples=100`, more reliable statistics
 
-50 个构象就能算出有意义的暴露性分布，不需要跑 250 个。
+50 conformations are enough to compute a meaningful exposure distribution; you don't need to run 250.
 
 
 
-你的这套方案，其实已经相当接近“可用的研究级基础设施”了，但如果目标是**长期稳定运行 + 支撑你们 peptide fusion screening pipeline 的高频调用**，现在这个版本还停留在「单机脚本服务化」，距离真正的 production-grade 还有几步关键跃迁。下面我不会重复你已经写得很好的部分，而是直接帮你做一层**架构级 refinement**，重点回答你前面那个核心问题：**微服务到底能不能解决连续大量调用？以及应该怎么进化这一套系统。**
-
-------
-
-# 一、先给你一个结论（不绕弯）
-
-**FastAPI ≠ 能抗高并发**
-
-你现在这个服务：
-
-- ✔ 能异步提交任务（BackgroundTasks）
-- ❌ 不能并发执行 GPU 任务
-- ❌ 不能排队调度
-- ❌ 不能资源隔离
-- ❌ 不能横向扩展
-
-因此：
-
-> **微服务本身不能解决大量调用问题，真正解决问题的是「任务队列 + 调度系统 + GPU资源管理」。**
+Your plan is actually already quite close to "usable research-grade infrastructure", but if the goal is **long-term stable operation + supporting high-frequency calls from your peptide fusion screening pipeline**, this version is still at the "service-ify a single-machine script" stage, and there are still a few key leaps before it is truly production-grade. Below I won't repeat the parts you already wrote well; instead I'll directly do an **architecture-level refinement** for you, focusing on the core question you raised earlier: **can a microservice actually handle continuous, high-volume calls? And how should this system evolve?**
 
 ------
 
-# 二、你当前架构的隐性瓶颈（非常关键）
+# 1. A Conclusion Up Front (No Beating Around the Bush)
 
-我们用系统设计的视角，把你的 pipeline 拆一下：
+**FastAPI ≠ able to withstand high concurrency**
+
+Your current service:
+
+- ✔ can submit jobs asynchronously (BackgroundTasks)
+- ❌ cannot execute GPU jobs concurrently
+- ❌ cannot queue or schedule
+- ❌ cannot isolate resources
+- ❌ cannot scale horizontally
+
+Therefore:
+
+> **A microservice by itself cannot solve the high-volume call problem; what actually solves it is "task queue + scheduling system + GPU resource management".**
+
+------
+
+# 2. The Hidden Bottlenecks in Your Current Architecture (Highly Important)
+
+Let's break down your pipeline from a system-design perspective:
 
 ```text
 HTTP Request
@@ -344,63 +346,63 @@ subprocess.run()
 AlphaFlow (GPU)
 ```
 
-这个结构的问题在于：**它是同步资源占用模型伪装成异步接口**，也就是说：
+The problem with this structure is: **it is a synchronous resource-occupancy model disguised as an asynchronous interface**, that is:
 
-### 1. GPU 是硬瓶颈（不是 CPU）
+### 1. GPU Is the Hard Bottleneck (Not CPU)
 
-- 一张 GPU 同时基本只能跑 **1 个 AlphaFlow 推理**
-- 即使你开 `--workers 4`，也只是：
-  - 4 个进程抢 1 张 GPU
-  - 结果：OOM / crash / slowdown
+- One GPU can basically run only **1 AlphaFlow inference** at a time
+- Even if you set `--workers 4`, you only get:
+  - 4 processes fighting over 1 GPU
+  - Result: OOM / crash / slowdown
 
-👉 所以并发不是“能不能处理请求”，而是“GPU能不能排队”。
-
-------
-
-### 2. BackgroundTasks 是“假队列”
-
-FastAPI 的 BackgroundTasks：
-
-- 没有任务持久化（进程挂了就没了）
-- 没有并发控制
-- 没有优先级
-- 没有 retry
-
-👉 本质上只是：
-
-> **“把阻塞代码放到另一个线程跑”**
+👉 So concurrency is not about "can you handle requests" but about "can the GPU queue them".
 
 ------
 
-### 3. MSA 是隐藏炸弹
+### 2. BackgroundTasks Is a "Fake Queue"
 
-AlphaFlow 模式：
+FastAPI's BackgroundTasks:
+
+- no task persistence (gone if the process dies)
+- no concurrency control
+- no priority
+- no retry
+
+👉 In essence it is just:
+
+> **"running blocking code in another thread"**
+
+------
+
+### 3. MSA Is a Hidden Bomb
+
+AlphaFlow mode:
 
 ```text
-mmseqs_query → 网络请求 + CPU + 内存
+mmseqs_query → network requests + CPU + memory
 ```
 
-问题：
+Problems:
 
-- 很慢（分钟级）
-- 很不稳定（网络依赖）
-- 很吃 RAM
+- very slow (minutes)
+- very unstable (depends on the network)
+- very RAM hungry
 
-👉 如果并发上来，这一步会比 GPU 更先崩。
-
-------
-
-# 三、真正可扩展的架构（建议你直接升级）
-
-你这个项目，其实已经进入一个很标准的模式：
-
-> **AI推理服务（GPU-bound）+ 生物信息学预处理（CPU-bound）**
-
-所以推荐结构如下：
+👉 Once concurrency rises, this step will collapse before the GPU does.
 
 ------
 
-## ✅ 推荐架构（Production Version）
+# 3. A Truly Scalable Architecture (I Suggest You Upgrade to It Directly)
+
+Your project has actually already entered a very standard pattern:
+
+> **AI inference service (GPU-bound) + bioinformatics preprocessing (CPU-bound)**
+
+So the recommended structure is:
+
+------
+
+## ✅ Recommended Architecture (Production Version)
 
 ```text
                 ┌──────────────┐
@@ -408,18 +410,18 @@ mmseqs_query → 网络请求 + CPU + 内存
                 └──────┬───────┘
                        ↓
                 ┌──────────────┐
-                │   FastAPI    │  ← 只负责接请求
+                │   FastAPI    │  ← only handles incoming requests
                 └──────┬───────┘
                        ↓
                 ┌──────────────┐
-                │ Redis Queue  │  ← 核心：任务排队
+                │ Redis Queue  │  ← core: task queuing
                 └──────┬───────┘
          ┌─────────────┼─────────────┐
          ↓                           ↓
-┌────────────────┐        ┌────────────────┐
-│ CPU Worker     │        │ GPU Worker     │
-│ (MSA生成)      │        │ (AlphaFlow)    │
-└────────────────┘        └────────────────┘
+┌──────────────────┐        ┌────────────────┐
+│ CPU Worker       │        │ GPU Worker     │
+│ (MSA generation) │        │ (AlphaFlow)    │
+└──────────────────┘        └────────────────┘
          ↓                           ↓
                 ┌──────────────┐
                 │  Storage     │ (PDB / zip)
@@ -428,156 +430,156 @@ mmseqs_query → 网络请求 + CPU + 内存
 
 ------
 
-## 🔧 技术选型建议（务实版）
+## 🔧 Technology Choices (Pragmatic Version)
 
-| 组件     | 推荐                      |
+| Component     | Recommendation                      |
 | -------- | ------------------------- |
-| API 层   | FastAPI（你已经有了）     |
-| 队列     | **Redis + Celery / RQ**   |
-| GPU 调度 | 单机：队列控制；多机：K8s |
-| 存储     | 本地 / S3 / MinIO         |
-| 状态     | Redis / PostgreSQL        |
+| API layer   | FastAPI (you already have it)     |
+| Queue     | **Redis + Celery / RQ**   |
+| GPU scheduling | Single machine: queue-based control; multiple machines: K8s |
+| Storage     | Local / S3 / MinIO         |
+| State     | Redis / PostgreSQL        |
 
 ------
 
-# 四、关键升级点（逐条说透）
+# 4. Key Upgrade Points (Explained One by One)
 
-## 1️⃣ 引入任务队列（这是质变）
+## 1️⃣ Introduce a Task Queue (This Is the Game Changer)
 
-把你现在的：
+Replace your current:
 
 ```python
 background_tasks.add_task(run_prediction, ...)
 ```
 
-替换成：
+with:
 
 ```python
 celery_task.delay(...)
 ```
 
-这一步带来的变化是：
+What this step changes:
 
-| 能力     | 变化              |
+| Capability     | Change              |
 | -------- | ----------------- |
-| 并发控制 | ✅ 限制 GPU 任务数 |
-| 排队     | ✅ 自动排队        |
-| 崩溃恢复 | ✅                 |
+| Concurrency control | ✅ limits the number of GPU jobs |
+| Queuing     | ✅ automatic queuing        |
+| Crash recovery | ✅                 |
 | retry    | ✅                 |
-| 分布式   | ✅                 |
+| Distribution   | ✅                 |
 
 ------
 
-## 2️⃣ GPU Worker 必须“单线程”
+## 2️⃣ GPU Workers Must Be "Single-Threaded"
 
-这是很多人会踩的坑：
+This is a pit many people fall into:
 
 ```bash
-# 错误
+# wrong
 --workers 4
 
-# 正确
+# right
 --workers 1
 ```
 
-然后用：
+Then use:
 
 ```text
-多个 GPU Worker = 多张 GPU
+multiple GPU workers = multiple GPUs
 ```
 
-👉 核心原则：
+👉 Core principle:
 
-> **一张 GPU = 一个 worker 进程**
+> **one GPU = one worker process**
 
 ------
 
-## 3️⃣ CPU / GPU 分离（非常关键）
+## 3️⃣ Separate CPU and GPU (Highly Important)
 
-你现在是：
+Currently you have:
 
 ```text
-MSA + 推理 → 同一个进程
+MSA + inference → same process
 ```
 
-应该拆成：
+It should be split into:
 
 ```text
 Task A: MSA (CPU)
 Task B: AlphaFlow (GPU)
 ```
 
-这样：
+This way:
 
-- CPU 可以并发跑很多
-- GPU 不被阻塞
+- the CPU can run many tasks concurrently
+- the GPU is not blocked
 
 ------
 
-## 4️⃣ ESMFlow 是“吞吐量神器”
+## 4️⃣ ESMFlow Is a "Throughput Beast"
 
-你已经提到这一点，但我帮你明确战略意义：
+You already mentioned this, but let me make the strategic significance explicit:
 
-| 模式        | 特点           |
+| Mode        | Characteristics           |
 | ----------- | -------------- |
-| AlphaFlow   | 准确，但慢     |
-| **ESMFlow** | 快，不需要 MSA |
+| AlphaFlow   | Accurate, but slow     |
+| **ESMFlow** | Fast, no MSA needed |
 
-👉 推荐 pipeline：
+👉 Recommended pipeline:
 
 ```text
-Stage 1: ESMFlow（筛选 1000 条 → 20 条）
-Stage 2: AlphaFlow（精算 20 条 → 3 条）
+Stage 1: ESMFlow (screen 1000 → 20)
+Stage 2: AlphaFlow (precise scoring 20 → 3)
 ```
 
-这会直接把你的计算成本降一个数量级。
+This directly cuts your compute cost by an order of magnitude.
 
 ------
 
-# 五、能不能扛“连续大量调用”？（严肃回答）
+# 5. Can It Handle "Continuous High-Volume Calls"? (A Serious Answer)
 
-### ❌ 现在这个版本：不能
+### ❌ The Current Version: No
 
-当 QPS > 1：
+When QPS > 1:
 
-- GPU 阻塞
-- 内存爆
-- 任务丢失
+- GPU blocking
+- memory blow-up
+- lost jobs
 
 ------
 
-### ✅ 升级后：可以“线性扩展”
+### ✅ After the Upgrade: Yes, It Can "Scale Linearly"
 
-吞吐量模型：
+Throughput model:
 
 ```text
-总吞吐 ≈ GPU数量 / 单任务耗时
+total throughput ≈ number of GPUs / time per task
 ```
 
-举例：
+For example:
 
-| GPU      | 单任务时间 | 吞吐          |
+| GPU      | Time per task | Throughput          |
 | -------- | ---------- | ------------- |
 | 1 × 3090 | 10 min     | 6 tasks/hour  |
 | 4 × 3090 | 10 min     | 24 tasks/hour |
 
-👉 这就是为什么：
+👉 That is why:
 
-> **扩展靠加 GPU，不是加 FastAPI worker**
-
-------
-
-# 六、给你一个“工程级建议”（很关键）
-
-你现在这个系统，其实已经可以升级成：
-
-> **Peptide Design Compute Backend（内部算力平台）**
-
-建议你加三层抽象：
+> **scaling means adding GPUs, not adding FastAPI workers**
 
 ------
 
-## Layer 1：API（你已有）
+# 6. An "Engineering-Grade Recommendation" (Highly Important)
+
+Your current system can actually be upgraded into:
+
+> **Peptide Design Compute Backend (an internal compute platform)**
+
+I suggest adding three layers of abstraction:
+
+------
+
+## Layer 1: API (you already have it)
 
 ```text
 /predict
@@ -587,7 +589,7 @@ Stage 2: AlphaFlow（精算 20 条 → 3 条）
 
 ------
 
-## Layer 2：任务系统
+## Layer 2: Task System
 
 ```text
 task_type:
@@ -598,7 +600,7 @@ task_type:
 
 ------
 
-## Layer 3：Pipeline（核心价值）
+## Layer 3: Pipeline (the core value)
 
 ```text
 pipeline:
@@ -608,7 +610,7 @@ pipeline:
 
 ------
 
-这样你以后可以直接：
+Then later you can directly do:
 
 ```python
 POST /run_pipeline
@@ -618,91 +620,91 @@ POST /run_pipeline
 }
 ```
 
-而不是手动拼流程。
+instead of manually stitching the workflow together.
 
 ------
 
-# 七、我给你的“最小升级路径”（不折腾版）
+# 7. The "Minimal Upgrade Path" I Recommend (No-Fuss Version)
 
-如果你不想一下子上 K8s，最务实方案是：
+If you don't want to jump to K8s all at once, the most pragmatic plan is:
 
-### Step 1（必须做）
+### Step 1 (must do)
 
-- 引入 **Redis + RQ**
-- 把 BackgroundTasks 替换掉
-
-------
-
-### Step 2（强烈建议）
-
-- 拆 MSA 和推理
-- GPU worker 限制 = 1
+- Introduce **Redis + RQ**
+- Replace BackgroundTasks
 
 ------
 
-### Step 3（效果爆炸）
+### Step 2 (strongly recommended)
 
-- 加 ESMFlow 路径
-- 做两阶段筛选
-
-------
-
-# 最后一句（很重要）
-
-你现在已经不只是“在跑一个模型”，而是在**设计一个计算平台的雏形**；如果你把“并发问题”理解为 web 层问题，那永远会卡住，但一旦你切换到“GPU 是核心资源，需要调度”的视角，整个系统设计就会一下子变得清晰而且可扩展。
+- Split MSA and inference
+- GPU worker limit = 1
 
 ------
 
-如果你愿意，我可以下一步帮你把：
+### Step 3 (explosive effect)
 
-- **Celery + Redis + GPU worker 的完整代码模板**
-- 或者 **一个可直接部署的 docker-compose 架构**
-
-直接给你补齐到可以上线的程度。
-
-
-
-这个担心非常真实，而且基本是所有从“科研脚本”转向“Docker工程化”的人都会遇到的第一道心理门槛：**感觉本地开发被“容器化”绑架了，调试变慢、反馈变重、失去灵活性。**
-
-但实际情况恰恰相反——如果设计得对，Docker 不但不会让你变慢，反而会让你**开发-调试-部署三者一致且更快收敛问题**。关键在于你现在对 Docker 的理解还停留在“全量重新构建运行”的模式，而不是“分层开发模式”。
-
-我给你拆清楚。
+- Add the ESMFlow path
+- Implement two-stage screening
 
 ------
 
-# 一、你现在的误解：把 Docker 当成“虚拟机”
+# A Final Word (Very Important)
 
-你现在的担心本质是：
-
-> 每次改代码 → rebuild image → restart container → 重新跑 GPU pipeline
-
-如果真的这么用，结论是：
-
-> ❌ 确实会慢，而且非常反人类
-
-但这是**错误用法**，不是 Docker 的设计方式。
+You are no longer just "running a model"; you are **designing the prototype of a compute platform**. If you understand the "concurrency problem" as a web-layer problem, you will be stuck forever; but once you switch to the view that "the GPU is the core resource and needs scheduling", the entire system design suddenly becomes clear and scalable.
 
 ------
 
-# 二、正确理解 Docker 的开发模式：三层拆分
+If you like, as a next step I can help you with:
 
-Docker 在工程里通常分三层使用：
+- **a complete code template for Celery + Redis + GPU worker**
+- or **a directly deployable docker-compose architecture**
+
+and fill it in to the point where it can go live.
+
+
+
+This concern is very real, and it is basically the first psychological hurdle for everyone moving from "research scripts" to "Docker engineering": **you feel that local development has been taken hostage by containerization — debugging gets slower, feedback gets heavier, and you lose flexibility.**
+
+But the reality is exactly the opposite — if designed correctly, Docker not only won't slow you down; it will make **development, debugging, and deployment consistent and let you converge on problems faster**. The key is that your understanding of Docker is still stuck in the "full rebuild and run" mode rather than a "layered development mode".
+
+Let me break it down for you.
+
+------
+
+# 1. Your Current Misconception: Treating Docker as a "Virtual Machine"
+
+Your current concern is essentially:
+
+> every code change → rebuild image → restart container → re-run the GPU pipeline
+
+If you really used it that way, the conclusion is:
+
+> ❌ it would indeed be slow, and quite user-hostile
+
+But that is **incorrect usage**, not the way Docker is designed.
+
+------
+
+# 2. Understanding Docker's Development Model Correctly: A Three-Layer Split
+
+In engineering, Docker is usually used at three layers:
 
 ```text
-① 基础镜像（CUDA / Python / system libs）
-② 依赖层（pip/uv install）
-③ 代码层（你写的 FastAPI / AlphaFlow wrapper）
+① Base image (CUDA / Python / system libs)
+② Dependency layer (pip/uv install)
+③ Code layer (the FastAPI / AlphaFlow wrapper you write)
 ```
 
-关键点是：
+The key point is:
 
-> **开发阶段只动第 3 层，不重建 1-2 层**
+> **during development, only touch layer 3; do not rebuild layers 1-2**
 
 ------
 
-# 三、正确的本地开发方式：Volume Mount（核心机制）
+# 3. The Correct Local Development Approach: Volume Mount (the Core Mechanism)
 
-你真正应该用的是这种方式：
+What you should really use is this:
 
 ```bash
 docker run \
@@ -716,76 +718,76 @@ docker run \
 
 ------
 
-## 🔥 这个模式的意义
+## 🔥 What This Mode Means
 
-### ✔ 代码是“实时映射”的
+### ✔ Code Is "Live-Mapped"
 
-你改：
+You edit:
 
 ```python
 service.py
 ```
 
-容器里立刻生效，不需要 rebuild。
+It takes effect in the container immediately; no rebuild needed.
 
 ------
 
-### ✔ Docker 只负责“环境”
+### ✔ Docker Only Handles the "Environment"
 
-CUDA / torch / openfold：
+CUDA / torch / openfold:
 
-- 不变
-- 不重装
-- 不重新编译
-
-------
-
-### ✔ 你调试的是“运行态”，不是“构建态”
-
-这才是关键差异。
+- unchanged
+- not reinstalled
+- not recompiled
 
 ------
 
-# 四、你担心的“慢”，其实来自这三种错误用法
+### ✔ You Are Debugging the "Runtime State", Not the "Build State"
 
-## ❌ 错误 1：每次 rebuild image
+This is the key difference.
+
+------
+
+# 4. The "Slowness" You Worry About Actually Comes from These Three Misuses
+
+## ❌ Misuse 1: Rebuilding the Image Every Time
 
 ```bash
 docker build .
 docker run ...
 ```
 
-👉 这是生产部署方式，不是开发方式
+👉 This is for production deployment, not development
 
 ------
 
-## ❌ 错误 2：把代码 COPY 进镜像
+## ❌ Misuse 2: COPYing Code into the Image
 
 ```dockerfile
 COPY . /app
 ```
 
-👉 这会导致每次改代码都要 rebuild
+👉 This forces a rebuild on every code change
 
 ------
 
-## ❌ 错误 3：没有 volume mount
+## ❌ Misuse 3: No Volume Mount
 
-没有：
+Without:
 
 ```bash
 -v $(pwd):/app
 ```
 
-👉 就失去开发意义
+👉 development loses its point
 
 ------
 
-# 五、正确的开发流（你应该这样用）
+# 5. The Correct Development Flow (This Is How You Should Use It)
 
-## 🧠 标准 workflow（工业级）
+## 🧠 Standard Workflow (Industry-Grade)
 
-### Step 1：第一次构建（慢，但只做一次）
+### Step 1: First Build (Slow, but Only Once)
 
 ```bash
 docker build -t alphaflow .
@@ -793,7 +795,7 @@ docker build -t alphaflow .
 
 ------
 
-### Step 2：开发阶段（快）
+### Step 2: Development Phase (Fast)
 
 ```bash
 docker run \
@@ -807,84 +809,84 @@ docker run \
 
 ------
 
-### Step 3：你修改代码
+### Step 3: You Modify the Code
 
-你只需要：
+You only need to:
 
-- 保存 Python 文件
-- FastAPI 自动 reload
+- save the Python file
+- let FastAPI auto-reload
 
-👉 **无需重启 Docker**
+👉 **no need to restart Docker**
 
 ------
 
-# 六、性能对比（真实情况）
+# 6. Performance Comparison (The Real Situation)
 
-| 操作     | conda本地 | Docker开发模式 |
+| Operation     | Local conda | Docker development mode |
 | -------- | --------- | -------------- |
-| 改代码   | 即时      | 即时           |
-| 改依赖   | 可能重装  | uv sync        |
-| CUDA环境 | 容易坏    | 稳定           |
-| 启动速度 | 快        | 1-3 秒差异     |
-| GPU运行  | 不稳定    | 稳定           |
+| Code change   | Instant      | Instant           |
+| Dependency change   | May reinstall  | uv sync        |
+| CUDA environment | Easy to break    | Stable           |
+| Startup speed | Fast        | 1-3 second difference     |
+| GPU runs  | Unstable    | Stable           |
 
-👉 结论：
+👉 Conclusion:
 
-> Docker 慢的不是开发，是“错误使用方式”
-
-------
-
-# 七、一个关键认知转变（很重要）
-
-你现在的思维是：
-
-> “我要在本地调试 Python”
-
-但 Docker 带来的正确思维是：
-
-> **“我在调试一个和生产环境完全一致的系统”**
-
-这会带来一个很重要的收益：
+> What is slow is not Docker development, but the "incorrect usage pattern"
 
 ------
 
-## ✔ 你不会再遇到：
+# 7. A Key Mindset Shift (Very Important)
 
-- 本地能跑，服务器炸
+Your current thinking is:
+
+> "I want to debug Python locally"
+
+But the correct mindset Docker brings is:
+
+> **"I am debugging a system that is fully consistent with production"**
+
+This brings a very important benefit:
+
+------
+
+## ✔ You Will No Longer Run Into:
+
+- works locally, blows up on the server
 - CUDA mismatch
 - torch ABI crash
-- openfold 编译问题
+- openfold compilation problems
 
 ------
 
-# 八、那 uv + Docker 怎么配合才最舒服？
+# 8. So How Do uv and Docker Work Together Most Comfortably?
 
-你的理想组合其实是：
+Your ideal combination is actually:
 
 ```text
-Docker = 环境 + GPU + system libs
+Docker = environment + GPU + system libs
 uv     = Python dependency manager
 ```
 
-开发流变成：
+The development flow becomes:
 
 ```bash
-# 改 Python 依赖
+# change Python dependencies
 uv add fastapi
 
-# 改代码
+# change code
 vim service.py
 
-# 不用 rebuild container
+# no need to rebuild the container
 ```
 
 ------
 
-# 九、什么时候才需要 rebuild Docker？
+# 9. When Do You Actually Need to Rebuild Docker?
 
-只有三种情况：
+Only three cases:
 
-## 1️⃣ CUDA / system dependency 变了
+## 1️⃣ CUDA / system dependencies changed
 
 ```bash
 apt-get install xxx
@@ -892,11 +894,11 @@ apt-get install xxx
 
 ------
 
-## 2️⃣ torch / openfold 编译层变化
+## 2️⃣ Changes in the torch / openfold compilation layer
 
 ------
 
-## 3️⃣ 你升级基础镜像
+## 3️⃣ You upgrade the base image
 
 ```dockerfile
 FROM nvidia/cuda:12.x
@@ -904,48 +906,46 @@ FROM nvidia/cuda:12.x
 
 ------
 
-👉 其他情况都不需要 rebuild
+👉 No other case needs a rebuild
 
 ------
 
-# 十、给你的结论（非常明确）
+# 10. The Conclusion for You (Very Clear)
 
-你最担心的点可以直接一句话总结：
+The thing you worry about most can be summed up in one sentence:
 
-> ❗ Docker 慢不慢，取决于你是不是把它当“构建工具”，而不是“运行环境”
+> ❗ Whether Docker is slow depends on whether you treat it as a "build tool" rather than a "runtime environment"
 
 ------
 
-# 十一、如果你想进一步优化（很适合你这个项目）
+# 11. If You Want to Optimize Further (A Good Fit for Your Project)
 
-你这个 AlphaFlow + peptide screening 系统，其实可以再升级一步：
+Your AlphaFlow + peptide screening system can actually be upgraded one more step:
 
-## 🚀 推荐你下一步做：
+## 🚀 Recommended Next Steps:
 
 - docker + hot reload
-- GPU worker 容器化
+- containerize the GPU worker
 - Redis task queue
-- 多容器并行 inference
+- multi-container parallel inference
 
-最后会变成：
+In the end it becomes:
 
-> **一个类似 “AlphaFold-as-a-Service” 的本地云计算系统**
+> **a local cloud-computing system resembling "AlphaFold-as-a-Service"**
 
 ------
 
-如果你愿意，我可以下一步帮你直接设计：
+If you like, as a next step I can design directly for you:
 
-### 👉 “最适合你项目的 Docker + uv + GPU + FastAPI 完整开发模板”
+### 👉 "The Complete Docker + uv + GPU + FastAPI Development Template Best Suited to Your Project"
 
-包括：
+Including:
 
-- Dockerfile（CUDA optimized）
-- docker-compose（含 Redis + worker）
+- Dockerfile (CUDA optimized)
+- docker-compose (with Redis + worker)
 - uv integration best practice
-- GPU 单 worker 控制方案
-- 本地 debug / 生产一致架构
+- a scheme for controlling a single GPU worker
+- a local debug / production-consistent architecture
 
-这个做完，你就基本进入“可以对外提供计算服务”的级别了。
-
-
+Once this is done, you are basically at the level of "being able to provide compute services externally".
 

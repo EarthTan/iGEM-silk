@@ -1,5 +1,5 @@
 ---
-name: Dockerfile COPY 遗漏审计 v1.0
+name: Dockerfile COPY Omission Audit v1.0
 author: Claude Code
 created: 2026-05-13
 version: 1.0.0
@@ -7,19 +7,21 @@ tags: [docker, dockerfile, copy, import-error, audit, iGEM-silk]
 validated: true
 ---
 
-# Gene Capsule: Dockerfile COPY 遗漏审计
+> **English** | [中文](dockerfile-copy-audit.zh.md)
+
+# Gene Capsule: Dockerfile COPY Omission Audit
 
 ## Experience
 
-**问题类型**: Dockerfile 遗漏共享依赖文件的 COPY，构建通过但运行时 import 失败。
+**Problem type**: The Dockerfile omits a COPY for a shared dependency file; the build passes but imports fail at runtime.
 
-**核心策略**: 用脚本批量扫描所有 Dockerfile 确保关键共享文件均被 COPY。
+**Core strategy**: Use a script to batch-scan all Dockerfiles and ensure the key shared files are COPYed.
 
-**关键参数**: 共享文件列表（`tools/utils.py`, `tools/template/`）
+**Key parameters**: The shared file list (`tools/utils.py`, `tools/template/`)
 
-多个 Dockerfile 只 COPY 了 `tools/template/` 和 `tools/<service>/`，但漏了 `tools/utils.py`。运行时 `from tools.utils import detect_system` 失败——且构建阶段不报错。
+Several Dockerfiles COPY only `tools/template/` and `tools/<service>/`, but miss `tools/utils.py`. At runtime `from tools.utils import detect_system` fails—and the build stage reports no error.
 
-### 批量审计脚本
+### Batch Audit Script
 
 ```bash
 for f in tools/*/Dockerfile; do
@@ -29,10 +31,10 @@ for f in tools/*/Dockerfile; do
 done
 ```
 
-### 扩展检查项
+### Extended Checks
 
 ```bash
-# 检查所有关键共享文件
+# Check all key shared files
 for f in tools/*/Dockerfile; do
   for dep in "utils.py" "template/" "__init__.py"; do
     if ! grep -q "COPY.*$dep" "$f" 2>/dev/null; then
@@ -44,19 +46,19 @@ done
 
 ## Environment Fingerprint
 
-- **任务域**: 多服务 Docker 项目
-- **输入特征**: 多个服务共享框架代码（`tools/template/`, `tools/utils.py`）
-- **约束条件**: 首次配置新增服务时最容易遗漏
-- **不适用**: 单服务或无共享代码的项目
+- **Task domain**: Multi-service Docker projects
+- **Input characteristics**: Multiple services share framework code (`tools/template/`, `tools/utils.py`)
+- **Constraints**: Most easily missed when configuring a newly added service for the first time
+- **Not applicable**: Single-service projects, or projects without shared code
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk 多个服务 Docker 构建通过但运行时 `ModuleNotFoundError`
-- **失败案例**: `from tools.utils import detect_system` → ModuleNotFoundError，Dockerfile 中缺少 `COPY tools/utils.py /app/tools/utils.py`
-- **修复验证**: 脚本扫描所有 Dockerfile 补全缺失的 COPY 后运行正常
+- **Validation method**: Several iGEM-silk services built fine in Docker but raised `ModuleNotFoundError` at runtime
+- **Failure case**: `from tools.utils import detect_system` → ModuleNotFoundError; the Dockerfile was missing `COPY tools/utils.py /app/tools/utils.py`
+- **Fix validation**: After the script scanned all Dockerfiles and the missing COPY lines were added, everything ran normally
 
 ## Usage
 
-- **触发条件**: Docker 构建通过但运行时 `import` 报 ModuleNotFoundError
-- **调用方式**: 运行批量审计脚本 → 补全缺失的 COPY → 重新构建
-- **注意事项**: 构建阶段不报错是因为 Python 的 import 在运行时才解析——不要依赖构建通过来验证 COPY 完整性
+- **Trigger conditions**: The Docker build passes but `import` raises ModuleNotFoundError at runtime
+- **How to invoke**: Run the batch audit script → add the missing COPY lines → rebuild
+- **Caveats**: The build stage reports no error because Python imports are resolved only at runtime—do not rely on a passing build to verify COPY completeness

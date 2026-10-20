@@ -1,8 +1,10 @@
-# GraphCPP 模型架构详解
+> **English** | [中文](model-details.zh.md)
 
-## 模型配置
+# GraphCPP Model Architecture Details
 
-最佳超参数(见 `config.py`):
+## Model Configuration
+
+Best hyperparameters (see `config.py`):
 
 ```python
 BEST_PARAMETERS = {
@@ -25,36 +27,36 @@ BEST_PARAMETERS = {
 }
 ```
 
-## 核心组件
+## Core Components
 
-### 1. 分子图特征化
+### 1. Molecular graph featurization
 
-使用 `MolGraphConvFeaturizer`:
-- `use_edges=True`: 包含键类型特征
-- `use_chirality=True`: 包含手性信息
+Using `MolGraphConvFeaturizer`:
+- `use_edges=True`: include bond type features
+- `use_chirality=True`: include chirality information
 
-### 2. 图卷积层
+### 2. Graph convolution layers
 
-使用 GraphSAGE 卷积层:
-- 2层消息传递(`mp_layers=2`)
-- 聚合邻居信息更新节点表示
+Using GraphSAGE convolution layers:
+- 2 layers of message passing (`mp_layers=2`)
+- Aggregate neighbor information to update node representations
 
-### 3. 特征融合
+### 3. Feature fusion
 
-1. 节点嵌入经过多层图卷积
-2. 结合拓扑指纹(通过 `fp_dict` 生成)
-3. Mean pooling 得到全局图表示
-4. 全连接层输出预测
+1. Node embeddings pass through multiple graph convolution layers
+2. Combined with a topological fingerprint (generated through `fp_dict`)
+3. Mean pooling produces the global graph representation
+4. Fully connected layers output the prediction
 
-## 训练目标
+## Training Objective
 
-- **任务**: 二分类(CPP vs Non-CPP)
-- **损失函数**: BCEWithLogitsLoss
-- **评估指标**: MCC, AUC, Accuracy, F1
+- **Task**: binary classification (CPP vs Non-CPP)
+- **Loss function**: BCEWithLogitsLoss
+- **Evaluation metrics**: MCC, AUC, Accuracy, F1
 
-## 性能指标
+## Performance Metrics
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
 | Val MCC | 0.6683 |
 | Val AUC | 0.9288 |
@@ -62,12 +64,12 @@ BEST_PARAMETERS = {
 | Test MCC | 0.5787 |
 | Test AUC | 0.8459 |
 
-## 模型文件
+## Model Files
 
 ```
 model/
 ├── checkpoints/
-│   └── epoch=22-step=69.ckpt  # 预训练模型
-├── hparams.yaml                 # 模型超参数
-└── metrics.csv                  # 训练指标
+│   └── epoch=22-step=69.ckpt  # pre-trained model
+├── hparams.yaml                 # model hyperparameters
+└── metrics.csv                  # training metrics
 ```

@@ -1,36 +1,38 @@
-可以直接把 ESM 当作一个 Python 库来用，也可以用它自带的命令行工具（如 `esm-fold`、`esm-extract`），核心依赖是 PyTorch 和合适的 Python/CUDA 环境。
+> **English** | [中文](how_to_use_esm.zh.md)
 
-下面分两部分说：环境要求 + 常见使用方式。
+You can use ESM directly as a Python library, or you can use the command-line tools that ship with it (such as `esm-fold` and `esm-extract`). The core dependencies are PyTorch and a suitable Python/CUDA environment.
+
+Below I cover two parts: environment requirements + common usage patterns.
 
 ------
 
-## 环境与依赖
+## Environment and Dependencies
 
-## 基础环境
+## Base Environment
 
-- 必须先安装 **PyTorch**，再安装 ESM，本仓库所有模型都基于 PyTorch。
-- 建议使用 **Linux** 或 WSL/服务器环境，有 GPU 更合适（大模型和结构预测非常吃显存）。
+- You must install **PyTorch** first and then install ESM; all models in this repository are built on PyTorch.
+- A **Linux** or WSL/server environment is recommended, ideally with a GPU (large models and structure prediction are very GPU-memory hungry).
 
-## Python 版本要求
+## Python Version Requirements
 
-- 一般的 ESM/ESM‑2 语言模型：普通 PyTorch 环境即可，Python 3.8/3.9/3.10 通常都能用（以你安装的 PyTorch 版本为准）。
-- **ESMFold（结构预测模型）**：官方要求从一个 **Python ≤ 3.9** 且已安装 PyTorch 的环境开始。
+- For the regular ESM/ESM-2 language models: an ordinary PyTorch environment is enough; Python 3.8/3.9/3.10 usually all work (subject to the PyTorch version you install).
+- **ESMFold (the structure prediction model)**: the official instructions require starting from an environment with **Python ≤ 3.9** and PyTorch already installed.
 
-## 安装方式
+## Installation
 
-1. 安装 PyTorch（根据你机器的 CUDA 版本，在 https://pytorch.org 选择命令）。
-2. 安装 ESM：
+1. Install PyTorch (pick the command for your machine's CUDA version at https://pytorch.org).
+2. Install ESM:
 
 ```
 bash
-# 稳定版
+# Stable release
 pip install fair-esm
 
-# 或直接从 GitHub 主分支安装（“最新版”）
+# Or install directly from the GitHub main branch ("latest")
 pip install git+https://github.com/facebookresearch/esm.git
 ```
 
-1. 如果要用 **ESMFold** 做结构预测，需要额外安装 OpenFold 相关依赖，并要求本机有 `nvcc`（CUDA 编译器）：
+1. To use **ESMFold** for structure prediction, you need to install the additional OpenFold-related dependencies, and the machine must have `nvcc` (the CUDA compiler):
 
 ```
 bash
@@ -39,28 +41,28 @@ pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git'
 pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'
 ```
 
-- 若 OpenFold 安装失败，官方建议检查是否安装了 CUDA 对应的 `nvcc`，以及 PyTorch 是否是 **支持 CUDA** 的版本。
-- 也可以用现成的 `conda` 环境文件：`conda env create -f environment.yml`（仓库里提供了 `esmfold` 环境）。
+- If the OpenFold installation fails, the official guidance is to check whether `nvcc` for the corresponding CUDA version is installed, and whether PyTorch is a **CUDA-enabled** build.
+- You can also use the ready-made `conda` environment file: `conda env create -f environment.yml` (the repository provides an `esmfold` environment).
 
 ------
 
-## 在 Python 中使用 ESM 模型
+## Using ESM Models in Python
 
-## 1. 加载 ESM‑2 语言模型并抽取嵌入
+## 1. Load an ESM-2 Language Model and Extract Embeddings
 
-最常见的用法是加载 ESM‑2 模型，对蛋白序列抽取 per‑token 或 per‑sequence embedding，用于下游任务（结构预测、功能预测、变体效应建模等）。
+The most common usage is to load an ESM-2 model and extract per-token or per-sequence embeddings for protein sequences, for downstream tasks (structure prediction, function prediction, variant effect modeling, etc.).
 
 ```
 python
 import torch
 import esm
 
-# 加载 ESM-2 模型（示例：33 层、650M 参数）
+# Load an ESM-2 model (example: 33 layers, 650M parameters)
 model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
 batch_converter = alphabet.get_batch_converter()
-model.eval()  # 关闭 dropout，结果可复现
+model.eval()  # disable dropout so results are reproducible
 
-# 准备序列数据：(name, sequence)
+# Prepare sequence data: (name, sequence)
 data = [
     ("protein1", "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"),
     ("protein2", "KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE"),
@@ -73,24 +75,24 @@ with torch.no_grad():
     results = model(batch_tokens, repr_layers=[33], return_contacts=True)
 token_representations = results["representations"][33]
 
-# 求每条序列的平均 embedding（per-sequence 表征）
+# Compute the mean embedding for each sequence (per-sequence representation)
 sequence_representations = []
 for i, tokens_len in enumerate(batch_lens):
     seq_repr = token_representations[i, 1:tokens_len - 1].mean(0)
     sequence_representations.append(seq_repr)
 ```
 
-这段代码展示了：
+This code shows:
 
-- 如何加载预训练 ESM‑2 模型；
-- 如何把字符串形式的序列转成张量；
-- 如何得到每个氨基酸的表示，以及整条序列的平均表示。
+- how to load a pretrained ESM-2 model;
+- how to convert string sequences into tensors;
+- how to get the representation of each amino acid as well as the mean representation of the whole sequence.
 
 ------
 
-## 使用 ESMFold 做结构预测
+## Using ESMFold for Structure Prediction
 
-在安装了 `fair-esm[esmfold]` 和 OpenFold 依赖后，可以在 Python 中直接预测 pdb：
+After installing `fair-esm[esmfold]` and the OpenFold dependencies, you can predict a PDB directly in Python:
 
 ```
 python
@@ -98,7 +100,7 @@ import torch
 import esm
 
 model = esm.pretrained.esmfold_v1()
-model = model.eval().cuda()  # 建议放到 GPU 上
+model = model.eval().cuda()  # recommend moving it to the GPU
 
 sequence = "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"
 
@@ -109,23 +111,23 @@ with open("result.pdb", "w") as f:
     f.write(pdb_str)
 ```
 
-- 这会直接生成一个 PDB 字符串，可写入 `result.pdb`。
-- 你可以用 Biotite 或 PyMOL 进一步分析，Biotite 示例（用于取 pLDDT）：
+- This directly produces a PDB string that can be written to `result.pdb`.
+- You can analyze it further with Biotite or PyMOL. Biotite example (to read pLDDT):
 
 ```
 python
 import biotite.structure.io as bsio
 struct = bsio.load_structure("result.pdb", extra_fields=["b_factor"])
-print(struct.b_factor.mean())  # 平均 pLDDT
+print(struct.b_factor.mean())  # mean pLDDT
 ```
 
 ------
 
-## 使用命令行工具（无需自己写代码）
+## Using the Command-Line Tools (No Code Needed)
 
-安装包后，仓库自带两个常用 CLI：
+After installing the package, the repository ships two commonly used CLIs:
 
-## 1. `esm-fold`：批量结构预测
+## 1. `esm-fold`: Batch Structure Prediction
 
 ```
 bash
@@ -135,12 +137,12 @@ esm-fold -i input.fasta -o output_dir \
   --cpu-offload
 ```
 
-- `-i`：输入 FASTA 文件。
-- `-o`：输出 PDB 文件目录。
-- `--chunk-size` / `--max-tokens-per-batch`：在长序列或显存较小的 GPU 上减小内存占用。
-- `--cpu-offload`：将部分参数放到 CPU 内存，减少 GPU 显存压力。
+- `-i`: input FASTA file.
+- `-o`: output directory for PDB files.
+- `--chunk-size` / `--max-tokens-per-batch`: reduce memory usage on long sequences or GPUs with less memory.
+- `--cpu-offload`: move some parameters to CPU memory to reduce GPU memory pressure.
 
-## 2. `esm-extract`：从 FASTA 批量抽取嵌入
+## 2. `esm-extract`: Batch Embedding Extraction from FASTA
 
 ```
 bash
@@ -148,20 +150,20 @@ esm-extract esm2_t33_650M_UR50D some_proteins.fasta some_proteins_emb_esm2 \
   --repr_layers 0 32 33 --include mean per_tok
 ```
 
-- 输入是模型名称 + FASTA 文件，输出目录中每个序列生成一个 `.pt` 文件，可用 `torch.load()` 读入。
-- `--repr_layers`：选择要保存的层；`--include` 决定保存 mean embedding、per‑token embedding 等。
+- The inputs are the model name + FASTA file; the output directory gets one `.pt` file per sequence, which can be loaded with `torch.load()`.
+- `--repr_layers`: select the layers to save; `--include` decides what to save, such as the mean embedding and the per-token embedding.
 
 ------
 
-## 其他使用途径（更“省事”的方案）
+## Other Routes (Lower-Effort Options)
 
-如果你只是想快速试一下，不一定要自己搭环境：
+If you just want to try things out quickly, you don't necessarily have to build the environment yourself:
 
-- **HuggingFace Transformers**：可以直接通过 `AutoModel`/`AutoTokenizer` 调用 ESM 和 ESMFold，HuggingFace 对依赖做了简化，并提供统一 API。
+- **HuggingFace Transformers**: you can call ESM and ESMFold directly through `AutoModel`/`AutoTokenizer`; HuggingFace has simplified the dependencies and provides a unified API.
 
-- **ColabFold 集成 ESMFold**：可以在 Google Colab 里直接运行，适合没有本地 GPU 或懒得配环境的情况。
+- **ColabFold with integrated ESMFold**: can be run directly in Google Colab, suitable when you have no local GPU or don't want to configure the environment.
 
-- **ESM Atlas API**：可以用 `curl` 把序列发到官方 API，直接返回 PDB，例如：
+- **ESM Atlas API**: you can `curl` a sequence to the official API and get a PDB back directly, for example:
 
   ```
   bash
@@ -171,4 +173,4 @@ esm-extract esm2_t33_650M_UR50D some_proteins.fasta some_proteins_emb_esm2 \
 
 ------
 
-如果你能补充一下你的使用场景（比如“只想做结构预测”“主要做变体打分”“想抽 embedding 训练下游模型”），我可以帮你写一个更针对性的最小示例脚本和推荐环境配置。
+If you can tell me more about your use case (for example, "I only want structure prediction", "I mainly do variant scoring", "I want to extract embeddings to train downstream models"), I can write a more targeted minimal example script and recommend an environment setup for you.

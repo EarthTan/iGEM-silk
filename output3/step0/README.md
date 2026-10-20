@@ -1,43 +1,45 @@
-# Step 0 — 数据预处理报告
+> **English** | [中文](README.zh.md)
 
-> 生成时间: 2026-05-17 02:59
+# Step 0 — Data Preprocessing Report
 
-## 概览
+> Generated: 2026-05-17 02:59
 
-从 UniProt + MGnify 两个超大 FASTA 数据库（合计 222G）中提取 3-30aa 短肽，经标准氨基酸过滤后写入 DuckDB。
+## Overview
 
-| 指标 | 值 |
+Short peptides of 3-30aa were extracted from the two very large FASTA databases UniProt + MGnify (222G combined) and, after filtering for standard amino acids, written into DuckDB.
+
+| Metric | Value |
 |------|-----|
-| 候选池总数 | **19,890,021** |
-| 总扫描序列 | 849,416,450 |
-| 总耗时 | 5,924s（~98.7 min） |
-| DB 文件 | 2.6 GB |
-| 筛选范围 | 3-30 aa |
-| 数据源 | UniProt 102G + MGnify 120G |
+| Total candidate pool | **19,890,021** |
+| Total sequences scanned | 849,416,450 |
+| Total duration | 5,924s (~98.7 min) |
+| DB file | 2.6 GB |
+| Filter range | 3-30 aa |
+| Data sources | UniProt 102G + MGnify 120G |
 
-## 数据源统计
+## Data Source Statistics
 
-| Source | 扫描 | 写入 | 通过率 |
+| Source | Scanned | Written | Pass rate |
 |--------|------|------|--------|
 | UniProt | 225,619,586 | 733,573 | 0.33% |
 | MGnify | 623,796,864 | 19,156,448 | 3.07% |
 
-## 长度分布
+## Length Distribution
 
-主要集中在 20-30 aa 区间（长肽占主导），符合预期。
+The distribution is mainly concentrated in the 20-30 aa range (long peptides dominate), which matches expectations.
 
-| 长度区间 | 数量 | 占比 |
+| Length range | Count | Share |
 |---------|------|------|
 | 3-10 | 45,255 | 0.2% |
 | 11-19 | 176,701 | 0.9% |
 | 20-25 | 9,621,829 | 48.4% |
 | 26-30 | 10,052,401 | 50.5% |
 
-## 去重
+## Deduplication
 
-DuckDB 的 `candidates` 表以 `source + source_id` 建索引做精确去重。未使用 CD-HIT（经测试对 3-30aa 短肽几乎无效，任何阈值下聚类率 <5%）。
+The `candidates` table in DuckDB is indexed on `source + source_id` for exact deduplication. CD-HIT was not used (testing showed it is essentially ineffective for 3-30aa short peptides, with a clustering rate <5% at any threshold).
 
-## Pipeline 状态
+## Pipeline Status
 
 ```json
 {
@@ -47,23 +49,23 @@ DuckDB 的 `candidates` 表以 `source + source_id` 建索引做精确去重。�
 }
 ```
 
-## 关键技术指标
+## Key Technical Metrics
 
-| 项目 | 数值 |
+| Item | Value |
 |------|------|
-| UniProt 扫描速度 | 123k seq/s（平均） |
-| MGnify 扫描速度 | 192k seq/s（平均） |
-| DB 写入批大小 | 100k/batch |
-| 写入方式 | VALUES 子句批量 INSERT（10k/条 SQL） |
-| 最大内存占用 | ~1.8 GB RSS |
+| UniProt scan speed | 123k seq/s (average) |
+| MGnify scan speed | 192k seq/s (average) |
+| DB write batch size | 100k/batch |
+| Write method | batch INSERT with VALUES clauses (10k per SQL statement) |
+| Peak memory usage | ~1.8 GB RSS |
 
-## 输出文件
+## Output Files
 
 ```
 output3/
-├── pipeline.db              ← 2.6G DuckDB（19.9M candidates）
+├── pipeline.db              ← 2.6G DuckDB (19.9M candidates)
 ├── reports/
-│   └── stage0_report.md     ← 自动化数据统计报告
+│   └── stage0_report.md     ← automated data statistics report
 └── step0/
-    └── README.md            ← 本文件
+    └── README.md            ← this file
 ```

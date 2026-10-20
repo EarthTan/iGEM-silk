@@ -1,36 +1,42 @@
-## Inclusion body → Refolding：核心问题与应对（简版）
+> **English** | [中文](Inclusion%20body%20%E2%86%92%20Refolding%EF%BC%9A%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E4%B8%8E%E5%BA%94%E5%AF%B9%EF%BC%88%E7%AE%80%E7%89%88%EF%BC%89.zh.md)
 
-### 一、为什么丝素蛋白融合体系必须面对复性问题？
-- 丝素蛋白在 **E. coli** 中表达必然形成 **包涵体**（序列重复、tRNA耗竭、疏水性强）。
-- 标准流程：**洗涤 → 高浓度变性剂溶解（尿素/盐酸胍）→ 去除变性剂复性**。
-- 复性过程决定功能肽能否**正确暴露**并保留活性。
+## Inclusion Body → Refolding: Core Problems and Countermeasures (Brief Version)
 
-### 二、核心风险（三条）
-1. **整体回收率低**：丝素蛋白β-sheet强，易在复性中不可逆聚集，回收率常在20%左右。
-2. **功能肽被β-sheet包埋**：复性时天然β-sheet堆积力可能把功能肽“拉入”疏水核心，造成活性完全丧失。
-3. **功能肽自身错误聚集**：若功能肽强疏水、多Cys、极端电荷，会诱发分子间交联或二硫键错配。
+### 1. Why Must Silk Fibroin Fusion Systems Deal with Refolding?
 
-### 三、保持活性的关键策略
-**策略A：预筛选相容性功能肽**（Dry Lab主要介入点）
-- 选择 **亲水性肽**（GRAVY < 0）
-- 长度5～15 aa，净电荷适中，避免多Cys
-- **优先含Pro残基**（天然断裂β-sheet，帮助功能肽暴露）
-- 用ESMFold预测融合蛋白结构，计算功能肽的**溶剂可及表面积（SASA）**，避免被埋入内部
+- Silk fibroin expressed in **E. coli** inevitably forms **inclusion bodies** (repetitive sequence, tRNA depletion, high hydrophobicity).
+- Standard workflow: **wash → dissolve in high-concentration denaturant (urea/guanidine hydrochloride) → remove the denaturant and refold**.
+- The refolding process determines whether the functional peptide can be **correctly exposed** and retain its activity.
 
-**策略B：优化复性条件**
-- 低温（4°C）、低浓度（0.1–1 mg/mL）
-- **L-精氨酸**（0.4–0.5 M）抑制聚集
-- 分段去除变性剂（逐步稀释/透析）
-- pH偏离等电点，碱性（8.0–9.0）优先
+### 2. Core Risks (Three)
 
-**策略C（长远）** ：绕过复性——改用 **NusA融合标签** 或 **毕赤酵母分泌表达**，实现可溶性/分泌表达，从根本上消除包涵体复性的不确定性。
+1. **Low overall recovery**: silk fibroin has strong β-sheet propensity and readily aggregates irreversibly during refolding; recovery is often around 20%.
+2. **The functional peptide gets buried by β-sheet**: during refolding, the natural β-sheet stacking forces may "pull" the functional peptide into the hydrophobic core, causing a complete loss of activity.
+3. **The functional peptide itself aggregates incorrectly**: if the functional peptide is strongly hydrophobic, rich in Cys, or carries extreme charge, it can induce intermolecular cross-linking or disulfide bond mispairing.
 
-### 四、Dry Lab可提供的复性友好性评估
-- 计算GRAVY、pI、电荷、Cys数量
-- 预测融合蛋白二级结构（功能肽不应被预测为β-sheet）
-- 计算SASA（直接判断功能肽能否暴露于表面）
-- 输出候选肽评分 + 推荐复性pH/添加剂
+### 3. Key Strategies for Preserving Activity
+
+**Strategy A: Pre-screen compatible functional peptides** (the main entry point for Dry Lab)
+- Choose **hydrophilic peptides** (GRAVY < 0)
+- Length 5–15 aa, moderate net charge, avoid many Cys
+- **Prefer peptides containing Pro residues** (naturally breaks β-sheet, helping the functional peptide stay exposed)
+- Predict the fusion protein structure with ESMFold and compute the **solvent-accessible surface area (SASA)** of the functional peptide to avoid it being buried inside
+
+**Strategy B: Optimize refolding conditions**
+- Low temperature (4°C), low concentration (0.1–1 mg/mL)
+- **L-arginine** (0.4–0.5 M) to suppress aggregation
+- Remove the denaturant in stages (stepwise dilution/dialysis)
+- Keep the pH away from the isoelectric point; alkaline (8.0–9.0) is preferred
+
+**Strategy C (long term)**: bypass refolding — switch to a **NusA fusion tag** or **Pichia pastoris secretory expression** to achieve soluble/secreted expression and eliminate the uncertainty of inclusion body refolding at the root.
+
+### 4. Refolding-Friendliness Assessment That Dry Lab Can Provide
+
+- Compute GRAVY, pI, charge, and Cys count
+- Predict the fusion protein secondary structure (the functional peptide should not be predicted as β-sheet)
+- Compute SASA (to directly judge whether the functional peptide can be exposed on the surface)
+- Output candidate peptide scores + recommended refolding pH/additives
 
 ---
 
-**一句话总结**：复性是丝素蛋白融合功能肽的最大瓶颈——通过选择亲水、含Pro、结构暴露的功能肽，搭配精氨酸和低温缓慢复性，可大幅提升功能肽保留活性的概率。
+**One-sentence summary**: refolding is the biggest bottleneck for silk fibroin–functional peptide fusions — by choosing hydrophilic, Pro-containing, structurally exposed functional peptides and combining L-arginine with slow, low-temperature refolding, the probability that the functional peptide retains its activity can be greatly increased.

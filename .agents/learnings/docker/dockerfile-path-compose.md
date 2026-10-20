@@ -1,5 +1,5 @@
 ---
-name: docker-compose dockerfile 路径一致性 v1.0
+name: docker-compose dockerfile Path Consistency v1.0
 author: Claude Code
 created: 2026-05-13
 version: 1.0.0
@@ -7,17 +7,19 @@ tags: [docker, docker-compose, build-context, path-resolution, iGEM-silk]
 validated: true
 ---
 
-# Gene Capsule: docker-compose dockerfile 路径一致性
+> **English** | [中文](dockerfile-path-compose.zh.md)
+
+# Gene Capsule: docker-compose dockerfile Path Consistency
 
 ## Experience
 
-**问题类型**: Docker Compose 中 `dockerfile` 路径相对于 `context` 而非 compose 文件位置，导致找不到 Dockerfile。
+**Problem type**: In Docker Compose, the `dockerfile` path is relative to `context` rather than to the compose file's location, so the Dockerfile is not found.
 
-**核心策略**: `dockerfile` 路径相对于 `context`。当 `context: ..` 而 Dockerfile 在 `tools/<name>/` 下时，必须写 `dockerfile: tools/<name>/Dockerfile`。
+**Core strategy**: The `dockerfile` path is relative to `context`. When `context: ..` while the Dockerfile lives under `tools/<name>/`, you must write `dockerfile: tools/<name>/Dockerfile`.
 
-**关键参数**: `context` 和 `dockerfile` 的相对关系
+**Key parameters**: The relative relationship between `context` and `dockerfile`
 
-### 错误模式
+### Incorrect Pattern
 
 ```yaml
 # tools/docker-compose.yml
@@ -25,10 +27,10 @@ services:
   anoxpepred:
     build:
       context: ..
-      dockerfile: Dockerfile    # ❌ 相对于 context (项目根)，实际在 tools/AnOxPePred/Dockerfile
+      dockerfile: Dockerfile    # ❌ relative to context (project root), but it is actually at tools/AnOxPePred/Dockerfile
 ```
 
-### 正确模式
+### Correct Pattern
 
 ```yaml
 services:
@@ -38,28 +40,28 @@ services:
       dockerfile: tools/AnOxPePred/Dockerfile
 ```
 
-### 批量校验
+### Batch Validation
 
 ```bash
 grep 'dockerfile:' docker-compose.yml
-# 逐一与 ls tools/*/Dockerfile 比对
+# compare one by one with ls tools/*/Dockerfile
 ```
 
 ## Environment Fingerprint
 
-- **任务域**: Docker 多服务项目构建
-- **输入特征**: docker-compose.yml 中 `context` 与 `dockerfile` 不在同一目录
-- **约束条件**: 首次配置或新增服务时最容易出错
-- **不适用**: `context` 和 `dockerfile` 在同一目录的简单场景
+- **Task domain**: Docker multi-service project builds
+- **Input characteristics**: `context` and `dockerfile` in docker-compose.yml are not in the same directory
+- **Constraints**: Most error-prone during first configuration or when adding a service
+- **Not applicable**: Simple cases where `context` and `dockerfile` are in the same directory
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk 15 个服务全量 docker compose build 验证
-- **失败案例**: 多个服务的 dockerfile 路径指向项目根目录而非 `tools/<name>/` 子目录，导致 `docker compose build` 找不到 Dockerfile
-- **修复验证**: 全量 `grep` + `ls` 比对后修复，再次 build 通过
+- **Validation method**: Validated with a full docker compose build of 15 iGEM-silk services
+- **Failure case**: Several services had dockerfile paths pointing to the project root instead of the `tools/<name>/` subdirectory, so `docker compose build` could not find the Dockerfile
+- **Fix validation**: After a full `grep` + `ls` comparison and the fixes, the rebuild passed
 
 ## Usage
 
-- **触发条件**: 新增微服务、修改 docker-compose.yml 的 build 配置
-- **调用方式**: 首次配置后立即用脚本比对所有 dockerfile 路径
-- **注意事项**: 不要凭记忆逐个修复——一次性全量 grep 扫描效率远高于等待 CI 逐个报错
+- **Trigger conditions**: Adding a microservice, or modifying the build configuration in docker-compose.yml
+- **How to invoke**: Immediately after the first configuration, use a script to compare all dockerfile paths
+- **Caveats**: Do not fix them one by one from memory—a single full grep scan is far more efficient than waiting for CI to report each error

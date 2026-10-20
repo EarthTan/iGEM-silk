@@ -1,72 +1,60 @@
-# **项目背景**
+> **English** | [中文](PROGRAM%20Old.zh.md)
 
-当前护肤行业的主流做法是将多种功效成分（抗氧化、抗糖化、胶原蛋白促进剂等）简单混合到一个产品中，但这种方式存在三大核心问题：
+# **Project Background**
 
-1. **成分缺乏协同性**，甚至相互干扰
-2. **缺乏渗透机制**，大多数高效活性成分无法穿透皮肤表层
-3. **稳定性不可预测**，复杂混合物的行为难以控制
+The current mainstream practice in the skincare industry is to simply mix multiple active ingredients (antioxidants, anti-glycation agents, collagen promoters, etc.) into a single product, but this approach has three core problems:
 
-传统肽的发现依赖随机实验，成本高、周期长、高度依赖运气。
+1. **Ingredients lack synergy**, and may even interfere with each other
+2. **No penetration mechanism** — most highly effective active ingredients cannot cross the skin surface
+3. **Unpredictable stability** — the behavior of complex mixtures is hard to control
 
-# **项目目标**
+Traditional peptide discovery relies on random experiments: high cost, long cycles, and heavy dependence on luck.
 
-项目提出一种 **AI 驱动的模块化功能肽设计平台**，核心思路是：将多种功能整合进**一个单一分子**，而不是简单混合多个成分。用户输入期望效果，平台自动输出经过实验验证的最优分子设计。这一平台不仅仅作为公开可用的工具，同时还可以帮助湿实验筛选高潜力肽。
+# **Project Goals**
 
-从用户体验的角度来看，本项目构建的平台会实现：用户选择其想要的**两个**功能（例如，抗氧化+递送），平台自动找到在这两个功能上具有潜力的**两个短肽**，以及所有可能的**linker**。遍历所有可能的 `短肽A+linker+短肽B` 的组合，选择最具潜力的组合呈现给用户。
+The project proposes an **AI-driven modular functional peptide design platform**. The core idea: integrate multiple functions into **a single molecule** rather than simply mixing several ingredients. The user enters the desired effect, and the platform automatically outputs an experimentally validated optimal molecular design. This platform is not only a publicly available tool but can also help wet-lab screening of high-potential peptides.
 
-从工程的角度来看，本项目所构建的计算机工程需要实现两大功能：
+From the user experience perspective, the platform built in this project will enable the following: the user selects the **two** functions they want (for example, antioxidant + delivery), and the platform automatically finds the **two short peptides** with potential for those two functions, along with all possible **linkers**. It enumerates all possible `short peptide A + linker + short peptide B` combinations and presents the most promising combination to the user.
 
-### **1）对于肽的功能预测打分**
+From the engineering perspective, the computational engineering built in this project needs to deliver two major capabilities:
 
-我们需要通过机器学习训练出一个**模型**，这个**模型**可以实现：输入制定的 **肽（FASTA格式，氨基酸序列）**，模型输出这个**肽**在某一特定层面上（比如，抗氧化）的预测分数。
+### **1) Functional prediction scoring for peptides**
 
-由于我们需要预测多个功能，因此实际上需要多个模型，分别实现对于六种功效的预测打分。：
+We need to train a **model** through machine learning that can do the following: given a specified **peptide (FASTA format, amino acid sequence)** as input, the model outputs a predicted score for that **peptide** on a particular dimension (for example, antioxidant).
 
-- **抗氧化 & 抗糖化**；
-- **促胶原蛋白生成**；
-- **抗菌**（尤其针对痤疮菌）；
-- **抗炎**；
-- **抗黑色素生成**；
-- **透皮递送模块**
+Since we need to predict multiple functions, we actually need multiple models, each providing prediction scores for one of six efficacies:
 
-具体而言，模型训练的训练分为三步，
+- **Antioxidant & anti-glycation**;
+- **Collagen production promotion**;
+- **Antibacterial** (especially against acne bacteria);
+- **Anti-inflammatory**;
+- **Anti-melanogenesis**;
+- **Transdermal delivery module**
 
-1. 原始数据的获取。 （对于每个FASTA序列，对应一个 binary label： 有/无 对应功能）
-2. 数据的特征化。(理化性质计算，氨基酸/二肽比例计算，ESM嵌入，.....）
-3. 模型训练。（可能采用的机器学习算法：Raindom Forest, XGhoost, MLP...)
+Specifically, model training is divided into three steps:
 
-### 2） 融合引擎
+1. Raw data acquisition. (For each FASTA sequence, a corresponding binary label: with/without the corresponding function)
+2. Feature engineering of the data. (Physicochemical property calculation, amino acid/dipeptide composition calculation, ESM embedding, ...)
+3. Model training. (Possible machine learning algorithms: Random Forest, XGBoost, MLP...)
 
-融合引擎需要列举所有可能的 `短肽A+linker+短肽B`  组合，并根据场景（注射/面敷/补丁）择优推送。因此，融合引擎需要实现至少以下功能：
+### 2) Fusion engine
 
-1. 找出具有潜力的 `短肽A、linker和短肽B` 进行全排列。
-2. 筛选明显不合理的组合。(硬编码筛选，例如linker长度限制，净电荷过高或过低过滤.....)
-3. 对于每一种组合进行**打分。** （分子量过高惩罚，疏水性过高惩罚.....)
+The fusion engine needs to enumerate all possible `short peptide A + linker + short peptide B` combinations and push the best ones according to the scenario (injection/topical/patch). Therefore, the fusion engine needs to implement at least the following:
 
-通过这三步，我们筛选出可能的最优组合推送给用户。
+1. Find promising `short peptide A, linkers and short peptide B` and take the full permutation.
+2. Filter out obviously unreasonable combinations. (Hard-coded filtering, for example linker length limits, filtering out net charge that is too high or too low...)
+3. **Score** each combination. (Penalty for excessive molecular weight, penalty for excessive hydrophobicity...)
 
- 
-
-# 任务
-
-本iGEM项目中的主要CS任务如下：
-
-1. 研发肽设计功能 （收集数据，训练单功能预测模型，开发融合引擎，整合工具）
-2. 平台的全栈开发 （将功能整理为后端服务器，开发前端，设计API等）（参考技术栈：React+TS++Vite+Tailwind CSS+React Queries+Python+FastAPI)
-3. Wiki （前端UIX设计，前端开发） （参考技术栈：React/Flask）
+Through these three steps, we screen out the likely optimal combinations and push them to the user.
 
  
 
- 
+# Tasks
 
- 
+The main CS tasks in this iGEM project are as follows:
 
- 
-
- 
-
- 
-
- 
+1. Peptide design R&D (collect data, train single-function prediction models, develop the fusion engine, integrate tools)
+2. Full-stack development of the platform (organize the functionality into backend servers, develop the frontend, design APIs, etc.) (Reference stack: React+TS+Vite+Tailwind CSS+React Queries+Python+FastAPI)
+3. Wiki (frontend UIX design, frontend development) (Reference stack: React/Flask)
 
  

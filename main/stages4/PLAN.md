@@ -1,513 +1,515 @@
-# Stages4 Pipeline Plan：层级筛选 + 安全优先
+> **English** | [中文](PLAN.zh.md)
 
-> 版本: v2.0 — 2026-05-18
-> 数据源: UniProt (225M) + MGnify (624M)
-> 入口候选: ~19.9M (由 stages3 Round 0 预处理完成)
-> 目标: 19.9M → Top 100 + Bottom 100
+# Stages4 Pipeline Plan: Hierarchical Filtering + Safety First
+
+> Version: v2.0 — 2026-05-18
+> Data sources: UniProt (225M) + MGnify (624M)
+> Input candidates: ~19.9M (produced by stages3 Round 0 preprocessing)
+> Target: 19.9M → Top 100 + Bottom 100
 
 ---
 
-## 1. 背景：stages2 的两个致命问题
+## 1. Background: The Two Fatal Problems of stages2
 
-### 问题 1：加权平均稀释了关键安全属性
+### Problem 1: Weighted averaging diluted critical safety attributes
 
-Stages2 使用加权平均的方式混合抗氧化性、溶血性、致敏性、MHC 结合等不同维度的属性。
+Stages2 used a weighted average to blend attributes from different dimensions, such as antioxidant capacity, hemolysis, allergenicity, and MHC binding.
 
 ```
 AnOxPePred(0.45) + ToxinPred3(0.13) + HemoPI2(0.09) + MHCflurry(0.05) + ...
 ```
 
-在这个公式中，HemoPI2 的权重仅为 0.05–0.09，这意味着即使一个肽溶血性极差（高溶血风险），只要抗氧化得分足够高，综合分仍然可能排在前列。**安全属性变成了可以被"补偿"的评分项，而不是一票否决的硬条件。**
+In this formula, HemoPI2 carries a weight of only 0.05–0.09, which means that even if a peptide has extremely poor hemolytic behavior (high hemolysis risk), its composite score can still rank near the top as long as its antioxidant score is high enough. **Safety attributes became score components that could be "compensated", instead of hard conditions with veto power.**
 
-**正确的做法**：安全属性应该是硬阈值（达标 / 淘汰），不参与加权混合。
+**The correct approach**: safety attributes should be hard thresholds (pass / eliminate) and should not participate in weighted blending.
 
-### 问题 2：双通道仍被综合分数中的抗氧化主导
+### Problem 2: The dual channels were still dominated by antioxidant in the composite score
 
-虽然双通道的初始分选使用了纯 AnOxPePred（正确），但在后续 Round 3–7 中仍然使用包含 AnOxPePred 权重的综合分进行排名和筛选。这导致：
+Although the initial dual-channel split used pure AnOxPePred (correct), subsequent Rounds 3–7 still used a composite score that included AnOxPePred weight for ranking and screening. This caused:
 
-- Bottom 通道（抗氧化最差的肽）在后续轮次中还是被 AnOxPePred 的残余权重影响
-- 安全筛选并没有真正独立于抗氧化信号
+- The Bottom channel (peptides with the worst antioxidant capacity) was still affected by residual AnOxPePred weight in later rounds
+- Safety screening was not truly independent of the antioxidant signal
 
-**正确的做法**：抗氧化只在双通道分选时使用一次，后续轮次不再参与任何排名。
+**The correct approach**: antioxidant is used only once, for the dual-channel split, and does not participate in any ranking in later rounds.
 
 ---
 
-## 2. stages4 核心原则
+## 2. stages4 Core Principles
 
-### 原则 A：层级筛选，绝不跨属性加权平均
+### Principle A: Hierarchical filtering; never average across attributes
 
-每个轮次使用单一筛选标准——或排序取百分比，或硬阈值淘汰。同一轮次绝不对不同属性做加权平均混合。
+Each round uses a single screening criterion — either rank and take a percentage, or eliminate with a hard threshold. The same round never blends different attributes in a weighted average.
 
-### 原则 B：安全属性使用硬阈值
+### Principle B: Safety attributes use hard thresholds
 
-毒性、溶血性、致敏性等安全相关属性，只设通过/淘汰阈值，不参与任何评分混合。
+Safety-related attributes such as toxicity, hemolysis, and allergenicity only have pass/eliminate thresholds and do not participate in any score blending.
 
-### 原则 C：抗氧化只用一次
+### Principle C: Antioxidant is used only once
 
-AnOxPePred 仅在 Round 1 的双通道分选时使用。一旦通道确定，后续所有轮次不再使用抗氧化分数。
+AnOxPePred is used only for the dual-channel split in Round 1. Once the channels are fixed, no later round uses the antioxidant score.
 
-### 原则 D：可变权重机制（SD 驱动 + 手动调节）
+### Principle D: Variable weighting mechanism (SD-driven + manual adjustment)
 
-加权平均仅在 Round 3（深度评分）中使用，采用两层权重机制：
+Weighted averaging is used only in Round 3 (deep scoring), with a two-layer weighting mechanism:
 
-- **基础权重**：SD 驱动，`w_base = σ_i / Σσ_j`，区分度高的属性自动获得高权重
-- **手动调节**：在 SD 权重基础上乘以手动系数 `α`，允许领域知识介入
+- **Base weights**: SD-driven, `w_base = σ_i / Σσ_j`; attributes with high discriminative power automatically receive high weight
+- **Manual adjustment**: multiply the SD weights by a manual coefficient `α`, allowing domain knowledge to intervene
 
 ```
-w_final_i = w_base_i × α_i         (再归一化使 Σw = 1)
+w_final_i = w_base_i × α_i         (renormalize so that Σw = 1)
 ```
 
-默认所有属性 `α = 1.0`（纯 SD 驱动）。手动系数必须在 `weight_config` 表中显式记录，附带调节理由。
+By default `α = 1.0` for all attributes (purely SD-driven). Manual coefficients must be explicitly recorded in the `weight_config` table, together with the reason for the adjustment.
 
-**AnOxPePred 的特殊处理**：虽然在 Round 1 中已作为分选标准使用过，但如果希望在 Round 3 中让抗氧化信号参与深度评分，可以通过手动系数 `α > 1.0` 让它在加权中占更高权重（例如 α = 1.3）。这样做的前提是：分选通道已经确定，Round 3 的抗氧化评分是在通道内部对候选做区分，不影响跨通道比较。
+**Special handling of AnOxPePred**: although it has already been used as a split criterion in Round 1, if you want the antioxidant signal to participate in deep scoring in Round 3, you can use a manual coefficient `α > 1.0` to give it a higher weight in the average (for example α = 1.3). The precondition is that the split channels are already fixed, so the Round 3 antioxidant score only discriminates among candidates within a channel and does not affect cross-channel comparison.
 
-| 属性组 | 处理方式 | 位置 |
+| Attribute group | Handling | Location |
 |--------|---------|------|
-| 抗氧化 | Round 1 分选使用；Round 3 可选参与加权（默认参与，α=1.0） | Round 1, Round 3 |
-| 安全（毒性/溶血/致敏/免疫） | 硬阈值通过/淘汰 | Round 1–2 |
-| 功能（B细胞表位/热稳定/溶解度/细胞穿透） | SD 加权综合分 | Round 3 |
-| 3D 结构（SASA/Aggrescan3D/pLDDT） | SD 加权或独立排名 | Round 6–7 |
+| Antioxidant | Used for the Round 1 split; may optionally participate in Round 3 weighting (participates by default, α=1.0) | Round 1, Round 3 |
+| Safety (toxicity/hemolysis/allergenicity/immunogenicity) | Hard threshold pass/eliminate | Round 1–2 |
+| Function (B-cell epitope/thermal stability/solubility/cell penetration) | SD-weighted composite score | Round 3 |
+| 3D structure (SASA/Aggrescan3D/pLDDT) | SD weighting or independent ranking | Round 6–7 |
 
-### 原则 E：从轻到重，逐级收紧
+### Principle E: From light to heavy, tightening step by step
 
 ```
-Round 1 (轻, ~5min/百万) → 排序取前百分之几
-Round 2 (轻, 安全阈值)   → 硬淘汰
-Round 3 (重, GPU~min/百) → SD 加权 → 取前百分之几
-Round 4 (轻, 枚举)       → 排序取前百分之几
-Round 5 (最重, GPU~min/条) → 全部通过
-Round 6 (轻, CPU秒/条)    → 全部评分
-Round 7 (纯本地)          → 最终排名
+Round 1 (light, ~5min/million) → rank and take the top few percent
+Round 2 (light, safety thresholds)   → hard elimination
+Round 3 (heavy, GPU~min/hundred) → SD weighting → take the top few percent
+Round 4 (light, enumeration)       → rank and take the top few percent
+Round 5 (heaviest, GPU~min/construct) → all pass
+Round 6 (light, CPU seconds/construct)    → score all
+Round 7 (purely local)          → final ranking
 ```
 
 ---
 
-## 3. 八轮漏斗设计
+## 3. Eight-Round Funnel Design
 
-### Round 0：数据预处理
+### Round 0: Data preprocessing
 
-**复用 stages3 Round 0 的结果**，不做算法变更。
+**Reuse the results of stages3 Round 0**, with no algorithmic changes.
 
-| 步骤 | 操作 | 数据量 |
+| Step | Operation | Data volume |
 |------|------|--------|
-| 长度筛选 | 3–30 aa | 849M → ~5% |
-| AA 过滤 | 仅 20 种标准氨基酸 | +去重 |
-| 写入 DB | DuckDB `candidates` 表 | 19,890,021 |
+| Length filtering | 3–30 aa | 849M → ~5% |
+| AA filtering | only the 20 standard amino acids | + deduplication |
+| Write to DB | DuckDB `candidates` table | 19,890,021 |
 
-**预期耗时**：~99 min
+**Expected runtime**: ~99 min
 
 ---
 
-### Round 1：抗氧化单指标分选
+### Round 1: Single-metric antioxidant split
 
-**核心变更**：这是抗氧化分数第一次被使用。如果选择让 AnOxPePred 参与 Round 3 加权，则此处是双通道分选的唯一依据，而非唯一使用位置。
+**Core change**: this is the first time the antioxidant score is used. If you choose to let AnOxPePred participate in Round 3 weighting, then this is the only basis for the dual-channel split, rather than its only point of use.
 
-| 步骤 | 操作 | 依据 | 预计通过数 |
+| Step | Operation | Basis | Expected pass count |
 |------|------|------|-----------|
-| 1a | 对所有 19.9M 候选运行 AnOxPePred | 抗氧化活性预测 | 19.9M 全量评分 |
-| 1b | 运行 AlgPred2 | 致敏性硬阈值 ≥0.30 → 淘汰 | 淘汰 ~15% |
-| 1c | 通过 AlgPred2 的按 AnOxPePred 排序 | 纯抗氧化分，无混合 | — |
-| 1d | 取 Top 10% → Top 通道 | 抗氧化最好的 10% | ~1.7M |
-| 1e | 取 Bottom 1% → Bottom 通道 | 抗氧化最差的 1%（阴性对照） | ~170K |
+| 1a | Run AnOxPePred on all 19.9M candidates | antioxidant activity prediction | all 19.9M scored |
+| 1b | Run AlgPred2 | allergenicity hard threshold ≥0.30 → eliminate | eliminate ~15% |
+| 1c | Sort the AlgPred2-passing candidates by AnOxPePred | pure antioxidant score, no blending | — |
+| 1d | Take the Top 10% → Top channel | the 10% with the best antioxidant capacity | ~1.7M |
+| 1e | Take the Bottom 1% → Bottom channel | the 1% with the worst antioxidant capacity (negative control) | ~170K |
 
-**参与服务**：AnOxPePred (GPU), AlgPred2 (CPU)
+**Services involved**: AnOxPePred (GPU), AlgPred2 (CPU)
 
-**输出表**：`round1_scores`, `round1_channels`
+**Output tables**: `round1_scores`, `round1_channels`
 
 ---
 
-### Round 2：安全筛检（纯硬阈值，无加权）
+### Round 2: Safety screening (pure hard thresholds, no weighting)
 
-**核心变更**：安全属性不参与任何混合，每个属性独立淘汰。
+**Core change**: safety attributes do not participate in any blending; each attribute eliminates independently.
 
-| 步骤 | 操作 | 淘汰标准 |
+| Step | Operation | Elimination criterion |
 |------|------|---------|
-| 2a | 运行 ToxinPred3 | ≥0.38 → 淘汰（剧毒风险） |
-| 2b | 运行 HemoPI2 | ≥0.55 → 淘汰（溶血风险） |
-| 2c | 运行 MHCflurry | ≥0.5 → 淘汰（免疫原性风险） |
-| 2d | 合并淘汰列表 | 任一安全项不通过即淘汰 |
-| 2e | 幸存者进入 Round 3 | 所有安全项均通过 |
+| 2a | Run ToxinPred3 | ≥0.38 → eliminate (high toxicity risk) |
+| 2b | Run HemoPI2 | ≥0.55 → eliminate (hemolysis risk) |
+| 2c | Run MHCflurry | ≥0.5 → eliminate (immunogenicity risk) |
+| 2d | Merge the elimination lists | eliminate if any safety item fails |
+| 2e | Survivors enter Round 3 | all safety items pass |
 
-**参与服务**：ToxinPred3 (CPU), HemoPI2 (CPU), MHCflurry (GPU)
+**Services involved**: ToxinPred3 (CPU), HemoPI2 (CPU), MHCflurry (GPU)
 
-**设计理由**：
-- 安全属性是"一票否决"的，不是"可补偿"的
-- 不需要综合分，不需要排名，只需要通过/淘汰
-- 三个服务可并发运行，互不依赖
+**Design rationale**:
+- Safety attributes are "veto" conditions, not "compensable" ones
+- No composite score and no ranking are needed, only pass/eliminate
+- The three services can run concurrently and do not depend on each other
 
-**输出表**：`round2_scores`, `round2_passed`, `round2_excluded`
+**Output tables**: `round2_scores`, `round2_passed`, `round2_excluded`
 
 ---
 
-### Round 3：深度评分 + 可变权重（唯一加权位置）
+### Round 3: Deep scoring + variable weights (the only weighted location)
 
-**核心变更**：全流程唯一使用加权平均的位置。采用 SD 驱动 + 手动调节的双层权重机制。
+**Core change**: the only place in the entire pipeline that uses a weighted average. It adopts a two-layer weighting mechanism of SD-driven weights plus manual adjustment.
 
-| 步骤 | 操作 | 详情 |
+| Step | Operation | Details |
 |------|------|------|
-| 3a | 运行 BepiPred3 | B 细胞表位预测 (GPU) |
-| 3b | 运行 TemStaPro | 热稳定性预测 (GPU) |
-| 3c | 运行 SoDoPE | 溶解度预测 (CPU) |
-| 3d | 运行 pLM4CPPs | 细胞穿透预测 (GPU) |
-| 3e | 运行 GraphCPP | 细胞穿透 GNN (GPU) |
-| 3f | （可选）运行 AnOxPePred | 如果决定让抗氧化参与加权 |
-| 3g | 计算每个服务的 winsorized SD | 截尾 1% 极端值 |
-| 3h | 基础权重 | w_base_i = σ_i / Σσ_j |
-| 3i | 手动调节 | w_final_i = w_base_i × α_i，再归一化 |
-| 3j | 计算综合分 | Σ(w_final_i × score_i_normalized) |
-| 3k | 排序取 Top N% | 例如 Top 5% |
+| 3a | Run BepiPred3 | B-cell epitope prediction (GPU) |
+| 3b | Run TemStaPro | thermal stability prediction (GPU) |
+| 3c | Run SoDoPE | solubility prediction (CPU) |
+| 3d | Run pLM4CPPs | cell penetration prediction (GPU) |
+| 3e | Run GraphCPP | cell penetration GNN (GPU) |
+| 3f | (optional) Run AnOxPePred | if antioxidant is to participate in weighting |
+| 3g | Compute the winsorized SD of each service | clip the extreme 1% |
+| 3h | Base weights | w_base_i = σ_i / Σσ_j |
+| 3i | Manual adjustment | w_final_i = w_base_i × α_i, then renormalize |
+| 3j | Compute the composite score | Σ(w_final_i × score_i_normalized) |
+| 3k | Rank and take the Top N% | for example Top 5% |
 
-**权重公式**：
+**Weight formula**:
 
 ```
-// 基础：SD 驱动
+// base: SD-driven
 for each service s in participating_services:
     σ_s = winsorized_stddev(scores_s)
     w_base_s = σ_s / Σσ_all
 
-// 手动调节
+// manual adjustment
 for each service s:
     w_final_s = w_base_s × α_s       // α >= 0, default 1.0
 
-// 再归一化
+// renormalization
 Σw_final = Σ(w_final_s)
 w_norm_s = w_final_s / Σw_final
 ```
 
-**手动系数记录格式**：
+**Manual coefficient record format**:
 
-| 服务 | α | 理由 |
+| Service | α | Reason |
 |------|---|------|
-| anoxpepred | 1.0 | 默认（不额外抬高） |
-| bepipred3 | 1.0 | 默认 |
-| temstapro | 1.0 | 默认 |
-| ... | 1.0 | 默认 |
+| anoxpepred | 1.0 | default (no extra boost) |
+| bepipred3 | 1.0 | default |
+| temstapro | 1.0 | default |
+| ... | 1.0 | default |
 
-如果某天决定"把 AnOxPePred 权重抬高到 1.3 倍"，只需改一个数字，并且所有历史记录可追溯。
+If one day you decide to "raise the AnOxPePred weight to 1.3×", you only need to change one number, and every historical record remains traceable.
 
-**输出表**：`round3_scores`, `round3_ranking`, `score_distribution`, `weight_config`
+**Output tables**: `round3_scores`, `round3_ranking`, `score_distribution`, `weight_config`
 
 ---
 
-### Round 4：Construct 枚举 + 属性评分
+### Round 4: Construct enumeration + attribute scoring
 
-| 步骤 | 操作 |
+| Step | Operation |
 |------|------|
-| 4a | 取 Round 3 Top N 肽（Top 通道）+ Bottom M 肽（Bottom 通道） |
-| 4b | 枚举 3 个融合位置（N 端 / C 端 / 两端） |
-| 4c | 枚举 2 种 Linker（Flex_GGGGSx1 / Flex_GGGGSx2） |
-| 4d | 组装全序列（骨架 ~346aa + Linker + 肽） |
-| 4e | 运行 SoDoPE（全长 construct 溶解度） |
-| 4f | 运行 TemStaPro（全长 construct 热稳定性） |
-| 4g | 取 Top N 进入 Round 5 |
+| 4a | Take the Round 3 Top N peptides (Top channel) + Bottom M peptides (Bottom channel) |
+| 4b | Enumerate 3 fusion positions (N-terminus / C-terminus / both ends) |
+| 4c | Enumerate 2 linkers (Flex_GGGGSx1 / Flex_GGGGSx2) |
+| 4d | Assemble the full sequence (scaffold ~346aa + linker + peptide) |
+| 4e | Run SoDoPE (solubility of the full-length construct) |
+| 4f | Run TemStaPro (thermal stability of the full-length construct) |
+| 4g | Take the Top N into Round 5 |
 
-**注意**：此轮次不涉及加权平均。SoDoPE 和 TemStaPro 分别记录。
+**Note**: this round does not involve weighted averaging. SoDoPE and TemStaPro are recorded separately.
 
-**输出表**：`constructs`, `construct_scores`
+**Output tables**: `constructs`, `construct_scores`
 
 ---
 
-### Round 5：3D 结构预测
+### Round 5: 3D structure prediction
 
-| 步骤 | 操作 |
+| Step | Operation |
 |------|------|
-| 5a | OmegaFold 推理（所有 construct） |
-| 5b | 提取 pLDDT 置信度 |
-| 5c | PDB 文件按 construct 命名存储 |
+| 5a | OmegaFold inference (all constructs) |
+| 5b | Extract pLDDT confidence |
+| 5c | Store PDB files named by construct |
 
-**参与服务**：OmegaFold (GPU, 串行)
+**Services involved**: OmegaFold (GPU, serial)
 
-**输出表**：`structure_results`, PDB 文件
+**Output tables**: `structure_results`, PDB files
 
 ---
 
-### Round 6：PDB 评估
+### Round 6: PDB evaluation
 
-| 步骤 | 操作 |
+| Step | Operation |
 |------|------|
-| 6a | SASA 计算（肽段表面暴露度，越高越好） |
-| 6b | Aggrescan3D 计算（聚集风险，越低越好） |
+| 6a | SASA calculation (surface exposure of the peptide segment; higher is better) |
+| 6b | Aggrescan3D calculation (aggregation risk; lower is better) |
 
-**参与服务**：SASA (CPU), Aggrescan3D (CPU)
+**Services involved**: SASA (CPU), Aggrescan3D (CPU)
 
-**注意**：不做加权混合。SASA 和 Aggrescan3D 分别记录。
+**Note**: no weighted blending. SASA and Aggrescan3D are recorded separately.
 
-**输出表**：`pdb_eval`
+**Output tables**: `pdb_eval`
 
 ---
 
-### Round 7：最终排名输出
+### Round 7: Final ranking output
 
-| 步骤 | 操作 |
+| Step | Operation |
 |------|------|
-| 7a | Top 通道独立排名（基于 Round 6 的 3D 指标） |
-| 7b | Bottom 通道独立排名 |
-| 7c | 生成最终输出包（CSV + 报告） |
+| 7a | Independent ranking of the Top channel (based on the Round 6 3D metrics) |
+| 7b | Independent ranking of the Bottom channel |
+| 7c | Generate the final output package (CSV + reports) |
 
-**排名方案**：对 SASA, (1-Aggrescan3D), pLDDT 三个 3D 指标进行 SD 加权排名。也可以直接按 SASA 排序（参考 stages2 经验：SASA 区分度最好）。
+**Ranking scheme**: perform an SD-weighted ranking over the three 3D metrics SASA, (1-Aggrescan3D), and pLDDT. It is also acceptable to sort directly by SASA (following the stages2 experience: SASA has the best discriminative power).
 
-**输出**：
-- `top100.csv` — Top 通道排名
-- `bottom100.csv` — Bottom 通道排名
-- `score_distribution.json` — 最终分数分布
-- 每个 construct 独立文件夹（含 FASTA, PDB, scores）
+**Output**:
+- `top100.csv` — Top channel ranking
+- `bottom100.csv` — Bottom channel ranking
+- `score_distribution.json` — final score distribution
+- a separate folder per construct (with FASTA, PDB, scores)
 
 ---
 
-## 4. 文件系统规范
+## 4. File System Conventions
 
-### 命名规则
+### Naming rules
 
-统一使用 `s4_roundXX_name.py` 格式：
+Uniformly use the `s4_roundXX_name.py` format:
 
 ```
 main/stages4/
-├── PLAN.md                        # ← 本文档
+├── PLAN.md                        # ← this document
 ├── __init__.py
 │
-├── s4_round00_preprocess.py       # 数据预处理（可跳过）
-├── s4_round01_antioxidant_split.py # 抗氧化单指标分选
-├── s4_round02_safety_screen.py     # 安全筛检（硬阈值）
-├── s4_round03_deep_scoring.py      # 深度评分 + 可变权重
-├── s4_round04_enumerate.py         # Construct 枚举
-├── s4_round05_3d.py                # 3D 结构预测
-├── s4_round06_pdb_eval.py          # PDB 评估
-├── s4_round07_final.py             # 最终排名
+├── s4_round00_preprocess.py       # data preprocessing (can be skipped)
+├── s4_round01_antioxidant_split.py # single-metric antioxidant split
+├── s4_round02_safety_screen.py     # safety screening (hard thresholds)
+├── s4_round03_deep_scoring.py      # deep scoring + variable weights
+├── s4_round04_enumerate.py         # construct enumeration
+├── s4_round05_3d.py                # 3D structure prediction
+├── s4_round06_pdb_eval.py          # PDB evaluation
+├── s4_round07_final.py             # final ranking
 │
-├── s4_db.py                        # DuckDB 数据库接口
-├── s4_docker_utils.py              # Docker 按需启动
-├── s4_service_map.py               # 服务依赖映射
-├── s4_analytics.py                 # 方差感知权重引擎（含手动调节）
+├── s4_db.py                        # DuckDB database interface
+├── s4_docker_utils.py              # Docker on-demand startup
+├── s4_service_map.py               # service dependency map
+├── s4_analytics.py                 # variance-aware weighting engine (with manual adjustment)
 │
-├── plan/                           # 规划文档存储
+├── plan/                           # storage for planning documents
 │
 └── __pycache__/
 ```
 
-### 与 stages2 命名对比
+### Naming comparison with stages2
 
-| 含义 | stages2 | stages4 |
+| Meaning | stages2 | stages4 |
 |------|---------|---------|
-| 数据预处理 | `step00_integrate.py` | `s4_round00_preprocess.py` |
-| 轻量评分 | `round01_lightweight.py` | `s4_round01_antioxidant_split.py` |
-| 安全筛选 | （混在 round02–03） | `s4_round02_safety_screen.py` |
-| 深度评分 | `round03_heavy.py` | `s4_round03_deep_scoring.py` |
+| Data preprocessing | `step00_integrate.py` | `s4_round00_preprocess.py` |
+| Lightweight scoring | `round01_lightweight.py` | `s4_round01_antioxidant_split.py` |
+| Safety screening | (mixed into round02–03) | `s4_round02_safety_screen.py` |
+| Deep scoring | `round03_heavy.py` | `s4_round03_deep_scoring.py` |
 | Construct | `round04_enumerate.py` | `s4_round04_enumerate.py` |
-| 3D 结构 | `round05_3d.py` | `s4_round05_3d.py` |
-| PDB 评估 | `round06_pdb_eval.py` | `s4_round06_pdb_eval.py` |
-| 最终排名 | `round07_final.py` | `s4_round07_final.py` |
+| 3D structure | `round05_3d.py` | `s4_round05_3d.py` |
+| PDB evaluation | `round06_pdb_eval.py` | `s4_round06_pdb_eval.py` |
+| Final ranking | `round07_final.py` | `s4_round07_final.py` |
 
-### 输出目录结构
+### Output directory structure
 
 ```
 output4/
 ├── STATUS.md
-├── pipeline.db                    # DuckDB 数据库
-├── reports/                       # 各轮次报告
+├── pipeline.db                    # DuckDB database
+├── reports/                       # per-round reports
 │   ├── round0_report.md
 │   ├── round1_report.md
 │   └── ...
-├── pdb/                           # 3D 结构文件
+├── pdb/                           # 3D structure files
 │   └── con_XXXX/
 │       ├── construct.fasta
 │       ├── omegafold.pdb
 │       └── scores.json
-├── logs/                          # 运行日志
-└── final/                         # 最终输出
+├── logs/                          # run logs
+└── final/                         # final output
     ├── top100.csv
     ├── bottom100.csv
-    ├── weight_config.json          # 权重配置 + 手动调节记录
+    ├── weight_config.json          # weight configuration + manual adjustment records
     ├── score_distribution.json
-    └── constructs/                # 每个 construct 独立文件夹
+    └── constructs/                # a separate folder per construct
 ```
 
 ---
 
-## 5. 数据库设计
+## 5. Database Design
 
-### DuckDB 说明
+### Notes on DuckDB
 
-Stages4 使用 DuckDB 管理状态。虽然数据量（千万级）远小于 stages3（十亿级），使用数据库的优势仍成立：
-- 统一的 checkpoint/断点续跑机制
-- 查询灵活（SQL 比 CSV 接力的文件操作更可靠）
-- stages3 的 `db.py` 可以大幅复用
+Stages4 uses DuckDB to manage state. Although the data volume (tens of millions) is far smaller than stages3 (billions), the advantages of using a database still hold:
+- a unified checkpoint/resume mechanism
+- flexible querying (SQL is more reliable than handing off files through CSV)
+- most of stages3's `db.py` can be reused
 
-### 表清单
+### Table list
 
-| 表 | 用途 | 写入轮次 | 预计行数 |
+| Table | Purpose | Written in round | Expected rows |
 |----|------|---------|---------|
-| `candidates` | 候选肽段 | Round 0 | 19.9M |
+| `candidates` | candidate peptides | Round 0 | 19.9M |
 | `round1_scores` | AnOxPePred + AlgPred2 | Round 1 | 19.9M |
-| `round1_channels` | 双通道归属（Top/Bottom） | Round 1 | ~1.87M |
-| `round2_scores` | 安全服务评分 | Round 2 | ~1.87M |
-| `round2_passed` | 安全阈值通过者 | Round 2 | ~1.5M |
-| `round3_scores` | 深度服务评分 | Round 3 | ~1.5M |
-| `round3_ranking` | SD 加权排名 | Round 3 | ~1.5M |
-| `constructs` | 构造枚举 | Round 4 | ~10K–50K |
-| `construct_scores` | 构造级评分 | Round 4 | ~10K–50K |
-| `structure_results` | 3D 结构结果 | Round 5 | ~500–5K |
-| `pdb_eval` | PDB 评估结果 | Round 6 | ~500–5K |
-| `final_ranking` | 最终排名 | Round 7 | ~200 |
-| `score_distribution` | 分数分布统计 | Round 3, 7 | ~20 |
-| `weight_config` | 权重配置（含 SD 权重 + 手动系数 α） | Round 3, 7 | ~10 |
-| `checkpoint` | 检查点 | All | ~20 |
+| `round1_channels` | dual-channel membership (Top/Bottom) | Round 1 | ~1.87M |
+| `round2_scores` | safety service scores | Round 2 | ~1.87M |
+| `round2_passed` | candidates passing the safety thresholds | Round 2 | ~1.5M |
+| `round3_scores` | deep service scores | Round 3 | ~1.5M |
+| `round3_ranking` | SD-weighted ranking | Round 3 | ~1.5M |
+| `constructs` | construct enumeration | Round 4 | ~10K–50K |
+| `construct_scores` | construct-level scores | Round 4 | ~10K–50K |
+| `structure_results` | 3D structure results | Round 5 | ~500–5K |
+| `pdb_eval` | PDB evaluation results | Round 6 | ~500–5K |
+| `final_ranking` | final ranking | Round 7 | ~200 |
+| `score_distribution` | score distribution statistics | Round 3, 7 | ~20 |
+| `weight_config` | weight configuration (SD weights + manual coefficient α) | Round 3, 7 | ~10 |
+| `checkpoint` | checkpoints | All | ~20 |
 
-### 与 stages2 的差异
+### Differences from stages2
 
-| 维度 | stages2 | stages4 |
+| Dimension | stages2 | stages4 |
 |------|---------|---------|
-| 状态管理 | CSV 文件接力 | **DuckDB 统一管理** |
-| Round 1 输出 | `all_scored.csv`（全量，无通道标签） | `round1_channels`（含双通道归属） |
-| Round 2 安全处理 | 低权重混入综合分 | **独立硬阈值淘汰，单独表** |
-| 加权位置 | Round 2 + Round 3 + Round 6 | **仅 Round 3** |
-| 权重来源 | 人工固定 | **SD 驱动 + 手动系数 α** |
-| 抗氧化使用次数 | 多个轮次隐含使用 | **Round 1 分选；Round 3 可选参与** |
+| State management | CSV file hand-off | **unified DuckDB management** |
+| Round 1 output | `all_scored.csv` (full volume, no channel labels) | `round1_channels` (with dual-channel membership) |
+| Round 2 safety handling | mixed into the composite score with low weight | **independent hard-threshold elimination, in a separate table** |
+| Weighted locations | Round 2 + Round 3 + Round 6 | **Round 3 only** |
+| Weight source | manually fixed | **SD-driven + manual coefficient α** |
+| Number of antioxidant uses | implicitly used in multiple rounds | **Round 1 split; optional participation in Round 3** |
 
 ---
 
-## 6. 数据量估算
+## 6. Data Volume Estimates
 
-### 筛选漏斗
+### Screening funnel
 
 ```
 19,890,021  candidates
-    │ Round 1: AnOxPePred 排序取 Top 10%
+    │ Round 1: rank by AnOxPePred and take the Top 10%
     ▼
-~1,990,000  Top 通道 (+ ~200,000 Bottom 通道)
-    │ Round 2: 安全硬阈值（Toxin/Hemo/MHC）
+~1,990,000  Top channel (+ ~200,000 Bottom channel)
+    │ Round 2: safety hard thresholds (Toxin/Hemo/MHC)
     ▼
-~1,500,000  安全通过
-    │ Round 3: 深度评分 SD 加权 → Top 5%
+~1,500,000  safety-passing
+    │ Round 3: deep scoring SD weighting → Top 5%
     ▼
-~75,000     深度评分通过
-    │ Round 4: 枚举 × 6 (3 pos × 2 linker) → SoDoPE/TemStaPro → Top 5%
+~75,000     deep-scoring-passing
+    │ Round 4: enumerate × 6 (3 pos × 2 linker) → SoDoPE/TemStaPro → Top 5%
     ▼
 ~22,500     constructs
-    │ Round 5–6: OmegaFold + SASA + Aggrescan3D（全部通过）
+    │ Round 5–6: OmegaFold + SASA + Aggrescan3D (all pass)
     ▼
-~22,500     评分 construct
-    │ Round 7: 最终排名
+~22,500     scored constructs
+    │ Round 7: final ranking
     ▼
   Top 100 + Bottom 100
 ```
 
-### 瓶颈估算
+### Bottleneck estimates
 
-| 轮次 | 最耗时服务 | 单条耗时 | 总耗时（估） | 并发加速后 |
+| Round | Most time-consuming service | Time per item | Total time (est.) | After concurrency speedup |
 |------|-----------|---------|-------------|-----------|
 | Round 1 | AnOxPePred | ~0.1s | ~23d | ~2d (batch 1K, concurrency 10) |
 | Round 2 | ToxinPred3 | ~0.5s | ~11d | ~1d (batch 10, concurrency 5) |
 | Round 3 | BepiPred3 (GPU) | ~2.5s | ~43d | ~2d (concurrency 5, Semaphore) |
-| Round 5 | OmegaFold (GPU) | ~120s | ~31d | ~31d (串行，不可并发) |
+| Round 5 | OmegaFold (GPU) | ~120s | ~31d | ~31d (serial, cannot be parallelized) |
 
 ---
 
-## 7. 可变权重机制详解
+## 7. Variable Weighting Mechanism in Detail
 
-### 两层权重结构
+### Two-layer weight structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     weight_config 表                       │
-│                                                         │
-│  {                                                       │
-│    "round": 3,                                           │
-│    "formula": "winsorized_stddev_normalized",            │
-│    "sd_weights": {                                       │
-│      "bepipred3_score":  0.31,    ← 数据驱动的基础权重  │
-│      "temstapro_score":  0.18,                           │
-│      "sodope_score":     0.22,                           │
-│      "plm4cpps_score":   0.19,                           │
-│      "graphcpp_score":   0.10                            │
-│    },                                                    │
-│    "manual_coefficients": {                              │
-│      "bepipred3_score":  1.0,     ← 手动调节系数       │
-│      "temstapro_score":  1.0,                            │
-│      "sodope_score":     1.0,                            │
-│      "plm4cpps_score":   1.0,                            │
-│      "graphcpp_score":   1.0                             │
-│    },                                                    │
-│    "final_weights": {                                    │
-│      "bepipred3_score":  0.31,    ← 归一化后的最终权重  │
-│      ...                                                 │
-│    },                                                    │
-│    "adjustment_reason": "默认配置，无手动调节"            │
-│  }                                                       │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                     weight_config table                                │
+│                                                                        │
+│  {                                                                     │
+│    "round": 3,                                                         │
+│    "formula": "winsorized_stddev_normalized",                          │
+│    "sd_weights": {                                                     │
+│      "bepipred3_score":  0.31,    ← data-driven base weight            │
+│      "temstapro_score":  0.18,                                         │
+│      "sodope_score":     0.22,                                         │
+│      "plm4cpps_score":   0.19,                                         │
+│      "graphcpp_score":   0.10                                          │
+│    },                                                                  │
+│    "manual_coefficients": {                                            │
+│      "bepipred3_score":  1.0,     ← manual adjustment coefficient      │
+│      "temstapro_score":  1.0,                                          │
+│      "sodope_score":     1.0,                                          │
+│      "plm4cpps_score":   1.0,                                          │
+│      "graphcpp_score":   1.0                                           │
+│    },                                                                  │
+│    "final_weights": {                                                  │
+│      "bepipred3_score":  0.31,    ← final weights after normalization  │
+│      ...                                                               │
+│    },                                                                  │
+│    "adjustment_reason": "default configuration, no manual adjustment"  │
+│  }                                                                     │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 调节原则
+### Adjustment principles
 
-1. 默认所有 `α = 1.0`（纯 SD 驱动，无需人工干预）
-2. 修改 α 必须填写 `adjustment_reason`（如"AnOxPePred 是核心功能指标，轻微上抬"）
-3. 可以单次运行中尝试多组 α 值做敏感性分析
-4. 所有历史调节记录保存在 `weight_config` 表，可完全追溯
+1. By default all `α = 1.0` (purely SD-driven, no manual intervention needed)
+2. Changing α requires filling in `adjustment_reason` (e.g. "AnOxPePred is a core function metric, slightly boosted")
+3. Multiple α value sets can be tried in a single run for sensitivity analysis
+4. All historical adjustment records are kept in the `weight_config` table and are fully traceable
 
-### 使用场景示例
+### Usage examples
 
-| 场景 | 操作 | 效果 |
+| Scenario | Operation | Effect |
 |------|------|------|
-| 默认 | α = 1.0 全部 | 纯数据驱动 |
-| 轻微强调抗氧化 | anoxpepred α = 1.3 | SD 权重 × 1.3 后再归一化 |
-| 排除无区分度属性 | temstapro α = 0 | 完全从加权中排除 |
-| 强调 B 细胞表位 | bepipred3 α = 1.5 | B 细胞表位权重上调 50% |
+| Default | all α = 1.0 | purely data-driven |
+| Slightly emphasize antioxidant | anoxpepred α = 1.3 | SD weight × 1.3, then renormalize |
+| Exclude a non-discriminative attribute | temstapro α = 0 | fully excluded from the weighting |
+| Emphasize B-cell epitope | bepipred3 α = 1.5 | B-cell epitope weight raised by 50% |
 
 ---
 
-## 8. 与 stages2 的对比
+## 8. Comparison with stages2
 
-| 维度 | stages2（问题） | stages4（修复） |
+| Dimension | stages2 (problem) | stages4 (fix) |
 |------|----------------|-----------------|
-| 安全属性 | 低权重混入加权平均（0.05–0.13），可被抗氧化"补偿" | **独立硬阈值淘汰**，一票否决 |
-| 抗氧化使用 | 多轮次隐含使用，污染双通道 | **Round 1 分选专用；Round 3 可选参与** |
-| 双通道隔离度 | 后续排名仍受抗氧化影响 | **通道独立排名，无交叉污染** |
-| 加权方式 | 人工固定权重（凭经验赋值） | **SD 驱动 + 手动系数（数据驱动 + 领域知识）** |
-| 加权位置 | Round 2 + Round 3 + Round 6 | **仅 Round 3** |
-| 权重可审计性 | CSV 中手动记录 | **weight_config 表，SD权重+手动系数+理由** |
-| 文件命名 | `roundXX_name.py` + `step00` 混用 | **统一 `s4_roundXX_name.py`** |
-| 状态管理 | CSV 文件接力 | **DuckDB 统一管理** |
-| 无区分度属性 | 仍分配固定权重 | **自动降至零权重，或手动设为 α=0** |
-| 断点续跑 | 手动检查输出文件 | **checkpoint 表自动恢复** |
+| Safety attributes | mixed into the weighted average with low weight (0.05–0.13), can be "compensated" by antioxidant | **independent hard-threshold elimination**, veto |
+| Antioxidant usage | implicitly used in multiple rounds, contaminating the dual channels | **dedicated to the Round 1 split; optional participation in Round 3** |
+| Dual-channel isolation | later rankings still affected by antioxidant | **independent per-channel ranking, no cross-contamination** |
+| Weighting method | manually fixed weights (assigned by experience) | **SD-driven + manual coefficients (data-driven + domain knowledge)** |
+| Weighted locations | Round 2 + Round 3 + Round 6 | **Round 3 only** |
+| Weight auditability | manually noted in CSV | **weight_config table: SD weights + manual coefficients + reasons** |
+| File naming | `roundXX_name.py` + `step00` mixed | **uniform `s4_roundXX_name.py`** |
+| State management | CSV file hand-off | **unified DuckDB management** |
+| Non-discriminative attributes | still assigned a fixed weight | **automatically drop to zero weight, or manually set α=0** |
+| Checkpoint/resume | manually inspect output files | **automatic recovery via the checkpoint table** |
 
 ---
 
-## 9. 技术架构
+## 9. Technical Architecture
 
-### 基础设施来源
+### Infrastructure sources
 
-| 组件 | 来源 | 修改 |
+| Component | Source | Changes |
 |------|------|------|
-| `s4_db.py` | 基于 stages3 `db.py` 重构 | 表名改为 round_*，新增通道/安全筛选操作 |
-| `s4_docker_utils.py` | 从 stages3 直接复制 | 无修改 |
-| `s4_service_map.py` | 重写 | 按 8 轮重新映射服务依赖 |
-| `s4_analytics.py` | 基于 stages3 `analytics.py` 重构 | 新增手动系数 α 支持 |
-| `ServiceClient` | `main/client.py` | 直接复用 |
+| `s4_db.py` | refactored from stages3 `db.py` | table names changed to round_*; channel/safety screening operations added |
+| `s4_docker_utils.py` | copied directly from stages3 | no changes |
+| `s4_service_map.py` | rewritten | service dependencies remapped to the 8 rounds |
+| `s4_analytics.py` | refactored from stages3 `analytics.py` | support for manual coefficient α added |
+| `ServiceClient` | `main/client.py` | reused directly |
 
-### 并发策略
+### Concurrency strategy
 
-| 轮次 | 策略 | 说明 |
+| Round | Strategy | Notes |
 |------|------|------|
-| Round 1 | Semaphore(10–20), batch 1K/请求 | AnOxPePred 可高并发 |
-| Round 2 | Semaphore(2–5), ToxinPred3 串行化 | ToxinPred3 sklearn 线程不安全 |
-| Round 3 | Semaphore(3–5) per GPU service | GPU 服务控制并发防 OOM |
-| Round 5 | Semaphore(1) 串行 | OmegaFold 阻塞事件循环 |
-| Round 6 | Semaphore(10) | CPU 服务可高并发 |
+| Round 1 | Semaphore(10–20), batch 1K/request | AnOxPePred can handle high concurrency |
+| Round 2 | Semaphore(2–5), ToxinPred3 serialized | ToxinPred3 sklearn is not thread-safe |
+| Round 3 | Semaphore(3–5) per GPU service | GPU services limit concurrency to prevent OOM |
+| Round 5 | Semaphore(1) serial | OmegaFold blocks the event loop |
+| Round 6 | Semaphore(10) | CPU services can handle high concurrency |
 
-### 检查点与断点续跑
+### Checkpoints and resume
 
-复用 stages3 的 checkpoint 机制：`set_checkpoint()` / `get_checkpoint()` / `get_last_processed_id()`。
+Reuse stages3's checkpoint mechanism: `set_checkpoint()` / `get_checkpoint()` / `get_last_processed_id()`.
 
 ---
 
-## 10. 待决策事项
+## 10. Open Decisions
 
-| 问题 | 选项 | 建议 |
+| Question | Options | Recommendation |
 |------|------|------|
-| Round 1 Top 取多少 %？ | 5% / 10% / 20% | 10%（~1.99M） |
-| Round 1 Bottom 取多少 %？ | 0.5% / 1% / 2% | 1%（~199K） |
-| Round 3 取多少 %？ | 1% / 5% / 10% | 5%（~75K） |
-| Round 4 取多少 %？ | 1% / 5% / 10% | 5%（~22.5K constructs） |
-| MHCflurry 硬阈值？ | ≥0.5 / ≥0.7 / 不设 | 需查文献确认 |
-| AnOxPePred 是否参与 Round 3 加权？ | 参与 / 不参与 | 建议参与（α=1.0 默认） |
-| Round 7 排名依据 | 纯 SASA / SD加权(3D) | 建议先看分布再决定 |
-| 是否复用 stages3 的 DB？ | 复用 / 重跑 | 如果 schema 兼容则复用 |
+| What % for the Round 1 Top? | 5% / 10% / 20% | 10% (~1.99M) |
+| What % for the Round 1 Bottom? | 0.5% / 1% / 2% | 1% (~199K) |
+| What % for Round 3? | 1% / 5% / 10% | 5% (~75K) |
+| What % for Round 4? | 1% / 5% / 10% | 5% (~22.5K constructs) |
+| MHCflurry hard threshold? | ≥0.5 / ≥0.7 / none | need to confirm against the literature |
+| Should AnOxPePred participate in Round 3 weighting? | yes / no | recommended: yes (α=1.0 by default) |
+| Round 7 ranking basis | pure SASA / SD-weighted (3D) | recommended: look at the distribution first |
+| Reuse the stages3 DB? | reuse / rerun | reuse if the schema is compatible |

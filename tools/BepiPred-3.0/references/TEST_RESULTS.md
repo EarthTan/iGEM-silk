@@ -1,16 +1,18 @@
-# BepiPred-3.0 详细测试结果
+> **English** | [中文](TEST_RESULTS.zh.md)
 
-## 测试环境
+# BepiPred-3.0 Detailed Test Results
 
-- **平台**：macOS (Darwin)
-- **Python**：3.11
-- **PyTorch**：2.11.0 (CPU)
-- **fair-esm**：2.0.0
-- **设备**：Apple M1, CPU 模式
+## Test Environment
 
-## 安装验证
+- **Platform**: macOS (Darwin)
+- **Python**: 3.11
+- **PyTorch**: 2.11.0 (CPU)
+- **fair-esm**: 2.0.0
+- **Device**: Apple M1, CPU mode
 
-### 依赖安装命令
+## Installation Verification
+
+### Dependency Installation Commands
 
 ```bash
 uv venv .venv --python 3.11
@@ -18,20 +20,20 @@ uv pip install torch --index-url https://download.pytorch.org/whl/cpu
 uv pip install fair-esm numpy pandas plotly
 ```
 
-### 首次运行
+### First Run
 
-首次运行时会自动下载 ESM-2 模型权重（约 2.5GB）：
+On the first run, the ESM-2 model weights (about 2.5GB) are downloaded automatically:
 
 ```
 Downloading: "https://dl.fbaipublicfiles.com/fair-esm/models/esm2_t33_650M_UR50D.pt"
 Downloading: "https://dl.fbaipublicfiles.com/fair-esm/models/esm2_t33_650M_UR50D-contact-regression.pt"
 ```
 
-## 功能测试
+## Functional Tests
 
-### 测试 1：基本预测（3 条序列）
+### Test 1: Basic Prediction (3 Sequences)
 
-**输入**：
+**Input**:
 ```fasta
 >TEST_PEP1
 MKFLILLFNILCLFPVLAADNHGNPKTHPNPRG
@@ -41,65 +43,65 @@ GILGFVFTLTVPSERGL
 SIINFEKLTEWTSV
 ```
 
-**输出**：
-- ✅ `raw_output.csv` - 包含每残基分数
-- ✅ `Bcell_epitope_preds.fasta` - 表位标记
-- ✅ 约 5 秒完成
+**Output**:
+- ✅ `raw_output.csv` - contains per-residue scores
+- ✅ `Bcell_epitope_preds.fasta` - epitope flags
+- ✅ completed in about 5 seconds
 
-**关键发现**：
-- 大写字母表示预测为表位的残基
-- TEST_PEP1 的 D, N, H, G, N, P, K 等残基被标记为表位
+**Key findings**:
+- Uppercase letters indicate residues predicted as epitopes
+- Residues such as D, N, H, G, N, P, K in TEST_PEP1 were flagged as epitopes
 
-### 测试 2：融合肽场景
+### Test 2: Fusion Peptide Scenario
 
-**输入**：
+**Input**:
 ```fasta
 >FUSION_1
 MKFLILLFNILCLFPVLAADNHGNPKTHPNPRGGGGSEAAAKGILGFVFTLTVPSERGL
 ```
 
-**结果**：
-- Linker 区域（GGGGSEAAAK）部分被预测为非表位（小写）
-- 融合区域边界有部分被预测为表位
+**Results**:
+- Part of the linker region (GGGGSEAAAK) is predicted as non-epitope (lowercase)
+- Part of the fusion region boundary is predicted as epitope
 
-**观察**：
-- Linker (GGGGS, EAAAK) 通常被正确预测为非表位
-- 功能模块边界区域可能产生新的表位信号
+**Observations**:
+- Linkers (GGGGS, EAAAK) are usually correctly predicted as non-epitope
+- Functional module boundary regions may generate new epitope signals
 
-### 测试 3：短肽限制
+### Test 3: Short Peptide Limitations
 
-| 序列 | 长度 | 最高分数 | 阈值 | 预测为表位 |
+| Sequence | Length | Max score | Threshold | Predicted as epitope |
 |------|------|----------|------|------------|
-| GGGGS | 5 aa | 0.24 | 0.1512 | 否 |
-| DYKDDDDK | 8 aa | ~0.15 | 0.1512 | 可疑 |
-| X | 1 aa | 0.15 | 0.1512 | 否 |
+| GGGGS | 5 aa | 0.24 | 0.1512 | No |
+| DYKDDDDK | 8 aa | ~0.15 | 0.1512 | Suspect |
+| X | 1 aa | 0.15 | 0.1512 | No |
 
-**结论**：短肽（<10 aa）的预测结果应谨慎解读。
+**Conclusion**: predictions for short peptides (<10 aa) should be interpreted with caution.
 
-## 批量处理性能
+## Batch Processing Performance
 
-### 20 条序列测试
-
-```
-序列数量: 20
-平均长度: 25-45 aa
-处理时间: ~7 秒（ESM 编码已缓存）
-```
-
-### 100 条序列测试
+### 20-Sequence Test
 
 ```
-序列数量: 100
-平均长度: 15-55 aa
-处理时间: ~14 秒（冷启动，含 ESM 编码）
+Number of sequences: 20
+Average length: 25-45 aa
+Processing time: ~7 seconds (ESM encoding already cached)
 ```
 
-**性能结论**：
-- 批量处理 100 条序列在 15 秒内完成
-- ESM 编码可缓存，后续运行更快
-- 内存占用：处理 100 条时约 2-3GB
+### 100-Sequence Test
 
-## Python API 测试
+```
+Number of sequences: 100
+Average length: 15-55 aa
+Processing time: ~14 seconds (cold start, including ESM encoding)
+```
+
+**Performance conclusions**:
+- Batch processing of 100 sequences completes within 15 seconds
+- ESM encoding can be cached, making subsequent runs faster
+- Memory usage: about 2-3GB when processing 100 sequences
+
+## Python API Test
 
 ```python
 from bp3 import bepipred3
@@ -111,33 +113,33 @@ predictor.run_bp3_ensemble()
 predictor.create_csvfile(out_dir)
 ```
 
-✅ API 调用成功
+✅ API call succeeded
 
-## 输出格式详解
+## Output Format Details
 
-### raw_output.csv 字段
+### raw_output.csv Fields
 
-| 字段 | 说明 |
+| Field | Description |
 |------|------|
-| Accession | 序列标识符 |
-| Residue | 氨基酸残基（单字母） |
-| BepiPred-3.0 score | 原始表位预测分数（0-1） |
-| BepiPred-3.0 linear epitope score | 线性表位平滑分数 |
+| Accession | Sequence identifier |
+| Residue | Amino acid residue (one letter) |
+| BepiPred-3.0 score | Raw epitope prediction score (0-1) |
+| BepiPred-3.0 linear epitope score | Smoothed linear epitope score |
 
-### 阈值说明
+### Threshold Notes
 
-- **默认阈值**：0.1512（论文推荐）
-- **分数 > 阈值**：预测为表位残基
-- **分数 < 阈值**：预测为非表位残基
+- **Default threshold**: 0.1512 (recommended in the paper)
+- **Score > threshold**: predicted as an epitope residue
+- **Score < threshold**: predicted as a non-epitope residue
 
-## 与 BepiPred-2.0 的对比
+## Comparison with BepiPred-2.0
 
-| 特性 | BepiPred-2.0 | BepiPred-3.0 |
+| Feature | BepiPred-2.0 | BepiPred-3.0 |
 |------|--------------|--------------|
-| 基础模型 | 经验模型 | ESM-2 语言模型 |
-| 安装 | 需下载 IEDB 工具 | GitHub 克隆即可 |
-| 依赖 | Linux 64位 | Python 环境 |
-| 批量处理 | 需通过 Web | CLI/Python API |
-| 部署难度 | 较高 | 较低 |
+| Underlying model | Empirical model | ESM-2 language model |
+| Installation | Requires downloading the IEDB tool | Just clone from GitHub |
+| Dependencies | Linux 64-bit | Python environment |
+| Batch processing | Must go through the web | CLI/Python API |
+| Deployment difficulty | Higher | Lower |
 
-**推荐**：使用 BepiPred-3.0，本地集成更方便。
+**Recommendation**: use BepiPred-3.0; local integration is more convenient.

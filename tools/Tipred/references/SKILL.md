@@ -1,41 +1,43 @@
 ---
 name: tipred
-description: 当需要预测酪氨酸酶抑制肽(TIP)活性、进行抗黑色素生成肽筛选、或在融合引擎中进行TIP活性评分时触发此技能。
+description: Trigger this skill when you need to predict tyrosinase inhibitory peptide (TIP) activity, screen anti-melanogenic peptides, or score TIP activity in a fusion engine.
 created: 2026-04-18
 version: 2.0.0
 last_updated: 2026-04-21
 ---
 
-# TIPred - 酪氨酸酶抑制肽预测
+> **English** | [中文](SKILL.zh.md)
+
+# TIPred - Tyrosinase Inhibitory Peptide Prediction
 
 ## What It Is
 
-预测**酪氨酸酶抑制肽（Tyrosinase Inhibitory Peptides, TIPs）**活性的计算工具，加速美白/抗黑色素生成肽的筛选。
+A computational tool for predicting the activity of **tyrosinase inhibitory peptides (TIPs)**, accelerating the screening of whitening/anti-melanogenic peptides.
 
-### 融合引擎定位
+### Fusion Engine Role
 
-| 层级 | 作用 |
+| Layer | Role |
 |------|------|
-| 特征化层 | 提供 547 维多视图特征表示 |
-| 预测层 | TIP 活性概率评分（0-1） |
-| 粗筛层 | 全排列前剔除无 TIP 活性组合 |
+| Feature layer | Provides a 547-dimensional multi-view feature representation |
+| Prediction layer | TIP activity probability score (0-1) |
+| Coarse screening layer | Removes combinations without TIP activity before full enumeration |
 
 ## When to Use
 
-- 筛选抗黑色素生成肽候选序列
-- 对融合肽进行 TIP 活性评分
-- 作为六功效模型的特征输入之一
-- 美白功效肽的预测与排名
+- Screening candidate anti-melanogenic peptide sequences
+- Scoring the TIP activity of fusion peptides
+- Serving as one of the feature inputs for the six-efficacy model
+- Prediction and ranking of whitening-efficacy peptides
 
 ## Methodology
 
 ```
-肽序列 → 7种特征编码 → 547维特征向量 → Stacked Ensemble → TIP概率(0-1)
+Peptide sequence → 7 feature encodings → 547-dimensional feature vector → Stacked Ensemble → TIP probability (0-1)
 ```
 
-### 特征编码器（7种，547维）
+### Feature Encoders (7 kinds, 547 dimensions)
 
-| 编码器 | 全称 | 维度 |
+| Encoder | Full name | Dimensions |
 |--------|------|------|
 | AAC | Amino Acid Composition | 20 |
 | DPC | Dipeptide Composition | 400 |
@@ -49,11 +51,11 @@ last_updated: 2026-04-21
 
 - **Base Models (Level 0)**: KNN, RF, SVM (RBF), GB
 - **Meta Model (Level 1)**: Logistic Regression
-- **训练策略**: 5 折交叉验证生成 base predictions，避免数据泄露
+- **Training strategy**: 5-fold cross-validation to generate base predictions, avoiding data leakage
 
 ## Operations
 
-### 环境
+### Environment
 
 ```bash
 cd Tipred/
@@ -72,20 +74,20 @@ probs = predictor.predict(['YGGFL', 'GHK'])
 # → [0.905, 0.060]
 ```
 
-### 命令行
+### Command Line
 
 ```bash
-# 训练
+# Training
 python scripts/tipredictor_full.py --train --input sequences.fasta --labels labels.csv --save-model mvff_model.pkl --type stacked
 
-# 预测
+# Prediction
 python scripts/tipredictor_full.py --model mvff_model.pkl --input queries.fasta --output results.csv
 ```
 
 ## Inputs and Outputs
 
-- **输入**: FASTA / CSV（含 sequence 列）/ Python List
-- **输出**: TIP 概率（0-1）、预测分类（TIP/non-TIP，阈值 0.5）
+- **Input**: FASTA / CSV (with a sequence column) / Python List
+- **Output**: TIP probability (0-1), predicted class (TIP/non-TIP, threshold 0.5)
 
 ```csv
 ID,Sequence,TIP_Probability,Prediction
@@ -95,7 +97,7 @@ ID,Sequence,TIP_Probability,Prediction
 
 ## Examples
 
-### 快速训练与预测
+### Quick Training and Prediction
 
 ```python
 from scripts.tipredictor_full import TIPredictorMVFF
@@ -109,7 +111,7 @@ probs = predictor.predict(['YGGFL', 'RRRRR'])
 print(f'YGGFL: {probs[0]:.3f}, RRRRR: {probs[1]:.3f}')
 ```
 
-### 批量筛选
+### Batch Screening
 
 ```python
 import pandas as pd
@@ -119,15 +121,15 @@ predictor = TIPredictorMVFF.load('mvff_model.pkl')
 df = pd.read_csv('candidates.csv')
 df['TIP_Prob'] = predictor.predict(df['Sequence'].tolist())
 tip_candidates = df[df['TIP_Prob'] >= 0.5]
-print(f'从 {len(df)} 条中筛选出 {len(tip_candidates)} 条 TIP 候选')
+print(f'Screened {len(tip_candidates)} TIP candidates out of {len(df)} sequences')
 ```
 
 ## References Index
 
 | File | Contents |
 |------|----------|
-| `references/TIP-redesign.md` | 详细特征编码说明、模型对比、限制说明 |
-| `references/tipredictor.py` | 旧版简单实现（10维特征） |
-| `references/test_peptides.csv` | 测试数据 |
-| `references/test_peptides.fasta` | 测试数据（FASTA 格式） |
-| `scripts/train_example.py` | 训练示例脚本 |
+| `references/TIP-redesign.md` | Detailed feature encoding description, model comparison, limitations |
+| `references/tipredictor.py` | Older simple implementation (10-dimensional features) |
+| `references/test_peptides.csv` | Test data |
+| `references/test_peptides.fasta` | Test data (FASTA format) |
+| `scripts/train_example.py` | Example training script |

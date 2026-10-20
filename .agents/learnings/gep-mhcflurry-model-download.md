@@ -1,57 +1,59 @@
 ---
-title: MHCflurry 模型下载失败处理
+title: MHCflurry Model Download Failure Handling
 type: gep
 created: 2026-05-17
 status: verified
 ---
 
-## 问题
+> **English** | [中文](gep-mhcflurry-model-download.zh.md)
 
-MHCflurry 在 Docker build 时模型下载失败，运行时 `Class1AffinityPredictor.load()` 报错：
+## Problem
+
+MHCflurry's model download fails during the Docker build, and at runtime `Class1AffinityPredictor.load()` reports an error:
 ```
 RuntimeError: Missing MHCflurry downloadable file: /app/tools/MHCflurry/models/models_class1_pan/models.combined
 ```
 
-## 原因
+## Cause
 
-1. **Dockerfile 缺少 `--release` 参数**：设置了 `MHCFLURRY_DOWNLOADS_DIR` 自定义路径后，`mhcflurry-downloads fetch` 必须加 `--release 2.2.0`，否则报 "No release defined"
-2. **`|| exit 0` 吞掉错误**：Dockerfile 用 `|| exit 0` 让 build 不报错，但模型实际上没下载
-3. **GitHub 在国内不可达**：模型 URL `https://github.com/openvax/mhcflurry/releases/download/pre-2.0/models_class1_pan.selected.20200610.tar.bz2` 在国内直接连接超时
+1. **The Dockerfile is missing the `--release` parameter**: after setting a custom path via `MHCFLURRY_DOWNLOADS_DIR`, `mhcflurry-downloads fetch` must include `--release 2.2.0`, otherwise it reports "No release defined"
+2. **`|| exit 0` swallows the error**: the Dockerfile uses `|| exit 0` so the build reports no error, but the model is not actually downloaded
+3. **GitHub is unreachable from China**: the model URL `https://github.com/openvax/mhcflurry/releases/download/pre-2.0/models_class1_pan.selected.20200610.tar.bz2` times out on a direct connection from China
 
-## 修复方法
+## Fix Methods
 
-### 方法 1：通过 ghproxy 下载（推荐，国内网络适用）
+### Method 1: download via ghproxy (recommended, suitable for China networks)
 
 ```bash
-# 从 ghproxy 镜像下载模型 (156MB)
+# Download the model from the ghproxy mirror (156MB)
 curl -L -o /tmp/mhcflurry_models.tar.bz2 \
   "https://ghproxy.net/https://github.com/openvax/mhcflurry/releases/download/pre-2.0/models_class1_pan.selected.20200610.tar.bz2"
 
-# 解压
+# Extract
 mkdir -p /tmp/mhcflurry_models
 cd /tmp/mhcflurry_models
 tar xjf /tmp/mhcflurry_models.tar.bz2
 
-# 容器内目录结构
+# Directory structure inside the container
 # /app/tools/MHCflurry/models/models_class1_pan/
-#   ├── models.combined/       ← 权重文件在此目录
+#   ├── models.combined/       ← the weight files are in this directory
 #   ├── additional_alleles.txt
 #   └── ...
 
-# 复制到容器
+# Copy into the container
 docker cp /tmp/mhcflurry_models/. mhcflurry:/app/tools/MHCflurry/models/models_class1_pan/
 ```
 
-### 方法 2：Dockerfile 用 COPY
+### Method 2: use COPY in the Dockerfile
 
 ```dockerfile
-# 替代 RUN mhcflurry-downloads fetch，因为网络限制
+# Replaces RUN mhcflurry-downloads fetch because of network restrictions
 COPY models/ /app/tools/MHCflurry/models/
 ```
 
-注意本地需要有完整的 `models/` 目录结构。
+Note that a complete local `models/` directory structure is required.
 
-### 方法 3：在线下载（有 GitHub 访问时）
+### Method 3: online download (when GitHub is accessible)
 
 ```dockerfile
 RUN mkdir -p /app/tools/MHCflurry/models && \
@@ -59,22 +61,22 @@ RUN mkdir -p /app/tools/MHCflurry/models && \
     mhcflurry-downloads fetch models_class1_pan --release 2.2.0
 ```
 
-## 验证
+## Verification
 
 ```bash
-# 检查健康状态
+# Check the health status
 curl http://127.0.0.1:8005/health
-# 应返回: model_loaded=true, alleles=14883
+# Should return: model_loaded=true, alleles=14883
 
-# 测试预测
+# Test prediction
 curl -X POST http://127.0.0.1:8005/predict/batch \
   -H "Content-Type: application/json" \
   -d '{"sequences": [{"sequence": "ACGTKLMN", "peptide_id": "test001"}]}'
 ```
 
-## 参考
+## References
 
-- MHCflurry 版本: 2.2.1
-- 模型文件: `models_class1_pan.selected.20200610.tar.bz2` (156MB)
-- 模型路径: `/app/tools/MHCflurry/models/models_class1_pan/models.combined/`
-- 等位基因数: 14,883
+- MHCflurry version: 2.2.1
+- Model file: `models_class1_pan.selected.20200610.tar.bz2` (156MB)
+- Model path: `/app/tools/MHCflurry/models/models_class1_pan/models.combined/`
+- Number of alleles: 14,883

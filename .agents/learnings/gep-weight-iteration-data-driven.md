@@ -1,5 +1,5 @@
 ---
-name: 权重迭代与数据驱动决策 — construct_composite 集中度失效发现 v1.0
+name: Weight Iteration and Data-Driven Decisions — Discovering That construct_composite Had Lost Its Discriminative Power v1.0
 author: Claude Code
 created: 2026-05-18
 version: 1.0.0
@@ -7,95 +7,97 @@ tags: [weighting, data-driven, eda, composite-score, distribution-analysis, deci
 validated: true
 ---
 
-# Gene Capsule: 权重迭代与数据驱动决策 — construct_composite 集中度失效发现
+> **English** | [中文](gep-weight-iteration-data-driven.zh.md)
+
+# Gene Capsule: Weight Iteration and Data-Driven Decisions — Discovering That construct_composite Had Lost Its Discriminative Power
 
 ## Experience
 
-**问题描述**: 初始 Round 6 评分公式给 construct_composite 分配了 0.50 权重，期望它在最终排名中反映肽功能+SoDoPE+TemStaPro 的综合质量。但在 Top 90 construct 中，construct_composite 的分布高度集中 —— P25=0.5225, P75=0.5336，中间 50% 的 spread 仅 **0.011**。
+**Problem description**: The initial Round 6 scoring formula assigned a 0.50 weight to construct_composite, expecting it to reflect the combined quality of peptide function + SoDoPE + TemStaPro in the final ranking. But among the Top 90 constructs, the construct_composite distribution was highly concentrated — P25=0.5225, P75=0.5336, and the spread of the middle 50% was only **0.011**.
 
-**症状**:
-- construct_composite 加权重后几乎完全决定了排名（因为 SASA/A3D 的 spread 大但权重低）
-- SASA 和 Aggrescan3D 的实际区分力被稀释到无意义
-- 问题在运行 Round 6 前无法发现——数据分布特征需要实际跑完前序步骤才能获得
+**Symptoms**:
+- After weighting, construct_composite almost completely determined the ranking (because SASA/A3D have large spread but low weight)
+- The actual discriminative power of SASA and Aggrescan3D was diluted into meaninglessness
+- The problem could not be found before running Round 6 — the data distribution characteristics can only be obtained by actually finishing the preceding steps
 
-**根因**: 经过 Round 1-5 的多轮筛选（1M → 150），候选肽的质量趋于同质化。这是"筛选漏斗"的必然结果——顶部候选在前期各维度都高分，进入最终轮时差异极小。
+**Root cause**: After multiple rounds of screening in Rounds 1-5 (1M → 150), the quality of candidate peptides tends toward homogeneity. This is the inevitable outcome of the "screening funnel" — top candidates score high in every dimension in earlier rounds, so by the final round the differences are tiny.
 
 ```
-筛选过程本身就是方差缩减过程：
-  1M 肽 → 各维度方差大 → 多轮加权筛选 → 只剩高分肽
-  → 高分肽在各维度上都高分 → 综合分差异极小（σ ≈ 0.011）
-  → 综合分失去区分能力
+The screening process is itself a variance-reduction process:
+  1M peptides → large variance in each dimension → multiple rounds of weighted screening → only high-scoring peptides remain
+  → high-scoring peptides score high in every dimension → tiny differences in the composite score (σ ≈ 0.011)
+  → the composite score loses its discriminative ability
 ```
 
-### 解决方案
+### Solution
 
-**数据驱动决策流程**：
+**Data-driven decision workflow**:
 
-1. **先跑数据，再看分布，后定权重**
+1. **Run the data first, look at the distribution next, decide the weights last**
 
 ```python
-# 步骤 1：先跑一轮（含 construct_composite）
+# Step 1: run one round first (including construct_composite)
 constructs = load_constructs()
 scores = [c["construct_composite"] for c in constructs]
 
-# 步骤 2：分析分布
+# Step 2: analyze the distribution
 import numpy as np
 vals = sorted(scores)
 p25, p75 = np.percentile(vals, [25, 75])
 spread = p75 - p25
-# Top 90: spread = 0.011 → 无区分能力
+# Top 90: spread = 0.011 → no discriminative power
 
-# 步骤 3：决策
-if spread < 0.05:  # 高度集中
-    W_CONSTRUCT = 0.0   # 忽略
-    W_SASA = 0.40       # 提升 SASA 权重
-    W_AGG = 0.40        # 提升 Aggrescan3D 权重
-    W_pLDDT = 0.20      # 保留结构置信度
+# Step 3: decide
+if spread < 0.05:  # highly concentrated
+    W_CONSTRUCT = 0.0   # ignore
+    W_SASA = 0.40       # increase the SASA weight
+    W_AGG = 0.40        # increase the Aggrescan3D weight
+    W_pLDDT = 0.20      # retain structure confidence
 else:
-    W_CONSTRUCT = 0.50  # 保留原权重
+    W_CONSTRUCT = 0.50  # keep the original weight
 ```
 
-2. **用 EDA 替换假设**
+2. **Replace assumptions with EDA**
 
-| 假设 | 数据验证 | 结论 |
+| Assumption | Data validation | Conclusion |
 |------|---------|------|
-| "construct_composite 应该能拉开差距" | P25-P75 spread=0.011 | ❌ 高度集中 |
-| "SASA spread 不够大" | min=0.501, max=0.831 | ✅ spread=0.33 |
-| "Aggrescan3D 有区分力" | 0.289–0.398 | ✅ spread=0.11 |
-| "pLDDT 太差不可用" | 0.3666–0.4547 | ⚠️ 中等，可作质量控制 |
+| "construct_composite should be able to separate candidates" | P25-P75 spread=0.011 | ❌ highly concentrated |
+| "SASA spread is not large enough" | min=0.501, max=0.831 | ✅ spread=0.33 |
+| "Aggrescan3D has discriminative power" | 0.289–0.398 | ✅ spread=0.11 |
+| "pLDDT is too poor to be usable" | 0.3666–0.4547 | ⚠️ moderate, usable for quality control |
 
-3. **最终 Round 6 公式**（移除 construct_composite 后）：
+3. **Final Round 6 formula** (after removing construct_composite):
 
 ```
 round6 = 0.40 × SASA + 0.40 × (1 - aggrisk) + 0.20 × pLDDT_norm
 ```
 
-### 关键洞察
+### Key Insight
 
-**不要预设权重，让数据说话。** 尤其是在多轮筛选流水线的后期阶段，早期有效的权重在后期可能完全失效。每一轮的权重应基于该轮输入数据的实际分布重新评估。
+**Do not preset weights; let the data speak.** This is especially true in the later stages of a multi-round screening pipeline: weights that worked early may fail completely later on. The weights of each round should be re-evaluated based on the actual distribution of that round's input data.
 
-### 通用诊断方法
+### General Diagnosis Method
 
-| 步骤 | 操作 | 判断标准 |
+| Step | Operation | Criterion |
 |------|------|---------|
-| 1. 计算 P25/P75 | `np.percentile(vals, [25, 75])` | spread < 0.05 → 高度集中 |
-| 2. 计算 CV | `std/mean` | CV < 0.05 → 高度集中 |
-| 3. 可视化 | histogram/distplot | 单峰窄分布 → 无区分力 |
-| 4. 比较各维度 spread | 所有评分维度的 spread 排名 | 选 spread 最大的 2-3 个维度做主权重 |
+| 1. Compute P25/P75 | `np.percentile(vals, [25, 75])` | spread < 0.05 → highly concentrated |
+| 2. Compute CV | `std/mean` | CV < 0.05 → highly concentrated |
+| 3. Visualize | histogram/distplot | single narrow peak → no discriminative power |
+| 4. Compare the spread of each dimension | spread ranking of all scoring dimensions | pick the 2-3 dimensions with the largest spread as the main weights |
 
 ### Environment Fingerprint
 
-- **任务域**: 多维度加权评分流水线
-- **输入特征**: 经过多轮筛选的候选集（方差递减）
-- **约束条件**: 最终排名需要最大区分度；各评分维度量纲不同
-- **触发模式**: 筛选流水线的后期轮次（funnel 末端），数据已经高度同质化
-- **不适用**: 初始筛选轮次（方差大，预设权重合理）；单维度评分场景；分类（而非排序）任务
+- **Task domain**: Multi-dimensional weighted scoring pipeline
+- **Input characteristics**: Candidate sets that have gone through multiple rounds of screening (decreasing variance)
+- **Constraints**: The final ranking needs maximum discrimination; the scoring dimensions have different scales
+- **Trigger pattern**: Late rounds of a screening pipeline (end of the funnel), where the data is already highly homogeneous
+- **Not applicable**: Initial screening rounds (large variance, preset weights are reasonable); single-dimension scoring scenarios; classification (rather than ranking) tasks
 
 ### Audit Record
 
-- **验证方式**: Top 90 construct_composite 分布实际计算 + 移除权重后 SASA/A3D 起作用的排名对比
-- **测试用例**:
-  1. 原权重（construct=0.50）: Top 10 与 construct_composite 排序几乎一致 → SASA/A3D 无效
-  2. 新权重（construct=0.00）: Top 10 与 SASA 排序一致 → SASA/A3D 真正决定排名
-- **成功率**: 100%（数据验证了决策的正确性）
-- **局限性**: 如果 SASA 和 Aggrescan3D 本身也无区分力（所有候选在 3D 层面相似），则需要回到肽序列层面寻找新维度。当前 Top 90 的 SASA spread 0.33 足够大。
+- **Validation method**: Actual computation of the Top 90 construct_composite distribution + comparison of rankings with the weight removed, where SASA/A3D take effect
+- **Test cases**:
+  1. Original weights (construct=0.50): Top 10 almost identical to the construct_composite ranking → SASA/A3D ineffective
+  2. New weights (construct=0.00): Top 10 consistent with the SASA ranking → SASA/A3D genuinely determine the ranking
+- **Success rate**: 100% (the data confirmed the decision was correct)
+- **Limitations**: If SASA and Aggrescan3D themselves also lack discriminative power (all candidates are similar at the 3D level), new dimensions must be sought back at the peptide sequence level. The current SASA spread of the Top 90, 0.33, is large enough.

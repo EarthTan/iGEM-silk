@@ -1,63 +1,65 @@
-# AlgPred2 实测结果与场景分析
+> **English** | [中文](test_results.zh.md)
 
-## 测试环境
+# AlgPred2 Measured Results and Scenario Analysis
 
-- **平台**: macOS (Darwin)
+## Test Environment
+
+- **Platform**: macOS (Darwin)
 - **Python**: 3.11.14
-- **uv**: 已配置
-- **验证日期**: 2026-04-24
+- **uv**: configured
+- **Validation date**: 2026-04-24
 
-## 功能验证结果
+## Functional Validation Results
 
-### 1. Python 导入测试
+### 1. Python Import Test
 
 ```bash
 uv run python -c "import algpred2; print(dir(algpred2))"
 ```
 
-**结果**: ✅ 成功
+**Result**: ✅ Success
 
-**输出**:
+**Output**:
 ```
 ['__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__']
 ```
 
-**结论**: 顶层命名空间几乎为空，确认不适合作为 Python API 直接调用。
+**Conclusion**: the top-level namespace is almost empty, confirming that it is not suitable for direct use as a Python API.
 
-### 2. 子模块检查
+### 2. Submodule Check
 
 ```bash
 uv run python scripts/inspect_submodules.py
 ```
 
-**结果**: ✅ 成功
+**Result**: ✅ Success
 
-**发现**:
-- `python_scripts` 子模块存在
-- console script 入口: `algpred2 -> algpred2.python_scripts.algpred2:main`
+**Findings**:
+- The `python_scripts` submodule exists
+- console script entry point: `algpred2 -> algpred2.python_scripts.algpred2:main`
 
-### 3. 依赖版本验证
+### 3. Dependency Version Validation
 
 ```bash
 uv run python -c "import joblib, sklearn, numpy; print(f'joblib: {joblib.__version__}, sklearn: {sklearn.__version__}, numpy: {numpy.__version__}')"
 ```
 
-**结果**: ✅ 成功
+**Result**: ✅ Success
 
-**版本**:
+**Versions**:
 - joblib: 1.5.3
 - scikit-learn: 1.2.2
 - numpy: 1.26.4
 
-### 4. 文本输入预测
+### 4. Text Input Prediction
 
-**输入** (`test_input/test_lines.txt`):
+**Input** (`test_input/test_lines.txt`):
 ```
 ACDEFGHI
 KKLLKLLKL
 ```
 
-**命令**:
+**Command**:
 ```python
 from algpred2.python_scripts.algpred2 import main
 import sys
@@ -65,20 +67,20 @@ sys.argv = ['algpred2', '-i', './test_input/test_lines.txt', '-o', './outputs/te
 main()
 ```
 
-**结果**: ✅ 成功
+**Result**: ✅ Success
 
-**输出 CSV**:
+**Output CSV**:
 ```csv
 ID,Sequence,ML_Score,Prediction
 Seq_1,ACDEFGHI,0.458,Allergen
 Seq_2,KKLLKLLKL,0.367,Allergen
 ```
 
-### 5. FASTA 输入预测
+### 5. FASTA Input Prediction
 
-**输入**: 100 条序列的 FASTA 文件
+**Input**: a FASTA file with 100 sequences
 
-**命令**:
+**Command**:
 ```python
 from algpred2.python_scripts.algpred2 import main
 import sys
@@ -86,45 +88,45 @@ sys.argv = ['algpred2', '-i', './test_input/test_peptides.fasta', '-o', './outpu
 main()
 ```
 
-**结果**: ✅ 成功处理 100 条序列
+**Result**: ✅ Successfully processed 100 sequences
 
-## 批量能力评估
+## Batch Capability Assessment
 
-| 规模 | 结果 | 备注 |
+| Scale | Result | Notes |
 | --- | --- | --- |
-| 2 条 | ✅ 成功 | 文本输入测试 |
-| 100 条 | ✅ 成功 | FASTA 文件测试 |
+| 2 sequences | ✅ Success | Text input test |
+| 100 sequences | ✅ Success | FASTA file test |
 
-**结论**: 支持小到中等规模批量预测。
+**Conclusion**: supports small- to medium-scale batch prediction.
 
-## 已知问题
+## Known Issues
 
-### Shebang 路径错误
+### Shebang Path Error
 
-`.venv/bin/algpred2` 文件内容：
+Contents of the `.venv/bin/algpred2` file:
 
 ```bash
 #!/Users/concerto391/Documents/GitHub/iGEM-Tools/from.Lehan/algpred2-risk-prediction/.venv/bin/python
 ```
 
-**问题**: 路径中使用了 `from.Lehan`（句点），实际应为 `from-Lehan`（连字符）
+**Problem**: the path uses `from.Lehan` (dot) where it should actually be `from-Lehan` (hyphen)
 
-**影响**: 直接运行 `algpred2` 命令会报 "bad interpreter" 错误
+**Impact**: running the `algpred2` command directly reports a "bad interpreter" error
 
-**规避方案**:
-1. 使用 `uv run algpred2 ...`
-2. 使用 Python import 方式调用
+**Workarounds**:
+1. Use `uv run algpred2 ...`
+2. Call it through Python import
 
-## 场景适用性分析
+## Scenario Suitability Analysis
 
-### ✅ 适合的场景
+### ✅ Suitable Scenarios
 
-1. **过敏原性风险粗筛**: 对候选肽序列进行初步风险评估
-2. **惩罚项来源**: `Prediction = Allergen` 或高 `ML_Score` 作为融合引擎惩罚信号
-3. **批量文件处理**: 需要处理多条序列的离线分析
+1. **Allergenicity risk coarse screening**: preliminary risk assessment of candidate peptide sequences
+2. **Penalty term source**: `Prediction = Allergen` or a high `ML_Score` as a fusion engine penalty signal
+3. **Batch file processing**: offline analysis that needs to process multiple sequences
 
-### ⚠️ 需注意的场景
+### ⚠️ Scenarios to Watch
 
-1. **短肽 (< 10 aa)**: 可能不是最优选择
-2. **融合肽**: 建议对各组分分别评估
-3. **修饰肽**: 未针对化学修饰肽优化
+1. **Short peptides (< 10 aa)**: may not be the optimal choice
+2. **Fusion peptides**: recommended to evaluate each component separately
+3. **Modified peptides**: not optimized for chemically modified peptides

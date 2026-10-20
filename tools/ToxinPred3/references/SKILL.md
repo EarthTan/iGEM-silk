@@ -1,51 +1,53 @@
 ---
 name: toxinpred3
-description: 当需要预测肽序列毒性、提取 AAC/DPC 特征用于机器学习模型、或在融合引擎中过滤有毒肽候选时触发此技能。
+description: Trigger this skill when you need to predict peptide sequence toxicity, extract AAC/DPC features for machine learning models, or filter toxic peptide candidates in a fusion engine.
 created: 2026-04-11
 version: 1.1
 last_updated: 2026-04-25
 ---
 
-# ToxinPred 3.0 技能包
+> **English** | [中文](SKILL.zh.md)
 
-> 原仓库: https://github.com/raghavagps/toxinpred3
-> 论文: Rathore AS, et al. (2024) "ToxinPred3.0: An improved method for the prediction of toxicity of peptides." *Computers in Biology and Medicine*.
+# ToxinPred 3.0 Skill Package
 
-## 工具定位
+> Original repository: https://github.com/raghavagps/toxinpred3
+> Paper: Rathore AS, et al. (2024) "ToxinPred3.0: An improved method for the prediction of toxicity of peptides." *Computers in Biology and Medicine*.
 
-**ToxinPred 3.0** 是由印度 IIITD Prof. G. P. S. Raghava 团队开发的肽毒性预测工具，在融合引擎中承担**粗筛过滤**角色，用于在全排列组合之前剔除明显有毒的肽段。
+## Tool Positioning
 
-### 在融合引擎中的定位
+**ToxinPred 3.0** is a peptide toxicity prediction tool developed by Prof. G. P. S. Raghava's team at IIITD, India. In the fusion engine it plays the role of **coarse screening filter**, removing clearly toxic peptide segments before full permutation.
 
-| 应用场景 | 具体作用 |
+### Role in the Fusion Engine
+
+| Application scenario | Specific role |
 |---------|---------|
-| 粗筛过滤 | 剔除有毒肽候选 |
-| 特征输入 | AAC/DPC 特征作为六功效模型输入 |
-| 安全性评估 | 评估融合肽各组分潜在毒性风险 |
-| 参考对照 | 与其他毒性预测工具交叉验证 |
+| Coarse screening filter | Remove toxic peptide candidates |
+| Feature input | AAC/DPC features as input to the six-efficacy model |
+| Safety assessment | Assess the potential toxicity risk of each component of the fusion peptide |
+| Reference control | Cross-validate against other toxicity prediction tools |
 
-### 技术原理
+### Technical Principle
 
 ```
-毒性预测 = ML 分数 (Extra Trees + AAC/DPC)
-- ML 模型：基于 Extra Trees 分类器
-- 特征：AAC(20维) + DPC(400维) = 420维
-- 服务使用 Model 1 (纯 ML)，不依赖 MERCI/Perl 杂交路径
+Toxicity prediction = ML score (Extra Trees + AAC/DPC)
+- ML model: based on an Extra Trees classifier
+- Features: AAC (20 dimensions) + DPC (400 dimensions) = 420 dimensions
+- The service uses Model 1 (pure ML) and does not depend on the MERCI/Perl hybrid path
 ```
 
-> **Model 1 vs Model 2**: 官方提供两种模式 — Model 1 (AAC+DPC) 和 Model 2 (Hybrid+MERCI motif)。
-> 实际测试发现 Model 2 在已知毒素上产生假阴性（MERCI 负向 motif 过度惩罚），服务选择 Model 1。
+> **Model 1 vs Model 2**: The official release provides two modes — Model 1 (AAC+DPC) and Model 2 (Hybrid+MERCI motif).
+> Actual testing found that Model 2 produces false negatives on known toxins (the MERCI negative motif over-penalizes), so the service chooses Model 1.
 
 ---
 
-## 安装与配置
+## Installation and Configuration
 
-### 环境要求
+### Environment Requirements
 
-- Python 3.11 - 3.11 (需要 scikit-learn 1.2.2 兼容)
-- 依赖：numpy<2, pandas, scikit-learn==1.2.2, joblib
+- Python 3.11 - 3.11 (requires scikit-learn 1.2.2 compatibility)
+- Dependencies: numpy<2, pandas, scikit-learn==1.2.2, joblib
 
-### 标准化安装流程
+### Standardized Installation Procedure
 
 ```bash
 cd ToxinPred3
@@ -56,7 +58,7 @@ uv pip install "numpy<2" pandas scikit-learn==1.2.2 joblib
 uv pip install toxinpred3
 ```
 
-### 快速验证
+### Quick Verification
 
 ```python
 from toxinpred_features import predict_toxicity
@@ -68,76 +70,76 @@ print(results)
 
 ---
 
-## 核心功能
+## Core Functions
 
-### 1. AAC 氨基酸组成 (20维)
+### 1. AAC Amino Acid Composition (20 dimensions)
 
 ```python
 from toxinpred_features import aac_composition
 
 sequences = ["KWKLFKKIGAVLKVL"]
 aac = aac_composition(sequences)
-# 输出: DataFrame, 20列, AAC_A, AAC_C, ... AAC_Y
+# Output: DataFrame, 20 columns, AAC_A, AAC_C, ... AAC_Y
 ```
 
-**生物学意义：**
-- 阳离子氨基酸(K,R)高 → 可能抗菌
-- 疏水氨基酸(A,V,I,L)高 → 影响膜穿透
-- 芳香族氨基酸(W,Y,F) → 可能影响受体结合
+**Biological significance:**
+- High cationic amino acids (K,R) → possibly antibacterial
+- High hydrophobic amino acids (A,V,I,L) → affects membrane penetration
+- Aromatic amino acids (W,Y,F) → may affect receptor binding
 
-### 2. DPC 二肽组成 (400维)
+### 2. DPC Dipeptide Composition (400 dimensions)
 
 ```python
 from toxinpred_features import dpc_composition
 
 sequences = ["KWKLFKKIGAVLKVL"]
 dpc = dpc_composition(sequences)
-# 输出: DataFrame, 400列, DPC_AA, DPC_AC, ... DPC_WY
+# Output: DataFrame, 400 columns, DPC_AA, DPC_AC, ... DPC_WY
 ```
 
-**生物学意义：**
-- 反映局部结构偏好
-- 某些二肽 motif 是毒素特征标记
-- 捕捉氨基酸间相互作用
+**Biological significance:**
+- Reflects local structural preferences
+- Certain dipeptide motifs are characteristic markers of toxins
+- Captures interactions between amino acids
 
-### 3. 完整特征提取 (420维)
+### 3. Complete Feature Extraction (420 dimensions)
 
 ```python
 from toxinpred_features import extract_features
 
 sequences = ["KWKLFKKIGAVLKVL"]
 features = extract_features(sequences)
-# 输出: DataFrame, 420列 (AAC + DPC)
+# Output: DataFrame, 420 columns (AAC + DPC)
 ```
 
-### 4. 毒性预测
+### 4. Toxicity Prediction
 
 ```python
 from toxinpred_features import predict_toxicity
 
 sequences = ["KWKLFKKIGAVLKVL", "MKPPLNAKLVLKPMWIG"]
 results = predict_toxicity(sequences, threshold=0.38, model=2)
-# 输出: Name, Sequence, Length, Score, Prediction
+# Output: Name, Sequence, Length, Score, Prediction
 ```
 
-**参数说明：**
-| 参数 | 说明 | 默认值 |
+**Parameter description:**
+| Parameter | Description | Default |
 |------|------|--------|
-| threshold | 毒性阈值 (0-1) | 0.38 |
+| threshold | Toxicity threshold (0-1) | 0.38 |
 | model | 1=AAC+DPC, 2=Hybrid | 2 |
 
-**阈值建议：**
-| 场景 | 阈值 | 说明 |
+**Threshold recommendations:**
+| Scenario | Threshold | Description |
 |------|------|------|
-| 高风险（直接给药） | 0.3 | 提高敏感性 |
-| 初筛阶段 | 0.38 | 默认值 |
-| 低风险（外用） | 0.5 | 提高特异性 |
+| High risk (direct administration) | 0.3 | Increase sensitivity |
+| Primary screening stage | 0.38 | Default value |
+| Low risk (topical) | 0.5 | Increase specificity |
 
 ---
 
-## 批量处理
+## Batch Processing
 
-### 从 FASTA 文件批量预测
+### Batch Prediction from a FASTA File
 
 ```python
 from toxinpred_features import batch_predict_from_file
@@ -150,7 +152,7 @@ results = batch_predict_from_file(
 )
 ```
 
-### 融合引擎集成示例
+### Fusion Engine Integration Example
 
 ```python
 from toxinpred_features import predict_toxicity, extract_features
@@ -158,10 +160,10 @@ import pandas as pd
 
 def filter_toxic_peptides(peptides: list, threshold: float = 0.38) -> tuple:
     """
-    过滤掉可能有毒的肽段
+    Filter out potentially toxic peptide segments
 
     Returns:
-        (安全肽列表, 有毒肽列表)
+        (list of safe peptides, list of toxic peptides)
     """
     predictions = predict_toxicity(peptides, threshold=threshold)
 
@@ -173,12 +175,12 @@ def filter_toxic_peptides(peptides: list, threshold: float = 0.38) -> tuple:
 
 def get_peptide_features(peptides: list) -> pd.DataFrame:
     """
-    获取肽的完整特征向量，用于机器学习模型输入
+    Get the complete feature vector of peptides for machine learning model input
     """
     return extract_features(peptides)
 
 
-# 使用示例
+# Usage example
 test_peptides = ["KWKLFKKIGAVLKVL", "MKPPLNAKLVLKPMWIG", "GIGAVLKVLTTGLPALISWIKRKRQQ"]
 safe, toxic = filter_toxic_peptides(test_peptides)
 features = get_peptide_features(test_peptides)
@@ -186,21 +188,21 @@ features = get_peptide_features(test_peptides)
 
 ---
 
-## 快速参考
+## Quick Reference
 
-| 功能 | 函数 | 输出 |
+| Feature | Function | Output |
 |------|------|------|
-| 特征提取 | `extract_features(sequences)` | DataFrame (420列) |
-| AAC | `aac_composition(sequences)` | DataFrame (20列) |
-| DPC | `dpc_composition(sequences)` | DataFrame (400列) |
-| 毒性预测 | `predict_toxicity(sequences)` | DataFrame |
-| 批量预测 | `batch_predict_from_file(input, output)` | CSV文件 |
+| Feature extraction | `extract_features(sequences)` | DataFrame (420 columns) |
+| AAC | `aac_composition(sequences)` | DataFrame (20 columns) |
+| DPC | `dpc_composition(sequences)` | DataFrame (400 columns) |
+| Toxicity prediction | `predict_toxicity(sequences)` | DataFrame |
+| Batch prediction | `batch_predict_from_file(input, output)` | CSV file |
 
 ---
 
 ## Examples
 
-### 示例1：单序列毒性预测
+### Example 1: Single-Sequence Toxicity Prediction
 
 ```python
 from toxinpred_features import predict_toxicity
@@ -209,20 +211,20 @@ result = predict_toxicity(["KWKLFLFKKIGAVLKVL"], threshold=0.38)
 print(result)
 ```
 
-### 示例2：批量处理+特征提取
+### Example 2: Batch Processing + Feature Extraction
 
 ```python
 from toxinpred_features import batch_predict_from_file, extract_features
 
-# 批量预测
+# Batch prediction
 results = batch_predict_from_file("peptides.fa", "out.csv")
 
-# 提取特征用于ML
+# Extract features for ML
 features = extract_features("peptides.fa")
-print(f"特征维度: {features.shape}")  # (n, 420)
+print(f"Feature dimensions: {features.shape}")  # (n, 420)
 ```
 
-### 示例3：运行演示脚本
+### Example 3: Run the Demo Script
 
 ```bash
 cd ToxinPred3
@@ -232,15 +234,15 @@ python scripts/demo.py
 
 ---
 
-## 已知问题
+## Known Issues
 
-### 官方 CLI 的 delimiter bug
+### The Official CLI's Delimiter Bug
 
-**问题：** toxinpred3 CLI 在写入输出文件时报错 `ValueError: bad delimiter value`
+**Problem:** the toxinpred3 CLI raises `ValueError: bad delimiter value` when writing the output file
 
-**原因：** pandas 1.4+ 对 `to_csv` 的 delimiter 参数检查更严格
+**Cause:** pandas 1.4+ checks the delimiter argument of `to_csv` more strictly
 
-**解决方案：** 使用 `toxinpred_features.py` 中的 Python API（已修复此问题）
+**Solution:** use the Python API in `toxinpred_features.py` (this issue has already been fixed there)
 
 ---
 
@@ -248,39 +250,39 @@ python scripts/demo.py
 
 | File | Contents |
 |------|----------|
-| `references/installation.md` | 详细安装步骤与故障排除 |
-| `references/biological_background.md` | 肽毒性生物学背景 |
-| `references/api_reference.md` | API 详细参数说明 |
-| `scripts/demo.py` | 演示脚本 |
-| `toxinpred_features.py` | Python API 封装模块 |
+| `references/installation.md` | Detailed installation steps and troubleshooting |
+| `references/biological_background.md` | Biological background of peptide toxicity |
+| `references/api_reference.md` | Detailed API parameter reference |
+| `scripts/demo.py` | Demo script |
+| `toxinpred_features.py` | Python API wrapper module |
 
 ---
 
-## 交付物清单
+## Deliverables Checklist
 
-| 文件 | 状态 | 说明 |
+| File | Status | Description |
 |------|------|------|
-| `toxinpred_features.py` | ✅ 已创建 | Python API 封装 (v1.1) |
-| `test_demo.fa` | ✅ 已创建 | 测试数据 |
-| `scripts/demo.py` | ✅ 已修复 | 演示脚本 |
-| `SKILL.md` | ✅ 已更新 | 本技能文档 |
-| `references/` | ✅ 可用 | 详细参考文档 |
+| `toxinpred_features.py` | ✅ Created | Python API wrapper (v1.1) |
+| `test_demo.fa` | ✅ Created | Test data |
+| `scripts/demo.py` | ✅ Fixed | Demo script |
+| `SKILL.md` | ✅ Updated | This skill document |
+| `references/` | ✅ Available | Detailed reference documentation |
 
 ---
 
-## 更新日志
+## Changelog
 
 ### v1.1 (2026-04-25)
-- 创建 `toxinpred_features.py` Python API 封装
-- 修复 demo.py 导入路径
-- 修复官方 CLI 的 pandas delimiter bug
-- 更新 SKILL.md 准确描述功能
+- Created the `toxinpred_features.py` Python API wrapper
+- Fixed the import path in demo.py
+- Fixed the official CLI's pandas delimiter bug
+- Updated SKILL.md to describe the functionality accurately
 
 ### v1.0 (2026-04-11)
-- 初始版本（文档描述不准确）
+- Initial version (the documentation description was inaccurate)
 
 ---
 
-**作者**：Sisyphus (Agent)
-**日期**：2026-04-25
-**验证状态**：✅ **全部通过** (Python 3.11 + sklearn 1.2.2)
+**Author**: Sisyphus (Agent)
+**Date**: 2026-04-25
+**Verification status**: ✅ **All passed** (Python 3.11 + sklearn 1.2.2)

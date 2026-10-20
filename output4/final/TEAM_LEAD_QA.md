@@ -1,14 +1,16 @@
-# 组长问答：四题统一稿
+> **English** | [中文](TEAM_LEAD_QA.zh.md)
 
-本文件按四个问题分别成节，每节先给中文说明、再给英文说明，供wiki、parts、video 与汇报材料直接取用。
+# Team Lead Q&A: Unified Draft for Four Questions
 
-### 一、表格中 source data 与 round7_score 的含义
+This document is divided into one section per question, each giving first the Chinese explanation and then the English explanation, for direct use in the wiki, parts, video, and presentation materials.
 
-**中文**
+### 1. Meaning of source data and round7_score in the table
 
-表格中 `source_database` 与 `source_accession` 两列记录功能肽的原始出处。`source_database` 只取两个值：`mgy` 指 MGnify 宏基因组数据库，accession 形如 `MGYP003726304477`；`uniprot` 指 UniProt 参考蛋白库，accession 形如 `A0A5K0UWX3`。Top 10 中九条来自 MGnify、一条来自 UniProt；全部 250 个构建体中 244 条来自 MGnify。比例失衡不是设计选择，而是预处理第一步只保留 3–30 aa 短肽的结果——UniProt 以全长蛋白为主，几乎全部被长度筛除。MGnify 来源的肽只有序列存在，没有任何功能注释。
+**Chinese**
 
-`round7_score` 是最终结构质量分，公式为 `0.40 × SASA + 0.40 × (1 − Aggrescan3D) + 0.20 × pLDDT_norm`。SASA 是功能肽在折叠后暴露于表面的相对溶剂可及面积，越高说明肽越容易被目标分子接触到；Aggrescan3D 是聚集倾向，越低越好，故取 1−A；pLDDT 是 OmegaFold 的结构置信度，经 min–max 归一化后使用。三项全部只衡量物理质量，**不含任何功能项**——抗氧化的预测值在第一轮划分通道之后就再未参与任何排名。因此 `global_rank` 前八名全部属于 Bottom 阴性对照通道，这是设计结果而非错误。全表 250 条的分数范围为 0.4800–0.7579。
+The two columns `source_database` and `source_accession` in the table record the original source of the functional peptide. `source_database` takes only two values: `mgy` denotes the MGnify metagenomic database, with accessions of the form `MGYP003726304477`; `uniprot` denotes the UniProt reference protein database, with accessions of the form `A0A5K0UWX3`. In the Top 10, nine come from MGnify and one from UniProt; across all 250 constructs, 244 come from MGnify. This imbalance is not a design choice but a consequence of the first preprocessing step retaining only 3–30 aa short peptides — UniProt consists mostly of full-length proteins, so almost all of its entries are removed by the length filter. Peptides of MGnify origin exist only as sequences and carry no functional annotation whatsoever.
+
+`round7_score` is the final structure-quality score, with the formula `0.40 × SASA + 0.40 × (1 − Aggrescan3D) + 0.20 × pLDDT_norm`. SASA is the relative solvent-accessible surface area of the functional peptide exposed on the surface after folding: the higher it is, the more easily the peptide can be reached by the target molecule. Aggrescan3D is aggregation propensity, where lower is better, hence the term is inverted as 1−A. pLDDT is OmegaFold's structural confidence, used after min–max normalization. All three terms measure physical quality only, and **contain no functional term** — the predicted antioxidant value never took part in any ranking after the first round's channel split. As a result, the top eight of `global_rank` all belong to the Bottom negative-control channel; this is a design outcome rather than an error. Across the full table of 250 rows, scores range from 0.4800 to 0.7579.
 
 **English**
 
@@ -17,33 +19,33 @@ Two columns in the table record where each functional peptide came from before t
 `round7_score` is the final structure-quality score, computed as `0.40 × SASA + 0.40 × (1 − Aggrescan3D) + 0.20 × pLDDT_norm`. SASA is the relative solvent-accessible surface area of the functional peptide after folding: the higher it is, the more readily the peptide can make contact with its target. Aggrescan3D measures aggregation propensity, where lower is better, hence the term is inverted as 1−A. pLDDT is OmegaFold's structural confidence, min–max normalised across the dataset before use. All three terms describe physical quality only. **None of them is a functional term.** Predicted antioxidant activity is used once, to assign candidates to channels in the first round, and never re-enters any downstream ranking. A direct consequence is that global ranks 1 through 8 all belong to the Bottom negative-control channel, which is a structural outcome rather than a design fault. Across all 250 constructs the score ranges from 0.4800 to 0.7579.
 
 
-### 二、蛋白质构建流程
+### 2. Protein construct workflow
 
-**中文**
+**Chinese**
 
-每一个进入表格的构建体都由三段序列组装而成：丝蛋白骨架、柔性连接肽、功能肽，末端再追加一次纯化标签。可变的量有三个——肽放在哪里、用哪种连接肽、用哪一条肽。
+Every construct that enters the table is assembled from three sequence segments: a silk protein scaffold, a flexible linker, and a functional peptide, with a single purification tag appended at the end. Three quantities vary — where the peptide goes, which linker is used, and which peptide is chosen.
 
-**骨架**是重组丝蛋白 `FibLNT8-10xRep-FibHCT`，合成时长372 aa：*B. mori* 纤维蛋白的 N 端结构域、十段甘氨酸富集重复序列（丝素 C 端的特征），以及一段自带组氨酸标签的 C 端。组装时把骨架自带的 C 端标签切除，避免与末端追加的标签重复，去除后骨架长 364 aa，250 个构建体全部使用同一段骨架。
+**The scaffold** is the recombinant silk protein `FibLNT8-10xRep-FibHCT`, 372 aa as synthesized: the N-terminal domain of *B. mori* fibroin, ten glycine-rich repeat segments (a feature of the silk C-terminus), and a C-terminal segment that carries a histidine tag of its own. During assembly the scaffold's native C-terminal tag is excised so that it does not duplicate the tag appended at the end; after removal the scaffold is 364 aa long, and all 250 constructs use the same scaffold segment.
 
-**纯化标签**是 `LEHHHHHH` 八残基序列，统一追加在每个构建体的C 端，作用是亲和层析纯化的结合位点，同时把末端 `HHHHHH` 与蛋白主体隔开。每个构建体只有一份，不重复出现。
+**The purification tag** is the eight-residue sequence `LEHHHHHH`, appended uniformly to the C-terminus of every construct; it serves as the binding site for affinity chromatography purification and at the same time keeps the terminal `HHHHHH` clear of the protein body. Each construct carries exactly one copy, never more.
 
-**连接肽**是桥接骨架与功能肽的甘氨酸-丝氨酸柔性链。项目评估了十种连接肽设计，进入组装的是两种：`Flex_GGGGSx1` 为五残基 `GGGGS`，最短、结构扰动最小；`Flex_GGGGSx2` 为十残基 `GGGGSGGGGS`，自由度更高，更可能把肽顶到骨架表面之外。之所以用甘氨酸与丝氨酸，是因为甘氨酸无侧链、构象最灵活，丝氨酸体积小且极性、维持链条可溶，`GGGGS` 重复是重组蛋白文献中的标准柔性连接肽基序。
+**The linker** is the glycine-serine flexible chain bridging scaffold and functional peptide. The project evaluated ten linker designs, of which two entered assembly: `Flex_GGGGSx1` is the five-residue `GGGGS`, the shortest and least structurally disruptive; `Flex_GGGGSx2` is the ten-residue `GGGGSGGGGS`, with more degrees of freedom and a greater likelihood of pushing the peptide out beyond the scaffold surface. Glycine and serine are used because glycine has no side chain and the most flexible conformation, while serine is small and polar and keeps the chain soluble; the `GGGGS` repeat is the standard flexible-linker motif in the recombinant protein literature.
 
-**位置**决定功能肽融合到骨架的哪一端，共枚举三种：`N` 端把肽放在骨架之前，`C` 端放在骨架之后，`Both` 端在骨架两端各放一份拷贝。每处融合都是同框直接相连，肽与骨架之间除连接肽外不再添加任何间隔序列。以`LEHHHHHH` 表示纯化标签，组装逻辑为：
+**Position** determines which end of the scaffold the functional peptide is fused to, and three are enumerated: `N` places the peptide before the scaffold, `C` places it after the scaffold, and `Both` places one copy at each end of the scaffold. Every fusion is a direct in-frame join, and no spacer sequence is added between peptide and scaffold beyond the linker. Writing `LEHHHHHH` for the purification tag, the assembly logic is:
 
 ```
-N端：肽 + 连接肽 + 骨架 + LEHHHHHH
-C 端：    骨架 + 连接肽 + 肽   + LEHHHHHH
-两端：肽 + 连接肽 + 骨架 + 连接肽 + 肽 + LEHHHHHH
+N-terminus: peptide + linker + scaffold + LEHHHHHH
+C-terminus:    scaffold + linker + peptide   + LEHHHHHH
+Both ends:  peptide + linker + scaffold + linker + peptide + LEHHHHHH
 ```
 
-排名第一的 `con_0418` 走 `C` 端加长连接肽的组合：364 aa 骨架、`GGGGSGGGGS`、25 aa 功能肽 `MNRPWITGHHHHHHHRRRRRRRRRR`、标签，产物共 407 aa。排名第三的 `con_0317` 走两端加短连接肽的组合，肽在骨架两端各一份，产物共 426 aa。Top 10 中五个为 `C` 端、五个为两端，两端融合在更早的筛选阶段已是存活主力，因为双拷贝肽在溶解度与热稳定性两项预测上表现更好。
+The top-ranked `con_0418` follows the `C`-terminus plus long-linker combination: 364 aa scaffold, `GGGGSGGGGS`, 25 aa functional peptide `MNRPWITGHHHHHHHRRRRRRRRRR`, tag, for a 407 aa product. The third-ranked `con_0317` follows the both-ends plus short-linker combination, with one copy of the peptide at each end of the scaffold, for a 426 aa product. Five of the Top 10 are `C`-terminus and five are both-ends; two-ended fusion was already the dominant survivor at earlier screening stages, because a double-copy peptide performs better on both the solubility and thermal stability predictions.
 
-**功能肽本身不是挑出来的，是筛出来的。** 流程从 19,890,021 条序列起始，经九轮漏斗收敛到 250 个构建体，总淘汰率 99.9987%，各轮各用单一标准，不做跨属性混合。
+**The functional peptides themselves were not picked; they were filtered out.** The process begins with 19,890,021 sequences and converges through a nine-round funnel to 250 constructs, an overall elimination rate of 99.9987%, with each round using a single criterion and no mixing across attributes.
 
-预处理按长度与残基类型裁剪，只保留 3–30 aa、仅含二十种标准氨基酸的序列。上限由预测模型本身决定，多个模型无法接受更长的输入。第一轮对全部候选跑抗氧化预测与过敏原预测，预测致敏分达到或超过 0.30 者直接淘汰；其余按纯抗氧化分排序，前10% 划入 Top 通道、后 1% 划入 Bottom 通道作为阴性对照，这是抗氧化分唯一一次参与决策的位置。第二轮执行安全否决：毒性预测须低于 0.38、溶血预测须低于 0.55、免疫原性预测须低于 0.50，三项各自独立判定，任一项不通过即淘汰，不存在加权补偿。第三轮对存活肽评分抗原表位、热稳定性、溶解度、细胞穿透性四项，并加权成综合分排名；权重不由人工指定，而是正比于各指标在本数据集上的截尾标准差，区分度越高的指标权重越大——这是全流程唯一使用加权平均的位置。第四轮把排名前4,324 的肽（Top 通道 116条、Bottom 通道 4,208 条）各按三种位置与两种连接肽组合成6 个构建体，共 25,944 个；以完整融合蛋白为单位重跑溶解度与热稳定性预测，取综合分前 10%，得 2,594 个。之所以要在组装后再评一次，是因为一条肽在游离状态下稳定可溶，接到364 aa 骨架上未必如此。第五、六轮用 OmegaFold 预测全部存活构建体的三维结构，再在结构上计算表面暴露度与聚集倾向，250 个构建体全部产出可用结构。第七轮合成`round7_score` 并排名。第八轮对两通道各前十名共 20 个构建体用 AlphaFold3 独立重算结构，作为对 OmegaFold 排序的交叉检验。
+Preprocessing trims by length and residue type, retaining only sequences of 3–30 aa that contain solely the twenty standard amino acids. The upper bound is determined by the prediction models themselves, several of which cannot accept longer input. Round 1 runs antioxidant prediction and allergen prediction on all candidates, eliminating outright any candidate whose predicted allergenicity score reaches or exceeds 0.30; the rest are sorted by pure antioxidant score, with the top 10% assigned to the Top channel and the last 1% to the Bottom channel as a negative control — this is the only place where the antioxidant score takes part in a decision. Round 2 executes the safety veto: predicted toxicity must be below 0.38, predicted hemolysis below 0.55, predicted immunogenicity below 0.50, each judged independently, with failure of any one eliminating the candidate and no weighted compensation. Round 3 scores surviving peptides on four items — epitope, thermal stability, solubility, and cell penetration — and weights them into a composite ranking; the weights are not assigned by hand but are proportional to each metric's winsorized standard deviation on this dataset, so metrics with greater discriminating power receive larger weights — this is the only place in the whole pipeline where a weighted average is used. Round 4 assembles the top 4,324 ranked peptides (116 in the Top channel, 4,208 in the Bottom channel) into 6 constructs each across three positions and two linkers, 25,944 in total; solubility and thermal stability predictions are rerun with the complete fusion protein as the unit, and the top 10% by composite score gives 2,594. The reason for scoring again after assembly is that a peptide that is stable and soluble in the free state need not be so once attached to a 364 aa scaffold. Rounds 5 and 6 use OmegaFold to predict the three-dimensional structure of all surviving constructs, then compute surface exposure and aggregation propensity on the structure; all 250 constructs produce usable structures. Round 7 composes `round7_score` and ranks. Round 8 independently recomputes structures for the top ten of each channel, 20 constructs in total, with AlphaFold3, as a cross-check on the OmegaFold ranking.
 
-**两处必须随流程一同说明的事实。** 其一，OmegaFold 置信度在本数据集整体偏低，均值 0.42、从未超过 0.50，原因是丝素的甘氨酸-丙氨酸重复序列本身无序，AlphaFold3 独立复核给出同样图景（均值 0.52）。因此 `round7_score` 应表述为对低置信度模型的一致排序方式，而非精确物理测量。其二，排名第一与第二的 `con_0418`、`con_0417` 携带的肽`MNRPWITGHHHHHHHRRRRRRRRRR` 在组成上是组氨酸标签加多聚精氨酸的纯化/克隆把手，而非具备抗氧化活性的功能肽；它仅通过了长度与残基类型预筛，靠抗氧化预测给出的中等偏高分进入通道，再靠结构排名升至前二，因为结构排名不考察一条肽的作用。
+**Two facts must be stated alongside this process.** First, OmegaFold confidence is low overall on this dataset, with a mean of 0.42 that never exceeds 0.50, because the glycine-alanine repeats of silk are themselves disordered; the independent AlphaFold3 recheck gives the same picture (mean 0.52). `round7_score` should therefore be described as a consistent way of ranking low-confidence models rather than as a precise physical measurement. Second, the peptide `MNRPWITGHHHHHHHRRRRRRRRRR` carried by the first- and second-ranked `con_0418` and `con_0417` is compositionally a histidine tag plus a poly-arginine purification/cloning handle rather than a functional peptide with antioxidant activity; it passed only the length and residue-type prefilter, entered a channel on a middling-to-high score from antioxidant prediction, and then rose to the top two through the structural ranking, because the structural ranking does not examine what a peptide does.
 
 **English**
 
@@ -58,9 +60,9 @@ Every construct listed in the table is one three-part assembly — a silk fibroi
 **The position** determines where the functional peptide is fused, and three positions were enumerated for every peptide: `N` places the peptide before the scaffold, `C` places it after the scaffold, and `Both` places one copy at each end. Each fusion is a direct in-frame join, with nothing added between peptide and scaffold beyond the linker. Writing `LEHHHHHH` for the purification tag, the assembly logic is:
 
 ```
-N端：肽 + 连接肽 + 骨架 + LEHHHHHH
-C 端：    骨架 + 连接肽 + 肽   + LEHHHHHH
-两端：肽 + 连接肽 + 骨架 + 连接肽 + 肽 + LEHHHHHH
+N-terminus: peptide + linker + scaffold + LEHHHHHH
+C-terminus:    scaffold + linker + peptide   + LEHHHHHH
+Both ends:  peptide + linker + scaffold + linker + peptide + LEHHHHHH
 ```
 
 `con_0418`, the highest-ranked construct in the Top channel, follows the `C` pattern with the longer linker: a 364-residue scaffold, `GGGGSGGGGS`, the 25-residue peptide `MNRPWITGHHHHHHHRRRRRRRRRR`, and the tag, giving a 407-residue product. `con_0317`, at channel rank 3, follows the `Both` pattern with the shorter linker, placing the peptide at each end of the scaffold for a 426-residue product. Five of the Top 10 use the `C` position and five use `Both`. Two-ended fusion was already the dominant survivor at the earlier filtering stage, because a doubled peptide scores better on both the solubility and the thermal-stability predictions.
@@ -71,17 +73,17 @@ Preprocessing trims on length and residue type, admitting only sequences of 3 to
 
 **Two facts must travel with this description.** First, OmegaFold confidence is low across this dataset, averaging 0.42 and never exceeding 0.50, because the glycine-alanine repeats of silk are intrinsically disordered; AlphaFold3 independently returns the same picture at a mean of 0.52. `round7_score` should therefore be described as a consistent way to rank low-confidence models rather than as a precise physical measurement. Second, the peptide carried by the top two constructs, `MNRPWITGHHHHHHHRRRRRRRRRR`, is compositionally a histidine tag plus a poly-arginine purification or cloning handle rather than a functional peptide with antioxidant activity. It passed the length and residue-type prefilter, entered a channel on a middling-to-high predicted antioxidant score, and rose to the top of the structural ranking, which never examines what a peptide does.
 
-### 三、四项安全评分是哪四项
+### 3. What the four safety scores are
 
-**中文**
+**Chinese**
 
-本项目的安全性评估由四项独立检查构成，各自设阈值，任一项不通过即淘汰，四项完全不参与任何加权平均，因此不存在其他维度分数优秀可以补偿安全性缺陷的情况。
+The project's safety assessment consists of four independent checks, each with its own threshold, with failure of any one eliminating the candidate; none of the four takes part in any weighted average at all, so there is no situation in which excellent scores in other dimensions can compensate for a safety defect.
 
-**毒性（ToxinPred3）**，阈值 0.38，基于Extra Trees 集成树分类器与氨基酸组成、二肽组成特征，模型 2 MB。该项执行两次：一次在安全筛检轮次，一次在深度评分轮次的前置筛查中，第二次额外淘汰 16,982 条肽段，淘汰率 16.4%。**溶血性（HemoPI2）**，阈值 0.55，基于微调后的 ESM-2 t6 语言模型，模型 30 MB。**过敏原性（AlgPred2）**，阈值 0.30，基于氨基酸组成与随机森林分类器，模型 1 MB；四项中只有这一项在抗氧化分选轮次执行，与通道划分同步。**免疫原性（MHCflurry）**，阈值 0.50，结合越强即风险越高。原始输出为 IC50（nM），服务层映射为 0–1 风险分：低于 50 nM 记为强结合剂（0.5–1.0），50–500 nM 记为弱结合剂（0.25–0.5），高于 500 nM 记为非结合剂（0–0.25）。
+**Toxicity (ToxinPred3)**, threshold 0.38, based on an Extra Trees ensemble tree classifier with amino acid composition and dipeptide composition features, model 2 MB. This item is executed twice: once in the safety screening round, and once in the pre-screening of the deep scoring round, where the second pass eliminates an additional 16,982 peptides, an elimination rate of 16.4%. **Hemolysis (HemoPI2)**, threshold 0.55, based on a fine-tuned ESM-2 t6 language model, model 30 MB. **Allergenicity (AlgPred2)**, threshold 0.30, based on amino acid composition and a random forest classifier, model 1 MB; of the four, only this one is executed in the antioxidant split round, in step with the channel assignment. **Immunogenicity (MHCflurry)**, threshold 0.50, where stronger binding means higher risk. The raw output is IC50 (nM), mapped by the service layer to a 0–1 risk score: below 50 nM counts as a strong binder (0.5–1.0), 50–500 nM as a weak binder (0.25–0.5), and above 500 nM as a non-binder (0–0.25).
 
-安全属性的处理方式与功能属性正好相反：功能属性用数据驱动的加权综合分排名，安全属性只做通过或淘汰的二元判定。这一区分是本项目方法学上最实质的一条约束。
+Safety attributes are handled in exactly the opposite way from functional attributes: functional attributes are ranked by a data-driven weighted composite score, while safety attributes receive only a binary pass-or-eliminate decision. This distinction is the single most substantive methodological constraint of the project.
 
-需同时说明两点局限。其一，免疫原性检查在最终 250 个构建体上实际未生效——MHCflurry 接受 5–15 aa 肽，而入选功能肽中仅一条为 8 aa、其余均在 18 aa 以上，服务层对超范围输入返回 0.0 分并标注为无效长度，而判定条件为低于 0.50 即通过，故全部静默放行，四项检查在最终产物上实际只有三项真正执行。其二，安全检查在服务不可用时按通过处理，故对外不宜表述为"每一项候选都通过了全部四项安全检查"，准确说法是"未触发任何一项安全否决的候选被保留"。
+Two limitations must be stated at the same time. First, the immunogenicity check does not actually take effect on the final 250 constructs — MHCflurry accepts peptides of 5–15 aa, whereas among the selected functional peptides only one is 8 aa and the rest are all above 18 aa; the service layer returns a score of 0.0 for out-of-range input and marks it as an invalid length, while the decision condition is to pass if the score is below 0.50, so all of them are silently passed, and of the four checks only three actually execute on the final products. Second, safety checks are treated as passed when a service is unavailable, so externally it is better not to state that "every candidate passed all four safety checks"; the accurate formulation is "candidates that triggered no safety veto were retained."
 
 **English**
 
@@ -93,13 +95,13 @@ The treatment of safety attributes is the mirror image of that of functional att
 
 Two limitations must be stated alongside this. First, the immunogenicity check does not in fact operate on the final 250 constructs. MHCflurry accepts peptides of 5 to 15 residues, whereas among the selected functional peptides exactly one is 8 residues and every other one is at least 18 residues. The service returns a score of 0.0 for out-of-range input and labels it as an invalid length, and the acceptance condition is a score below 0.50, so all such inputs are silently passed and nothing is eliminated on this basis: of the four checks, only three genuinely execute on the final products. Second, a safety check whose service is unavailable is treated as passed. It is therefore inaccurate to state that every candidate passed all four checks; the accurate formulation is that candidates triggering no safety veto were retained.
 
-### 四、使用 AI 时考虑的 AI 道德问题
+### 4. AI ethics considerations when using AI
 
-**中文**
+**Chinese**
 
-**第一，全部预测工具采用原作者已发表的代码与模型，不用生成式 AI 产出任何科学结论。** 项目工具文档把"避免 AI 幻觉和搪塞工作"写为明确设计动机。因此每一个分数都可追溯到一个经同行评议的模型，不存在模型自己生成模型的缺口。**第二，主动保留阴性对照。** 除高抗氧化通道外，另留100 个预测最差的构建体，占最终 250 个的四成，用于证伪流水线自身的假设。**第三，安全属性一票否决**，不可被其他分数补偿。**第四，全链路可追溯**，来源标识与权重配置理由全部落盘，人工调整权重必须填写理由才成立。**第五，不依赖单一模型**，250 个构建体全部由 OmegaFold 预测，两通道各前十名另用 AlphaFold3 交叉验证，两者趋势一致。**第六，主动披露不利数据**：BepiPred3 在构建体层面标准差仅 0.0053、几乎无区分度，结构预测置信度整体偏低，均写入报告。**第七，限定非系统性给药路径**，避开全身暴露风险，并声明计算预测不等同于功能实证。
+**First, all prediction tools use the original authors' published code and models, and no scientific conclusion is produced with generative AI.** The project's tool documentation names "avoiding AI hallucination and papering over the work" as an explicit design motivation. Every score is therefore traceable to a peer-reviewed model, with no gap in which a model generates its own model. **Second, a negative control is deliberately retained.** Besides the high-antioxidant channel, a further 100 constructs with the worst predictions are kept, forty percent of the final 250, to falsify the pipeline's own hypothesis. **Third, safety attributes carry a one-vote veto** and cannot be compensated by other scores. **Fourth, the whole chain is traceable**, with source identifiers and the reasons for weight configurations all written to disk, and a manual weight adjustment standing only once its justification has been filled in. **Fifth, no conclusion depends on a single model**: all 250 constructs were predicted by OmegaFold, and the top ten of each of the two channels were additionally cross-validated with AlphaFold3, with the two agreeing on trend. **Sixth, unfavorable data is proactively disclosed**: BepiPred3's standard deviation at the construct level is only 0.0053, with almost no discriminating power, and structure prediction confidence is low overall; both are written into the report. **Seventh, delivery routes are limited to non-systemic ones**, avoiding systemic exposure risk, with an explicit statement that computational prediction is not equivalent to functional evidence.
 
-需同时说明：项目全部输入为公开数据库蛋白序列，不涉患者或受试者数据，因此不适用知情同意程序；但项目**未经过任何正式伦理审查**，对外表述不应暗示已经过审查。
+It must be stated at the same time that all input for the project is protein sequence from public databases, involving no patient or human-subject data, so informed consent procedures do not apply; but the project **has not undergone any formal ethics review**, and external statements should not imply that it has.
 
 **English**
 

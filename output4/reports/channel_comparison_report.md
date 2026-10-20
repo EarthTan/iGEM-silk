@@ -1,167 +1,169 @@
-# 通道对比分析报告
+> **English** | [中文](channel_comparison_report.zh.md)
 
-**生成日期**: 2026-05-21 23:04:06
-**数据源**: `output4/pipeline_analysis.db`（pipeline.db 副本）
-**耗时**: 6.1s
+# Channel Comparison Analysis Report
+
+**Generated**: 2026-05-21 23:04:06
+**Data source**: `output4/pipeline_analysis.db` (copy of pipeline.db)
+**Time**: 6.1s
 
 ---
 
-## 前提验证：抗氧化（AnOxPePred）分数分布
+## Premise validation: antioxidant (AnOxPePred) score distribution
 
-**问题**: Top 通道的抗氧化性是否真的普遍高于 Bottom？如果这个前提不成立，双通道设计失去意义。
+**Question**: Is antioxidant activity in the Top channel really generally higher than in Bottom? If this premise does not hold, the dual-channel design loses its meaning.
 
-| 阶段 | Top N | Top 均值 | Top 中位数 | Top 最小值 | Bottom N | Bottom 均值 | Bottom 中位数 | Bottom 最大值 | Gap(Tmin-Bmax) | 重叠? |
+| Stage | Top N | Top mean | Top median | Top min | Bottom N | Bottom mean | Bottom median | Bottom max | Gap(Tmin-Bmax) | Overlap? |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|:---|
-| round1_channels (全部分通道)                  |  1284119 | 0.3950 | 0.3881 | 0.3654 |   128411 | 0.1739 | 0.1773 | 0.1871 |  0.1783 | ✅ 零重叠    |
-| round2_passed (安全通过者)                    |   519524 | 0.3935 | 0.3868 | 0.3654 |    74476 | 0.1736 | 0.1771 | 0.1871 |  0.1783 | ✅ 零重叠    |
-| round3_scores (深度评分阶段)                   |    51227 | 0.4487 | 0.4422 | 0.4266 |    35260 | 0.1700 | 0.1729 | 0.1812 |  0.2454 | ✅ 零重叠    |
-| round3_ranking (排名前4324)                 |      116 | 0.4534 | 0.4457 | 0.4267 |     4208 | 0.1647 | 0.1685 | 0.1812 |  0.2455 | ✅ 零重叠    |
-| 最终250 construct                          |      150 | 0.4530 | 0.4451 | 0.4268 |      100 | 0.1598 | 0.1652 | 0.1798 |  0.2470 | ✅ 零重叠    |
+| round1_channels (all assigned to channels)     |  1284119 | 0.3950 | 0.3881 | 0.3654 |   128411 | 0.1739 | 0.1773 | 0.1871 |  0.1783 | ✅ zero overlap    |
+| round2_passed (safety passers)                 |   519524 | 0.3935 | 0.3868 | 0.3654 |    74476 | 0.1736 | 0.1771 | 0.1871 |  0.1783 | ✅ zero overlap    |
+| round3_scores (deep scoring stage)             |    51227 | 0.4487 | 0.4422 | 0.4266 |    35260 | 0.1700 | 0.1729 | 0.1812 |  0.2454 | ✅ zero overlap    |
+| round3_ranking (top 4324 ranked)               |      116 | 0.4534 | 0.4457 | 0.4267 |     4208 | 0.1647 | 0.1685 | 0.1812 |  0.2455 | ✅ zero overlap    |
+| final 250 constructs                           |      150 | 0.4530 | 0.4451 | 0.4268 |      100 | 0.1598 | 0.1652 | 0.1798 |  0.2470 | ✅ zero overlap    |
 
-**结论：✅ 双通道抗氧化前提成立。** Top 通道的 AnOxPePred 最小值始终大于 Bottom 通道的最大值，**全程零重叠**。
-Top/Bottom 的均值差距约 2.3–2.8 倍，且随着 pipeline 推进（限制流、安全淘汰、深度评分排名），差距进一步扩大（gap 从 0.178 → 0.247）。
-这验证了 Round 1 的双通道分选正确执行，后续轮次没有破坏通道的抗氧化区分度。
-
----
-
-## 核心问题
-
-> Bottom 通道（低抗氧化）的序列在**除抗氧化外的所有属性上是否普遍优于 Top 通道（高抗氧化）**？
+**Conclusion: ✅ the dual-channel antioxidant premise holds.** The minimum AnOxPePred value in the Top channel is always greater than the maximum in the Bottom channel, with **zero overlap at every stage**.
+The mean gap between Top and Bottom is about 2.3–2.8×, and as the pipeline advances (rate limiting, safety elimination, deep scoring and ranking) the gap widens further (gap from 0.178 → 0.247).
+This confirms that the Round 1 dual-channel split was executed correctly and that later rounds did not degrade the antioxidant separation between the channels.
 
 ---
 
-## 摘要
+## Core question
 
-| 层面 | 属性数量 | Bottom 更优 | Top 更优 | 无显著差异 |
+> Are sequences in the Bottom channel (low antioxidant) generally better than those in the Top channel (high antioxidant) on **all attributes other than antioxidant activity**?
+
+---
+
+## Summary
+
+| Level | Number of attributes | Bottom better | Top better | No significant difference |
 |------|---------|------------|---------|-----------|
-| Round 3 深度评分 (86,487肽)                   |    4 |    3 |    0 |    1 |
-| Round 3 排名前4,324                         |    5 |    4 |    0 |    1 |
-| Round 4 Phase 1 (2,594 constructs)       |    3 |    2 |    1 |    0 |
-| 最终 250 constructs                        |   10 |    7 |    3 |    0 |
+| Round 3 deep scoring (86,487 peptides)        |    4 |    3 |    0 |    1 |
+| Round 3 top 4,324 ranked                      |    5 |    4 |    0 |    1 |
+| Round 4 Phase 1 (2,594 constructs)            |    3 |    2 |    1 |    0 |
+| Final 250 constructs                          |   10 |    7 |    3 |    0 |
 
 ---
 
-## 层面 1: Round 3 深度评分（86,487 个肽）
+## Level 1: Round 3 deep scoring (86,487 peptides)
 
-ToxinPred3 淘汰 + 限流后，所有 5 个深度评分服务的通道对比。
+Channel comparison across all 5 deep scoring services after ToxinPred3 elimination + rate limiting.
 
-| 属性 | Top N | Top 均值±SD | Top 中位数 | Bottom N | Bottom 均值±SD | Bottom 中位数 | Cohen's d | p值 | 方向 |
+| Attribute | Top N | Top mean±SD | Top median | Bottom N | Bottom mean±SD | Bottom median | Cohen's d | p-value | Direction |
 |---|---|---|---|---|---|---|---|---|---|
-| BepiPred3 (B细胞表位)         |  51227 | 0.2491 ± 0.0387 | 0.2535 |  35260 | 0.2466 ± 0.0470 | 0.2514 |  -0.057 | 0.0261 *    | ≈ 无显著差异              |
-| TemStaPro (热稳定)           |  51227 | 0.4580 ± 0.1629 | 0.4547 |  35260 | 0.5793 ± 0.1531 | 0.5898 |  +0.763 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| SoDoPE (溶解度)              |  51227 | 0.5742 ± 0.2882 | 0.6035 |  35260 | 0.8135 ± 0.2057 | 0.8939 |  +0.929 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| pLM4CPPs (细胞穿透)           |  51227 | 0.0274 ± 0.0690 | 0.0015 |  35260 | 0.1022 ± 0.2551 | 0.0018 |  +0.437 | 0.0000 ***  | ⬆ Bottom >> Top      |
-**解读**:
+| BepiPred3 (B-cell epitope)     |  51227 | 0.2491 ± 0.0387 | 0.2535 |  35260 | 0.2466 ± 0.0470 | 0.2514 |  -0.057 | 0.0261 *    | ≈ no significant difference   |
+| TemStaPro (thermal stability)  |  51227 | 0.4580 ± 0.1629 | 0.4547 |  35260 | 0.5793 ± 0.1531 | 0.5898 |  +0.763 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| SoDoPE (solubility)            |  51227 | 0.5742 ± 0.2882 | 0.6035 |  35260 | 0.8135 ± 0.2057 | 0.8939 |  +0.929 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| pLM4CPPs (cell penetration)    |  51227 | 0.0274 ± 0.0690 | 0.0015 |  35260 | 0.1022 ± 0.2551 | 0.0018 |  +0.437 | 0.0000 ***  | ⬆ Bottom >> Top      |
+**Interpretation**:
 
-- **BepiPred3 (B细胞表位)**: ≈ 无差异（效应量 可忽略，d=-0.057）
-- **TemStaPro (热稳定)**: ⬆ Bottom 优于 Top（效应量 中，d=0.763）
-- **SoDoPE (溶解度)**: ⬆ Bottom 优于 Top（效应量 大，d=0.929）
-- **pLM4CPPs (细胞穿透)**: ⬆ Bottom 优于 Top（效应量 小，d=0.437）
+- **BepiPred3 (B-cell epitope)**: ≈ no difference (effect size negligible, d=-0.057)
+- **TemStaPro (thermal stability)**: ⬆ Bottom better than Top (effect size medium, d=0.763)
+- **SoDoPE (solubility)**: ⬆ Bottom better than Top (effect size large, d=0.929)
+- **pLM4CPPs (cell penetration)**: ⬆ Bottom better than Top (effect size small, d=0.437)
 
 ---
 
-## 层面 2: Round 3 排名前 4,324 个肽
+## Level 2: Round 3 top 4,324 peptides
 
-SD 加权排名后进入 Round 4 的候选。
+Candidates entering Round 4 after SD-weighted ranking.
 
-| 属性 | Top N | Top 均值±SD | Top 中位数 | Bottom N | Bottom 均值±SD | Bottom 中位数 | Cohen's d | p值 | 方向 |
+| Attribute | Top N | Top mean±SD | Top median | Bottom N | Bottom mean±SD | Bottom median | Cohen's d | p-value | Direction |
 |---|---|---|---|---|---|---|---|---|---|
-| Composite (SD加权综合)        |    116 | 0.7009 ± 0.0813 | 0.7044 |   4208 | 0.7510 ± 0.0959 | 0.7605 |  +0.524 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| BepiPred3 (B细胞表位)         |    116 | 0.2802 ± 0.0353 | 0.2851 |   4208 | 0.2731 ± 0.0422 | 0.2790 |  -0.167 | 0.0935 n.s. | ≈ 无显著差异              |
-| TemStaPro (热稳定)           |    116 | 0.5717 ± 0.2279 | 0.6306 |   4208 | 0.6598 ± 0.1689 | 0.6869 |  +0.516 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| SoDoPE (溶解度)              |    116 | 0.9315 ± 0.0702 | 0.9482 |   4208 | 0.9840 ± 0.0326 | 0.9960 |  +1.536 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| pLM4CPPs (细胞穿透)           |    116 | 0.5587 ± 0.3136 | 0.5517 |   4208 | 0.7102 ± 0.3221 | 0.8596 |  +0.471 | 0.0000 ***  | ⬆ Bottom >> Top      |
-**解读**:
+| Composite (SD-weighted composite)   |    116 | 0.7009 ± 0.0813 | 0.7044 |   4208 | 0.7510 ± 0.0959 | 0.7605 |  +0.524 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| BepiPred3 (B-cell epitope)          |    116 | 0.2802 ± 0.0353 | 0.2851 |   4208 | 0.2731 ± 0.0422 | 0.2790 |  -0.167 | 0.0935 n.s. | ≈ no significant difference   |
+| TemStaPro (thermal stability)       |    116 | 0.5717 ± 0.2279 | 0.6306 |   4208 | 0.6598 ± 0.1689 | 0.6869 |  +0.516 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| SoDoPE (solubility)                 |    116 | 0.9315 ± 0.0702 | 0.9482 |   4208 | 0.9840 ± 0.0326 | 0.9960 |  +1.536 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| pLM4CPPs (cell penetration)         |    116 | 0.5587 ± 0.3136 | 0.5517 |   4208 | 0.7102 ± 0.3221 | 0.8596 |  +0.471 | 0.0000 ***  | ⬆ Bottom >> Top      |
+**Interpretation**:
 
-- **Composite (SD加权综合)**: ⬆ Bottom 优于 Top（效应量 中，d=0.524）
-- **BepiPred3 (B细胞表位)**: ≈ 无差异（效应量 可忽略，d=-0.167）
-- **TemStaPro (热稳定)**: ⬆ Bottom 优于 Top（效应量 中，d=0.516）
-- **SoDoPE (溶解度)**: ⬆ Bottom 优于 Top（效应量 大，d=1.536）
-- **pLM4CPPs (细胞穿透)**: ⬆ Bottom 优于 Top（效应量 小，d=0.471）
+- **Composite (SD-weighted composite)**: ⬆ Bottom better than Top (effect size medium, d=0.524)
+- **BepiPred3 (B-cell epitope)**: ≈ no difference (effect size negligible, d=-0.167)
+- **TemStaPro (thermal stability)**: ⬆ Bottom better than Top (effect size medium, d=0.516)
+- **SoDoPE (solubility)**: ⬆ Bottom better than Top (effect size large, d=1.536)
+- **pLM4CPPs (cell penetration)**: ⬆ Bottom better than Top (effect size small, d=0.471)
 
 ---
 
-## 层面 3: Round 4 Phase 1 通过（2,594 constructs）
+## Level 3: Round 4 Phase 1 pass (2,594 constructs)
 
-SoDoPE + TemStaPro 筛选后进入 Phase 2 的 constructs。
+Constructs entering Phase 2 after SoDoPE + TemStaPro screening.
 
-| 属性 | Top N | Top 均值±SD | Top 中位数 | Bottom N | Bottom 均值±SD | Bottom 中位数 | Cohen's d | p值 | 方向 |
+| Attribute | Top N | Top mean±SD | Top median | Bottom N | Bottom mean±SD | Bottom median | Cohen's d | p-value | Direction |
 |---|---|---|---|---|---|---|---|---|---|
-| SoDoPE (溶解度-construct)    |     10 | 0.7907 ± 0.0296 | 0.7798 |   2584 | 0.8152 ± 0.0361 | 0.8204 |  +0.677 | 0.0184 *    | ⬆ Bottom >> Top      |
-| TemStaPro (热稳定-construct) |     10 | 0.5060 ± 0.0111 | 0.5073 |   2584 | 0.4976 ± 0.0351 | 0.4949 |  -0.241 | 0.1748 n.s. | ⬇ Top >> Bottom      |
-| Phase 1 综合分               |     10 | 0.6484 ± 0.0135 | 0.6438 |   2584 | 0.6564 ± 0.0166 | 0.6519 |  +0.481 | 0.0000 ***  | ⬆ Bottom >> Top      |
-**解读**:
+| SoDoPE (solubility-construct)    |     10 | 0.7907 ± 0.0296 | 0.7798 |   2584 | 0.8152 ± 0.0361 | 0.8204 |  +0.677 | 0.0184 *    | ⬆ Bottom >> Top      |
+| TemStaPro (thermal stability-construct) |     10 | 0.5060 ± 0.0111 | 0.5073 |   2584 | 0.4976 ± 0.0351 | 0.4949 |  -0.241 | 0.1748 n.s. | ⬇ Top >> Bottom      |
+| Phase 1 composite score          |     10 | 0.6484 ± 0.0135 | 0.6438 |   2584 | 0.6564 ± 0.0166 | 0.6519 |  +0.481 | 0.0000 ***  | ⬆ Bottom >> Top      |
+**Interpretation**:
 
-- **SoDoPE (溶解度-construct)**: ⬆ Bottom 优于 Top（效应量 中，d=0.677）
-- **TemStaPro (热稳定-construct)**: ⬇ Top 优于 Bottom（效应量 小，d=-0.241）
-- **Phase 1 综合分**: ⬆ Bottom 优于 Top（效应量 小，d=0.481）
+- **SoDoPE (solubility-construct)**: ⬆ Bottom better than Top (effect size medium, d=0.677)
+- **TemStaPro (thermal stability-construct)**: ⬇ Top better than Bottom (effect size small, d=-0.241)
+- **Phase 1 composite score**: ⬆ Bottom better than Top (effect size small, d=0.481)
 
 ---
 
-## 层面 4: 最终 250 constructs（核心对比）
+## Level 4: Final 250 constructs (core comparison)
 
-最终选出的 Top 150 + Bottom 100 construct，所有维度对比。
+The Top 150 + Bottom 100 constructs selected in the end, compared on every dimension.
 
-| 属性 | Top N | Top 均值±SD | Top 中位数 | Bottom N | Bottom 均值±SD | Bottom 中位数 | Cohen's d | p值 | 方向 |
+| Attribute | Top N | Top mean±SD | Top median | Bottom N | Bottom mean±SD | Bottom median | Cohen's d | p-value | Direction |
 |---|---|---|---|---|---|---|---|---|---|
-| SASA (溶剂可及性)              |    150 | 0.7285 ± 0.0877 | 0.7662 |    100 | 0.6976 ± 0.0619 | 0.6967 |  -0.394 | 0.0007 ***  | ⬇ Top >> Bottom      |
-| Aggrescan3D (聚集风险)        |    150 | 0.3344 ± 0.0203 | 0.3365 |    100 | 0.3136 ± 0.0165 | 0.3140 |  -1.099 | 0.0092 **   | ⬇ Top >> Bottom      |
-| pLDDT (结构置信度)             |    150 | 0.4076 ± 0.0154 | 0.4083 |    100 | 0.4400 ± 0.0199 | 0.4364 |  +1.871 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| SoDoPE (溶解度-construct)    |    150 | 0.7288 ± 0.0339 | 0.7252 |    100 | 0.8540 ± 0.0216 | 0.8544 |  +4.225 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| TemStaPro (热稳定-construct) |    150 | 0.4759 ± 0.0283 | 0.4757 |    100 | 0.5490 ± 0.0265 | 0.5481 |  +2.656 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| BepiPred3 (B细胞表位-肽级)      |    150 | 0.2724 ± 0.0372 | 0.2776 |    100 | 0.2508 ± 0.0330 | 0.2523 |  -0.607 | 0.0000 ***  | ⬇ Top >> Bottom      |
-| TemStaPro (热稳定-肽级)        |    150 | 0.6404 ± 0.2557 | 0.7378 |    100 | 0.7833 ± 0.1302 | 0.8193 |  +0.666 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| SoDoPE (溶解度-肽级)           |    150 | 0.9603 ± 0.0445 | 0.9799 |    100 | 0.9996 ± 0.0017 | 0.9999 |  +1.139 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| pLM4CPPs (细胞穿透-肽级)        |    150 | 0.4803 ± 0.3637 | 0.4076 |    100 | 0.7676 ± 0.3768 | 0.9904 |  +0.778 | 0.0000 ***  | ⬆ Bottom >> Top      |
-| Round 7 综合分               |    150 | 0.6128 ± 0.0468 | 0.6248 |    100 | 0.6625 ± 0.0325 | 0.6623 |  +1.192 | 0.0000 ***  | ⬆ Bottom >> Top      |
-**解读**:
+| SASA (solvent accessibility)         |    150 | 0.7285 ± 0.0877 | 0.7662 |    100 | 0.6976 ± 0.0619 | 0.6967 |  -0.394 | 0.0007 ***  | ⬇ Top >> Bottom      |
+| Aggrescan3D (aggregation risk)       |    150 | 0.3344 ± 0.0203 | 0.3365 |    100 | 0.3136 ± 0.0165 | 0.3140 |  -1.099 | 0.0092 **   | ⬇ Top >> Bottom      |
+| pLDDT (structural confidence)        |    150 | 0.4076 ± 0.0154 | 0.4083 |    100 | 0.4400 ± 0.0199 | 0.4364 |  +1.871 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| SoDoPE (solubility-construct)        |    150 | 0.7288 ± 0.0339 | 0.7252 |    100 | 0.8540 ± 0.0216 | 0.8544 |  +4.225 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| TemStaPro (thermal stability-construct) |    150 | 0.4759 ± 0.0283 | 0.4757 |    100 | 0.5490 ± 0.0265 | 0.5481 |  +2.656 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| BepiPred3 (B-cell epitope, peptide level) |    150 | 0.2724 ± 0.0372 | 0.2776 |    100 | 0.2508 ± 0.0330 | 0.2523 |  -0.607 | 0.0000 ***  | ⬇ Top >> Bottom      |
+| TemStaPro (thermal stability, peptide level) |    150 | 0.6404 ± 0.2557 | 0.7378 |    100 | 0.7833 ± 0.1302 | 0.8193 |  +0.666 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| SoDoPE (solubility, peptide level)   |    150 | 0.9603 ± 0.0445 | 0.9799 |    100 | 0.9996 ± 0.0017 | 0.9999 |  +1.139 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| pLM4CPPs (cell penetration, peptide level) |    150 | 0.4803 ± 0.3637 | 0.4076 |    100 | 0.7676 ± 0.3768 | 0.9904 |  +0.778 | 0.0000 ***  | ⬆ Bottom >> Top      |
+| Round 7 composite score              |    150 | 0.6128 ± 0.0468 | 0.6248 |    100 | 0.6625 ± 0.0325 | 0.6623 |  +1.192 | 0.0000 ***  | ⬆ Bottom >> Top      |
+**Interpretation**:
 
-- **SASA (溶剂可及性)**: ⬇ Top 优于 Bottom（效应量 小，d=-0.394）
-- **Aggrescan3D (聚集风险)**: ⬆ Bottom 优于 Top（效应量 大，d=-1.099）（⚠ 注意：A3D越低=聚集风险越低=越好，所以Bottom实际更优）
-- **pLDDT (结构置信度)**: ⬆ Bottom 优于 Top（效应量 大，d=1.871）
-- **SoDoPE (溶解度-construct)**: ⬆ Bottom 优于 Top（效应量 大，d=4.225）
-- **TemStaPro (热稳定-construct)**: ⬆ Bottom 优于 Top（效应量 大，d=2.656）
-- **BepiPred3 (B细胞表位-肽级)**: ⬇ Top 优于 Bottom（效应量 中，d=-0.607）
-- **TemStaPro (热稳定-肽级)**: ⬆ Bottom 优于 Top（效应量 中，d=0.666）
-- **SoDoPE (溶解度-肽级)**: ⬆ Bottom 优于 Top（效应量 大，d=1.139）
-- **pLM4CPPs (细胞穿透-肽级)**: ⬆ Bottom 优于 Top（效应量 中，d=0.778）
-- **Round 7 综合分**: ⬆ Bottom 优于 Top（效应量 大，d=1.192）
-
----
-
-## 结论
-
-### 最终 250 constructs 层面的判断
-
-**注意**: Aggrescan3D 的"好"方向是反的（越低=聚集风险越低=越好），以下计数已修正。
-
-在 **10** 个最终属性中（方向修正后）：
-- **Bottom 显著优于 Top（效应量大）**: 8 个
-- **Bottom 略优于 Top（效应量中/小）**: 0 个
-- **Top 显著优于 Bottom**: 1 个
-- **Top 略优于 Bottom**: 1 个
-- **无显著差异**: 0 个
-
-### 总体结论
-
-**判定：该观察基本成立**。 Bottom 通道在 8/10 个属性上优于 Top，Top 仅在 2 个属性上占优（SASA、BepiPred3）。
-
-Bottom 显著更优的属性：Aggrescan3D (聚集风险), pLDDT (结构置信度), SoDoPE (溶解度-construct), TemStaPro (热稳定-construct), TemStaPro (热稳定-肽级), SoDoPE (溶解度-肽级), pLM4CPPs (细胞穿透-肽级), Round 7 综合分。
-
-Top 更优的属性：BepiPred3 (B细胞表位-肽级), SASA (溶剂可及性)。
-
-这可能是因为：
-1. **抗氧化与功能属性存在内在权衡** — 高抗氧化序列可能牺牲了溶解度、热稳定性等其他功能属性
-2. **Top 通道的筛选压力单一** — 仅按 AnOxPePred 排序，其他属性方差大；Bottom 通道虽然抗氧化差，但经过后续多轮筛选后，保留下来的反而在其他属性上更优
-3. **双通道设计的成功体现** — 如果只看抗氧化，会错过这些"低抗氧化但高多功能"的候选，这正是 Bottom 通道存在的原因
-
-### 对 pipeline 设计的影响
-
-- Bottom 通道的存在被证明是**有价值的** — 它确实捕获了在抗氧化上弱但在其他功能上强的候选
-- 最终排名公式中 Bottom 优于 Top 是**预期内的结构现象**，不代表设计有误
-- 建议 wet-lab 验证时**两个通道都选取 top 候选**，不要只选 Top 通道
-
+- **SASA (solvent accessibility)**: ⬇ Top better than Bottom (effect size small, d=-0.394)
+- **Aggrescan3D (aggregation risk)**: ⬆ Bottom better than Top (effect size large, d=-1.099) (⚠ Note: lower A3D = lower aggregation risk = better, so Bottom is in fact better)
+- **pLDDT (structural confidence)**: ⬆ Bottom better than Top (effect size large, d=1.871)
+- **SoDoPE (solubility-construct)**: ⬆ Bottom better than Top (effect size large, d=4.225)
+- **TemStaPro (thermal stability-construct)**: ⬆ Bottom better than Top (effect size large, d=2.656)
+- **BepiPred3 (B-cell epitope, peptide level)**: ⬇ Top better than Bottom (effect size medium, d=-0.607)
+- **TemStaPro (thermal stability, peptide level)**: ⬆ Bottom better than Top (effect size medium, d=0.666)
+- **SoDoPE (solubility, peptide level)**: ⬆ Bottom better than Top (effect size large, d=1.139)
+- **pLM4CPPs (cell penetration, peptide level)**: ⬆ Bottom better than Top (effect size medium, d=0.778)
+- **Round 7 composite score**: ⬆ Bottom better than Top (effect size large, d=1.192)
 
 ---
 
-*分析脚本: `main/analysis_validate_channel_claim.py`*
+## Conclusion
+
+### Judgment at the level of the final 250 constructs
+
+**Note**: the "good" direction for Aggrescan3D is reversed (lower = lower aggregation risk = better); the counts below have already been corrected.
+
+Among the **10** final attributes (after direction correction):
+- **Bottom significantly better than Top (large effect size)**: 8
+- **Bottom slightly better than Top (medium/small effect size)**: 0
+- **Top significantly better than Bottom**: 1
+- **Top slightly better than Bottom**: 1
+- **No significant difference**: 0
+
+### Overall conclusion
+
+**Verdict: the observation largely holds.** The Bottom channel is better than Top on 8/10 attributes, and Top is ahead on only 2 attributes (SASA, BepiPred3).
+
+Attributes where Bottom is significantly better: Aggrescan3D (aggregation risk), pLDDT (structural confidence), SoDoPE (solubility-construct), TemStaPro (thermal stability-construct), TemStaPro (thermal stability, peptide level), SoDoPE (solubility, peptide level), pLM4CPPs (cell penetration, peptide level), Round 7 composite score.
+
+Attributes where Top is better: BepiPred3 (B-cell epitope, peptide level), SASA (solvent accessibility).
+
+This may be because:
+1. **Antioxidant activity and functional attributes are in an intrinsic trade-off** — highly antioxidant sequences may sacrifice solubility, thermal stability, and other functional attributes
+2. **Selection pressure in the Top channel is single-track** — sorting only by AnOxPePred leaves high variance in other attributes; although the Bottom channel is poor on antioxidant activity, after subsequent rounds of screening what remains is in fact better on other attributes
+3. **A demonstration that the dual-channel design works** — looking only at antioxidant activity would miss these candidates that are "low antioxidant but highly multi-functional," which is precisely why the Bottom channel exists
+
+### Implications for pipeline design
+
+- The existence of the Bottom channel is proven **valuable** — it does capture candidates that are weak on antioxidant activity but strong on other functions
+- That Bottom outranks Top in the final ranking formula is an **expected structural phenomenon** and does not indicate a design error
+- For wet-lab validation it is recommended to **select top candidates from both channels**, not only from the Top channel
+
+
+---
+
+*Analysis script: `main/analysis_validate_channel_claim.py`*

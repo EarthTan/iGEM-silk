@@ -1,99 +1,101 @@
-# MHCflurry 使用指南
+> **English** | [中文](mhcflurry_guide.zh.md)
 
-## 概述
+# MHCflurry Usage Guide
 
-MHCflurry 是一个基于深度学习的MHC I类肽结合亲和力预测工具。本指南提供MHCflurry的完整使用说明，包括安装、配置、预测、分析和故障排除。
+## Overview
 
-## 安装和配置
+MHCflurry is a deep learning based MHC class I peptide binding affinity prediction tool. This guide provides complete instructions for using MHCflurry, including installation, configuration, prediction, analysis, and troubleshooting.
 
-### 系统要求
+## Installation and Configuration
 
-- Python 3.8 或更高版本
-- 至少 2GB 可用内存
-- 网络连接（用于下载预训练模型）
-- 约 200MB 磁盘空间（用于模型存储）
+### System Requirements
 
-### 安装步骤
+- Python 3.8 or later
+- At least 2GB of available memory
+- A network connection (to download the pre-trained models)
+- About 200MB of disk space (for model storage)
 
-1. **安装MHCflurry**:
+### Installation Steps
+
+1. **Install MHCflurry**:
    ```bash
    pip install mhcflurry
    ```
 
-2. **安装可选依赖**（用于数据分析和可视化）:
+2. **Install the optional dependencies** (for data analysis and visualization):
    ```bash
    pip install pandas numpy matplotlib seaborn
    ```
 
-3. **下载预训练模型**:
+3. **Download the pre-trained models**:
    ```bash
    python -c "from mhcflurry.downloads import fetch_models; fetch_models()"
    ```
 
-   或者，在代码中首次使用时自动下载。
+   Alternatively, they are downloaded automatically on first use in code.
 
-### 验证安装
+### Verifying the Installation
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
-# 创建预测器实例
+# Create a predictor instance
 predictor = Class1AffinityPredictor.load()
 
-# 测试预测
+# Test prediction
 predictions = predictor.predict(
     peptides=["SIINFEKL"],
     alleles=["HLA-A*02:01"]
 )
 
-print(f"安装成功！预测结果: {predictions}")
+print(f"Installation successful! Predictions: {predictions}")
 ```
 
-## 核心概念
+## Core Concepts
 
-### 1. 结合亲和力
+### 1. Binding affinity
 
-结合亲和力以纳摩尔（nM）为单位表示，值越低表示结合越强：
-- **< 50 nM**: 强结合
-- **50-500 nM**: 弱结合
-- **> 500 nM**: 非结合
+Binding affinity is expressed in nanomolar (nM) units; lower values indicate stronger binding:
+- **< 50 nM**: strong binding
+- **50-500 nM**: weak binding
+- **> 500 nM**: non-binding
 
-### 2. 百分位排名
+### 2. Percentile rank
 
-百分位排名表示该肽的结合亲和力相对于随机肽的排名：
-- **< 0.5%**: 极强结合
-- **0.5-2%**: 强结合
-- **2-10%**: 中等结合
-- **> 10%**: 弱结合
+The percentile rank indicates where the peptide's binding affinity ranks relative to random peptides:
+- **< 0.5%**: extremely strong binding
+- **0.5-2%**: strong binding
+- **2-10%**: moderate binding
+- **> 10%**: weak binding
 
-### 3. 结合类别
+### 3. Binding class
 
-基于标准阈值自动分类：
-- **强结合子**: ≤ 50 nM
-- **弱结合子**: 50-500 nM
-- **非结合子**: > 500 nM
+Automatically classified based on standard thresholds:
+- **strong binder**: ≤ 50 nM
+- **weak binder**: 50-500 nM
+- **non-binder**: > 500 nM
 
-## API参考
+## API Reference
 
-### 主要类
+### Main classes
 
 #### Class1AffinityPredictor
-主预测器类，提供所有预测功能。
+The main predictor class, providing all prediction functionality.
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
-# 加载预测器
+# Load the predictor
 predictor = Class1AffinityPredictor.load()
 
-# 主要方法
-predictions = predictor.predict(peptides, alleles)  # 预测结合亲和力
-predictions = predictor.predict_to_dataframe(peptides, alleles)  # 预测到DataFrame
-percentile_ranks = predictor.predict_percentile_ranks(peptides, alleles)  # 预测百分位排名
+# Main methods
+predictions = predictor.predict(peptides, alleles)  # predict binding affinity
+predictions = predictor.predict_to_dataframe(peptides, alleles)  # predict into a DataFrame
+percentile_ranks = predictor.predict_percentile_ranks(peptides, alleles)  # predict percentile ranks
 ```
 
 #### Class1PresentationPredictor
-包含抗原加工预测的增强预测器。
+An enhanced predictor that includes antigen processing prediction.
 
 ```python
 from mhcflurry import Class1PresentationPredictor
@@ -102,32 +104,32 @@ predictor = Class1PresentationPredictor.load()
 predictions = predictor.predict(peptides, alleles)
 ```
 
-### 预测结果
+### Prediction results
 
-预测结果包含以下字段：
+Prediction results contain the following fields:
 
-| 字段 | 类型 | 描述 |
+| Field | Type | Description |
 |------|------|------|
-| peptide | str | 肽序列 |
-| allele | str | MHC等位基因 |
-| prediction | float | 结合亲和力（nM） |
-| percentile_rank | float | 百分位排名 |
-| prediction_low | float | 预测下限（95%置信区间） |
-| prediction_high | float | 预测上限（95%置信区间） |
-| presentation_score | float | 呈递评分（仅Class1PresentationPredictor） |
-| processing_score | float | 加工评分（仅Class1PresentationPredictor） |
+| peptide | str | peptide sequence |
+| allele | str | MHC allele |
+| prediction | float | binding affinity (nM) |
+| percentile_rank | float | percentile rank |
+| prediction_low | float | lower prediction bound (95% confidence interval) |
+| prediction_high | float | upper prediction bound (95% confidence interval) |
+| presentation_score | float | presentation score (Class1PresentationPredictor only) |
+| processing_score | float | processing score (Class1PresentationPredictor only) |
 
-## 使用示例
+## Usage Examples
 
-### 示例1：基本预测
+### Example 1: basic prediction
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
-# 加载预测器
+# Load the predictor
 predictor = Class1AffinityPredictor.load()
 
-# 预测单个肽
+# Predict a single peptide
 peptides = ["SIINFEKL"]
 alleles = ["HLA-A*02:01"]
 
@@ -135,7 +137,7 @@ predictions = predictor.predict(peptides, alleles)
 print(predictions)
 ```
 
-### 示例2：批量预测
+### Example 2: batch prediction
 
 ```python
 from mhcflurry import Class1AffinityPredictor
@@ -143,19 +145,19 @@ import pandas as pd
 
 predictor = Class1AffinityPredictor.load()
 
-# 批量预测多个肽和等位基因
+# Batch predict multiple peptides and alleles
 peptides = ["SIINFEKL", "NLVPMVATV", "GILGFVFTL"]
 alleles = ["HLA-A*02:01", "HLA-A*01:01"]
 
-# 预测到DataFrame
+# Predict into a DataFrame
 df = predictor.predict_to_dataframe(peptides, alleles)
 print(df)
 
-# 保存结果
+# Save the results
 df.to_csv("predictions.csv", index=False)
 ```
 
-### 示例3：使用抗原加工预测
+### Example 3: using antigen processing prediction
 
 ```python
 from mhcflurry import Class1PresentationPredictor
@@ -165,25 +167,25 @@ predictor = Class1PresentationPredictor.load()
 peptides = ["SIINFEKL", "NLVPMVATV"]
 alleles = ["HLA-A*02:01"]
 
-# 预测包含加工和呈递评分
+# Predictions include processing and presentation scores
 predictions = predictor.predict(peptides, alleles)
 print(predictions)
 ```
 
-### 示例4：自定义阈值
+### Example 4: custom thresholds
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
 predictor = Class1AffinityPredictor.load()
 
-# 预测
+# Predict
 peptides = ["SIINFEKL", "NLVPMVATV", "GILGFVFTL"]
 alleles = ["HLA-A*02:01"]
 
 df = predictor.predict_to_dataframe(peptides, alleles)
 
-# 自定义分类阈值
+# Custom classification thresholds
 def classify_affinity(affinity_nM, strong_threshold=50, weak_threshold=500):
     if affinity_nM <= strong_threshold:
         return "strong_binder"
@@ -196,52 +198,52 @@ df["binding_class"] = df["prediction"].apply(classify_affinity)
 print(df[["peptide", "allele", "prediction", "binding_class"]])
 ```
 
-## 等位基因支持
+## Allele Support
 
-### 常见人类HLA等位基因
+### Common Human HLA Alleles
 
-MHCflurry支持数百种MHC I类等位基因，包括：
+MHCflurry supports hundreds of MHC class I alleles, including:
 
 #### HLA-A
-- HLA-A*02:01 (全球最常见)
-- HLA-A*01:01 (欧洲常见)
-- HLA-A*03:01 (全球分布)
-- HLA-A*11:01 (亚洲常见)
-- HLA-A*24:02 (亚洲最常见)
+- HLA-A*02:01 (most common worldwide)
+- HLA-A*01:01 (common in Europe)
+- HLA-A*03:01 (distributed worldwide)
+- HLA-A*11:01 (common in Asia)
+- HLA-A*24:02 (most common in Asia)
 
 #### HLA-B
-- HLA-B*07:02 (全球常见)
-- HLA-B*08:01 (欧洲常见)
-- HLA-B*15:01 (全球分布)
-- HLA-B*35:01 (地中海地区常见)
-- HLA-B*40:01 (亚洲常见)
+- HLA-B*07:02 (common worldwide)
+- HLA-B*08:01 (common in Europe)
+- HLA-B*15:01 (distributed worldwide)
+- HLA-B*35:01 (common in the Mediterranean region)
+- HLA-B*40:01 (common in Asia)
 
 #### HLA-C
-- HLA-C*07:02 (全球最常见)
-- HLA-C*04:01 (欧洲常见)
-- HLA-C*05:01 (中东常见)
-- HLA-C*06:02 (亚洲常见)
+- HLA-C*07:02 (most common worldwide)
+- HLA-C*04:01 (common in Europe)
+- HLA-C*05:01 (common in the Middle East)
+- HLA-C*06:02 (common in Asia)
 
-### 其他物种
+### Other Species
 
-#### 小鼠 (H-2)
+#### Mouse (H-2)
 - H-2-Kb
 - H-2-Db
 - H-2-Kd
 - H-2-Dd
 - H-2-Ld
 
-#### 恒河猴 (Mamu)
+#### Rhesus macaque (Mamu)
 - Mamu-A1*001
 - Mamu-B*001
 - Mamu-B*003
 - Mamu-B*004
 
-#### 黑猩猩 (Patr)
+#### Chimpanzee (Patr)
 - Patr-A*0101
 - Patr-B*0101
 
-### 获取支持列表
+### Getting the Supported List
 
 ```python
 from mhcflurry import Class1AffinityPredictor
@@ -249,56 +251,56 @@ from mhcflurry import Class1AffinityPredictor
 predictor = Class1AffinityPredictor.load()
 alleles = predictor.supported_alleles
 
-print(f"总共支持 {len(alleles)} 个等位基因")
-print("前20个等位基因:")
+print(f"Total supported alleles: {len(alleles)}")
+print("First 20 alleles:")
 for i, allele in enumerate(alleles[:20], 1):
     print(f"  {i:2d}. {allele}")
 ```
 
-## 性能优化
+## Performance Optimization
 
-### 1. 批量处理
+### 1. Batch processing
 
-批量预测比逐个预测更高效：
+Batch prediction is more efficient than predicting one by one:
 
 ```python
-# 推荐：批量预测
+# Recommended: batch prediction
 predictions = predictor.predict(peptides, alleles)
 
-# 不推荐：逐个预测
+# Not recommended: predicting one by one
 for peptide in peptides:
     prediction = predictor.predict([peptide], alleles)
 ```
 
-### 2. 减少等位基因数量
+### 2. Reducing the number of alleles
 
-预测时间与等位基因数量成正比：
+Prediction time is proportional to the number of alleles:
 
 ```python
-# 高效：使用较少的等位基因
+# Efficient: use fewer alleles
 predictions = predictor.predict(peptides, ["HLA-A*02:01", "HLA-B*07:02"])
 
-# 低效：使用大量等位基因
+# Inefficient: use a large number of alleles
 predictions = predictor.predict(peptides, all_alleles[:50])
 ```
 
-### 3. 使用适当的数据结构
+### 3. Using appropriate data structures
 
-使用列表而不是单个值进行预测：
+Use lists rather than single values for prediction:
 
 ```python
-# 正确：使用列表
+# Correct: use lists
 peptides = ["SIINFEKL", "NLVPMVATV"]
 alleles = ["HLA-A*02:01"]
 
-# 错误：使用单个值（需要额外处理）
+# Wrong: use single values (requires extra handling)
 peptide = "SIINFEKL"
 allele = "HLA-A*02:01"
 ```
 
-### 4. 内存管理
+### 4. Memory management
 
-对于大规模预测，分批处理：
+For large-scale predictions, process the data in batches:
 
 ```python
 def predict_in_batches(peptides, alleles, batch_size=1000):
@@ -309,21 +311,21 @@ def predict_in_batches(peptides, alleles, batch_size=1000):
         results.extend(batch_results)
     return results
 
-# 大规模预测
-large_peptide_list = [...]  # 10000个肽
+# Large-scale prediction
+large_peptide_list = [...]  # 10000 peptides
 results = predict_in_batches(large_peptide_list, ["HLA-A*02:01"])
 ```
 
-## 结果分析
+## Result Analysis
 
-### 统计摘要
+### Statistical summary
 
 ```python
 import pandas as pd
 import numpy as np
 
 def analyze_predictions(df):
-    """分析预测结果"""
+    """Analyze the prediction results"""
     summary = {
         "total_predictions": len(df),
         "strong_binders": len(df[df["prediction"] <= 50]),
@@ -336,213 +338,213 @@ def analyze_predictions(df):
         "std_affinity": df["prediction"].std(),
     }
     
-    # 按等位基因分组统计
+    # Group statistics by allele
     allele_stats = df.groupby("allele")["prediction"].agg([
         "count", "mean", "median", "min", "max", "std"
     ]).round(2)
     
     return summary, allele_stats
 
-# 使用示例
+# Example usage
 df = predictor.predict_to_dataframe(peptides, alleles)
 summary, allele_stats = analyze_predictions(df)
 
-print("统计摘要:")
+print("Statistical summary:")
 for key, value in summary.items():
     print(f"  {key}: {value}")
 
-print("\n等位基因统计:")
+print("\nAllele statistics:")
 print(allele_stats)
 ```
 
-### 可视化
+### Visualization
 
 ```python
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 def visualize_predictions(df, output_path=None):
-    """可视化预测结果"""
+    """Visualize the prediction results"""
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     
-    # 1. 结合亲和力分布
+    # 1. Binding affinity distribution
     axes[0, 0].hist(df["prediction"], bins=50, edgecolor='black', alpha=0.7)
-    axes[0, 0].axvline(x=50, color='red', linestyle='--', label='强结合阈值')
-    axes[0, 0].axvline(x=500, color='orange', linestyle='--', label='弱结合阈值')
-    axes[0, 0].set_xlabel("结合亲和力 (nM)")
-    axes[0, 0].set_ylabel("频数")
-    axes[0, 0].set_title("结合亲和力分布")
+    axes[0, 0].axvline(x=50, color='red', linestyle='--', label='strong binder threshold')
+    axes[0, 0].axvline(x=500, color='orange', linestyle='--', label='weak binder threshold')
+    axes[0, 0].set_xlabel("Binding affinity (nM)")
+    axes[0, 0].set_ylabel("Frequency")
+    axes[0, 0].set_title("Binding affinity distribution")
     axes[0, 0].legend()
     axes[0, 0].set_xscale('log')
     
-    # 2. 结合类别饼图
+    # 2. Binding class pie chart
     binding_classes = []
     for affinity in df["prediction"]:
         if affinity <= 50:
-            binding_classes.append("强结合子")
+            binding_classes.append("strong binder")
         elif affinity <= 500:
-            binding_classes.append("弱结合子")
+            binding_classes.append("weak binder")
         else:
-            binding_classes.append("非结合子")
+            binding_classes.append("non-binder")
     
     class_counts = pd.Series(binding_classes).value_counts()
     axes[0, 1].pie(class_counts.values, labels=class_counts.index, autopct='%1.1f%%')
-    axes[0, 1].set_title("结合类别分布")
+    axes[0, 1].set_title("Binding class distribution")
     
-    # 3. 等位基因箱线图
+    # 3. Allele box plot
     if len(df["allele"].unique()) > 1:
         sns.boxplot(data=df, x="allele", y="prediction", ax=axes[1, 0])
         axes[1, 0].set_yscale('log')
-        axes[1, 0].set_xlabel("等位基因")
-        axes[1, 0].set_ylabel("结合亲和力 (nM)")
-        axes[1, 0].set_title("等位基因比较")
+        axes[1, 0].set_xlabel("Allele")
+        axes[1, 0].set_ylabel("Binding affinity (nM)")
+        axes[1, 0].set_title("Allele comparison")
         axes[1, 0].tick_params(axis='x', rotation=45)
     
-    # 4. 肽长度散点图
+    # 4. Peptide length scatter plot
     df["peptide_length"] = df["peptide"].apply(len)
     axes[1, 1].scatter(df["peptide_length"], df["prediction"], alpha=0.6)
-    axes[1, 1].set_xlabel("肽长度")
-    axes[1, 1].set_ylabel("结合亲和力 (nM)")
-    axes[1, 1].set_title("肽长度与结合亲和力关系")
+    axes[1, 1].set_xlabel("Peptide length")
+    axes[1, 1].set_ylabel("Binding affinity (nM)")
+    axes[1, 1].set_title("Relationship between peptide length and binding affinity")
     axes[1, 1].set_yscale('log')
     
     plt.tight_layout()
     
     if output_path:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"可视化已保存到: {output_path}")
+        print(f"Visualization saved to: {output_path}")
     
     plt.show()
 
-# 使用示例
+# Example usage
 visualize_predictions(df, "mhcflurry_visualization.png")
 ```
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Common issues
 
-#### Q1: MHCflurry安装失败
-**错误**: `pip install mhcflurry` 失败
-**解决方案**:
+#### Q1: MHCflurry installation fails
+**Error**: `pip install mhcflurry` fails
+**Solution**:
 ```bash
-# 升级pip
+# Upgrade pip
 pip install --upgrade pip
 
-# 使用清华镜像
+# Use the Tsinghua mirror
 pip install mhcflurry -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 或使用conda
+# Or use conda
 conda install -c bioconda mhcflurry
 ```
 
-#### Q2: 模型下载失败
-**错误**: 首次使用时模型下载失败
-**解决方案**:
+#### Q2: Model download fails
+**Error**: the model download fails on first use
+**Solution**:
 ```bash
-# 手动下载
+# Manual download
 python -c "from mhcflurry.downloads import fetch_models; fetch_models()"
 
-# 或指定镜像
+# Or specify a mirror
 python -c "from mhcflurry.downloads import fetch_models; fetch_models(mirror='https://github.com')"
 ```
 
-#### Q3: 预测速度慢
-**问题**: 预测大量数据时速度慢
-**解决方案**:
-1. 使用批量预测而非单个预测
-2. 减少同时预测的等位基因数量
-3. 使用更强大的硬件
-4. 考虑使用GPU加速（如果可用）
+#### Q3: Prediction is slow
+**Problem**: prediction is slow when scoring large amounts of data
+**Solution**:
+1. Use batch prediction instead of single predictions
+2. Reduce the number of alleles predicted at the same time
+3. Use more powerful hardware
+4. Consider GPU acceleration (if available)
 
-#### Q4: 内存不足
-**问题**: 预测大量数据时内存不足
-**解决方案**:
-1. 减少批量大小
-2. 分批处理数据
-3. 增加系统内存
-4. 使用流式处理
+#### Q4: Out of memory
+**Problem**: out of memory when predicting large amounts of data
+**Solution**:
+1. Reduce the batch size
+2. Process the data in batches
+3. Add system memory
+4. Use streaming
 
-#### Q5: 等位基因不支持
-**错误**: `ValueError: 不支持的等位基因`
-**解决方案**:
+#### Q5: Allele not supported
+**Error**: `ValueError: Unsupported allele`
+**Solution**:
 ```python
-# 检查支持的等位基因
+# Check the supported alleles
 alleles = predictor.supported_alleles
-print(f"支持的等位基因: {alleles}")
+print(f"Supported alleles: {alleles}")
 
-# 使用支持的等位基因
+# Use a supported allele
 if "HLA-A*02:01" in alleles:
     predictions = predictor.predict(peptides, ["HLA-A*02:01"])
 ```
 
-### 错误处理示例
+### Error handling example
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
 try:
-    # 尝试加载预测器
+    # Try to load the predictor
     predictor = Class1AffinityPredictor.load()
     
-    # 尝试预测
+    # Try to predict
     predictions = predictor.predict(["SIINFEKL"], ["HLA-A*02:01"])
     
 except ImportError as e:
-    print(f"导入错误: {e}")
-    print("请确保已安装MHCflurry: pip install mhcflurry")
+    print(f"Import error: {e}")
+    print("Make sure MHCflurry is installed: pip install mhcflurry")
     
 except ValueError as e:
-    print(f"值错误: {e}")
-    print("请检查肽序列或等位基因格式")
+    print(f"Value error: {e}")
+    print("Check the peptide sequence or allele format")
     
 except RuntimeError as e:
-    print(f"运行时错误: {e}")
-    print("请检查模型文件是否存在")
+    print(f"Runtime error: {e}")
+    print("Check whether the model files exist")
     
 except Exception as e:
-    print(f"未知错误: {e}")
-    print("请查看MHCflurry文档或报告问题")
+    print(f"Unknown error: {e}")
+    print("See the MHCflurry documentation or report the issue")
 ```
 
-## 高级用法
+## Advanced Usage
 
-### 自定义模型
+### Custom models
 
 ```python
 from mhcflurry import Class1AffinityPredictor
 
-# 从自定义路径加载模型
+# Load the model from a custom path
 predictor = Class1AffinityPredictor.load("/path/to/custom/models")
 
-# 或训练自定义模型
+# Or train a custom model
 # predictor.train(training_data, ...)
 ```
 
-### 集成到工作流
+### Integration into a workflow
 
 ```python
 def vaccine_candidate_pipeline(fasta_file, alleles, output_dir):
-    """疫苗候选肽筛选流水线"""
+    """Vaccine candidate peptide screening pipeline"""
     import os
     from Bio import SeqIO
     
-    # 1. 从FASTA读取肽序列
+    # 1. Read peptide sequences from FASTA
     peptides = []
     for record in SeqIO.parse(fasta_file, "fasta"):
         peptides.append(str(record.seq))
     
-    # 2. 初始化预测器
+    # 2. Initialize the predictor
     predictor = Class1AffinityPredictor.load()
     
-    # 3. 批量预测
+    # 3. Batch prediction
     df = predictor.predict_to_dataframe(peptides, alleles)
     
-    # 4. 筛选强结合子
+    # 4. Filter strong binders
     strong_binders = df[df["prediction"] <= 50].copy()
     
-    # 5. 按亲和力排序
+    # 5. Sort by affinity
     strong_binders = strong_binders.sort_values("prediction")
     
-    # 6. 保存结果
+    # 6. Save the results
     os.makedirs(output_dir, exist

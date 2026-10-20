@@ -1,78 +1,80 @@
-# AlgPred2 方法论与技术背景
+> **English** | [中文](methodology.zh.md)
 
-## 算法定位
+# AlgPred2 Methodology and Technical Background
 
-**AlgPred2** 是由 Prof G. P. S. Raghava 团队开发的过敏原性预测工具。它的核心定位是：
+## Algorithm Positioning
 
-> 将肽/蛋白序列的过敏原性风险转化为可量化的机器学习评分，用于初步筛选阶段的保守风险评估。
+**AlgPred2** is an allergenicity prediction tool developed by Prof. G. P. S. Raghava's team. Its core positioning is:
 
-## 在融合引擎中的角色
+> Converting the allergenicity risk of peptide/protein sequences into a quantifiable machine learning score, used for conservative risk assessment in the preliminary screening stage.
 
-根据 TASK.md 的定义，AlgPred2 在融合引擎中承担以下角色：
+## Role in the Fusion Engine
 
-| 角色 | 说明 |
+According to the definition in TASK.md, AlgPred2 plays the following roles in the fusion engine:
+
+| Role | Description |
 | --- | --- |
-| **风险筛查层** | 作为保守惩罚项，对高过敏原风险的序列进行过滤 |
-| **特征信号源** | 提供 ML_Score 作为后续评分的输入信号之一 |
+| **Risk screening layer** | Acts as a conservative penalty term, filtering sequences with high allergenicity risk |
+| **Feature signal source** | Provides ML_Score as one of the input signals for subsequent scoring |
 
-## 方法论
+## Methodology
 
-### 核心思路
+### Core Idea
 
-1. **序列编码**: 将氨基酸序列转换为数值特征
-2. **机器学习模型**: 基于训练好的模型预测过敏原性概率
-3. **阈值判断**: 根据阈值判断是否为过敏原
+1. **Sequence encoding**: convert amino acid sequences into numerical features
+2. **Machine learning model**: predict allergenicity probability based on a trained model
+3. **Threshold decision**: decide whether the sequence is an allergen based on the threshold
 
-### 技术实现
+### Technical Implementation
 
-- **底层框架**: scikit-learn
-- **模型格式**: pickle 二进制模型
-- **依赖**: numpy 1.26.4（矩阵运算）
+- **Underlying framework**: scikit-learn
+- **Model format**: pickle binary model
+- **Dependency**: numpy 1.26.4 (matrix operations)
 
-### 输入限制
+### Input Limitations
 
-| 维度 | 限制 |
+| Dimension | Limitation |
 | --- | --- |
-| 序列长度 | 无明确上限，实测可处理长序列 |
-| 氨基酸类型 | 标准 20 种氨基酸 |
-| 输入格式 | FASTA 或纯序列文本 |
+| Sequence length | No explicit upper limit; long sequences are processable in practice |
+| Amino acid types | The 20 standard amino acids |
+| Input format | FASTA or plain sequence text |
 
-## 融合引擎集成建议
+## Fusion Engine Integration Recommendations
 
-### 作为惩罚项
+### As a Penalty Term
 
 ```python
-# 伪代码示例
+# Pseudocode example
 def calculate_penalty(score):
     if score.prediction == "Allergen":
-        return 1.0  # 完全排除
+        return 1.0  # Exclude entirely
     elif score.ml_score > 0.5:
-        return 0.5  # 高风险降权
+        return 0.5  # Down-weight high risk
     else:
-        return 0.0  # 低风险通过
+        return 0.0  # Low risk, pass
 ```
 
-### 阈值选择建议
+### Threshold Selection Recommendations
 
-| 应用场景 | 推荐阈值 |
+| Application scenario | Recommended threshold |
 | --- | --- |
-| 保守筛选（优先安全） | 0.3（默认） |
-| 平衡模式 | 0.5 |
-| 宽松筛选（优先活性） | 0.7 |
+| Conservative screening (safety first) | 0.3 (default) |
+| Balanced mode | 0.5 |
+| Lenient screening (activity first) | 0.7 |
 
-## 局限性
+## Limitations
 
-### 已确认限制
+### Confirmed Limitations
 
-1. **不是开箱即用**: 需要手动安装额外依赖
-2. **顶层 API 不完善**: 不能作为 Python 函数直接调用
-3. **适合文件输入**: 不适合嵌入为纯函数式 API
-4. **未优化短肽**: 主要针对蛋白设计，短肽可能效果有限
+1. **Not out of the box**: additional dependencies must be installed manually
+2. **Incomplete top-level API**: cannot be called directly as a Python function
+3. **File-input oriented**: not suitable for embedding as a purely functional API
+4. **Not optimized for short peptides**: mainly designed for proteins; effectiveness on short peptides may be limited
 
-### 融合肽场景注意事项
+### Caveats for Fusion Peptide Scenarios
 
-对于融合肽场景，AlgPred2 的使用建议：
+For fusion peptide scenarios, the recommended use of AlgPred2 is:
 
-1. **分别评估各组分**: 对融合肽的每个功能模块单独评估
-2. **Linker 区域风险**: Linker 序列可能引入新的过敏原性风险
-3. **组合效应**: 融合后的过敏原性可能不等于各组分之和
+1. **Evaluate each component separately**: assess each functional module of the fusion peptide individually
+2. **Linker region risk**: linker sequences may introduce new allergenicity risk
+3. **Combination effects**: the allergenicity after fusion may not equal the sum of the components

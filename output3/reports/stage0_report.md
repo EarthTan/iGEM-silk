@@ -1,29 +1,31 @@
-# Stage 0 预处理报告
+> **English** | [中文](stage0_report.zh.md)
 
-> 生成时间: 2026-05-17 02:59:44
+# Stage 0 Preprocessing Report
 
-## 概要
+> Generated: 2026-05-17 02:59:44
 
-| 指标 | 值 |
+## Summary
+
+| Metric | Value |
 |------|-----|
-| 候选池总数 | 19,890,021 |
-| UniProt 扫描 | 225,619,586 条 |
-| UniProt 写入 | 733,573 条 |
-| MGnify 扫描 | 623,796,864 条 |
-| MGnify 写入 | 19,156,448 条 |
-| 总耗时 | 5924s |
-| 筛选范围 | 3-30 aa |
+| Total candidate pool | 19,890,021 |
+| UniProt scanned | 225,619,586 |
+| UniProt written | 733,573 |
+| MGnify scanned | 623,796,864 |
+| MGnify written | 19,156,448 |
+| Total duration | 5924s |
+| Filter range | 3-30 aa |
 
-## 各数据源统计
+## Per-Source Statistics
 
-| Source | 条目数 | 最小长度 | 最大长度 | 平均长度 |
+| Source | Entries | Min length | Max length | Mean length |
 |--------|--------|---------|---------|---------|
 | mgy | 19,156,448 | 4 | 30 | 25.4 |
 | uniprot | 733,573 | 3 | 30 | 22.5 |
 
-## 长度分布
+## Length Distribution
 
-| 长度 | 数量 |
+| Length | Count |
 |------|------|
 | 3 | 5 █ |
 | 4 | 24 █ |
@@ -54,17 +56,17 @@
 | 29 | 2,198,924 ████████████████████████████████████████ |
 | 30 | 2,118,521 ██████████████████████████████████████ |
 
-## 预筛选详情
+## Pre-Filtering Details
 
-| 阶段 | 数量 |
+| Stage | Count |
 |------|------|
-| UniProt 原始序列 | 225,619,586 |
-| UniProt 长度通过 (3-30aa) | 744,565 |
-| UniProt AA 通过 | 733,573 |
-| UniProt 去重后写入 | 733,573 |
-| UniProt 重复跳过 | 0 |
-| MGnify 原始序列 | 623,796,864 |
-| MGnify 长度通过 (3-30aa) | 19,156,521 |
-| MGnify AA 通过 | 19,156,448 |
-| MGnify 去重后写入 | 19,156,448 |
-| MGnify 重复跳过 | 0 |
+| UniProt raw sequences | 225,619,586 |
+| UniProt passing length (3-30aa) | 744,565 |
+| UniProt passing AA filter | 733,573 |
+| UniProt written after deduplication | 733,573 |
+| UniProt duplicates skipped | 0 |
+| MGnify raw sequences | 623,796,864 |
+| MGnify passing length (3-30aa) | 19,156,521 |
+| MGnify passing AA filter | 19,156,448 |
+| MGnify written after deduplication | 19,156,448 |
+| MGnify duplicates skipped | 0 |

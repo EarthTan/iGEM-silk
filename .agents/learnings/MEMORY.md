@@ -1,34 +1,36 @@
-- [GPU 显存争用](gpu-memory-contention.md) — GEP: 多个 GPU 微服务共享 48GB 显存的 OOM 排查与避免策略
-- [Structure Service Patterns](structure-service-pattern.md) — GEP: 结构预测微服务的 Docker 镜像/CUDA/模型缓存/包命名标准化模式
-- [Git Worktree & Merge Resolution](git-worktree-and-merge.md) — GEP: 多分支并行开发的 worktree 隔离与可预测的合并冲突解决
-- [微服务网络绑定策略](microservice-host-binding.md) — GEP: 所有服务绑 0.0.0.0，由 Docker Compose 端口映射控制暴露范围
-- [ESMFold 依赖版本矩阵](gep-esmfold-dependency-matrix.md) — GEP: ESMFold 依赖版本矩阵；IPA key 不匹配与 strict=False；级联依赖升级策略
-- [ESMFold Docker 三层构建模式](gep-esmfold-docker-build.md) — GEP: 三层 Dockerfile 结构；CUDA 12.1 + Python 3.10 已验证版本矩阵；模型加载绕过 key 检查
-- [多层依赖链排错方法论](gep-dependency-troubleshooting-methodology.md) — GEP: 完整栈追踪→排除法→双向尝试→连锁升级→运行时补丁，通用排错策略
-- [Docker-outside-Docker 路径解析](docker/docker-outside-docker-paths.md) — GEP: docker.sock 嵌套调用时 volume 宿主机路径与容器路径分离
-- [容器内 Docker CLI 安装](docker/docker-cli-in-container.md) — GEP: 挂载宿主机 docker 二进制而非在容器内安装
-- [Docker Compose 构建原子性缺陷](docker/compose-atomic-build.md) — GEP: 多服务构建一个失败全回滚，应分批构建
-- [slim 镜像缺少 C 扩展编译依赖](docker/slim-image-build-deps.md) — GEP: python:slim 需 gcc/python3-dev/pkg-config 编译原生扩展
-- [Dockerfile COPY 遗漏审计](docker/dockerfile-copy-audit.md) — GEP: 批量扫描 Dockerfile 确保共享文件（utils.py/template/）被 COPY
-- [docker-compose dockerfile 路径一致性](docker/dockerfile-path-compose.md) — GEP: dockerfile 路径相对于 build context，含批量校验脚本
-- [构建失败时的批量审计策略](docker/batch-failure-audit.md) — GEP: 全量审计替代逐轮 CI 修复，大幅缩短多服务调试周期
-- [Docker latest tag 版本不确定性](docker/latest-tag-pinning.md) — GEP: pin 具体版本避免 :latest 的 breaking change
-- [Docker Hub 国内不可达](docker/docker-hub-china-mirror.md) — GEP: DaoCloud 镜像加速器配置方法
-- [Python 命名空间遮蔽](docker/python-namespace-shadowing.md) — GEP: 子目录 tools/ 遮蔽项目级命名空间包的排查与修复
-- [PyTorch CUDA cache 残留阻塞](gep-pytorch-cuda-cache-gpu-memory-leak.md) — GEP: 进程退出后 CUDA context 占用 34GB 不释放；docker stop 无效；kill -9 唯一解；按需启动 GPU 服务
-- [Python 2.7 遗留服务 Docker 化](gep-python2.7-docker-micromamba.md) — GEP: micromamba 静态二进制创建 Python 2.7 conda 环境；GHCR 可访问；miniconda2/python:2.7-slim 均已失效
-- [Waveflow 远程 API 代理微服务模式](gep-waveflow-remote-api-service.md) — GEP: Tamarind.bio REST API 包装为本地结构预测微服务；工具类型 URL 路由；ZIP 结果解压；API 响应格式适配
-- [权重迭代与数据驱动决策](gep-weight-iteration-data-driven.md) — GEP: construct_composite 在 Top90 中 spread 仅 0.011；先跑数据再看分布后定权重；EDA 替换假设
-- [流水线阶段编排与检查点恢复](gep-pipeline-stage-orchestration.md) — GEP: 独立脚本架构，JSON 检查点支持中断恢复，输出目录约定，STATUS.md 全局进度指针
-- [freesasa 2.2.1 selectArea API 不兼容](gep-freesasa-selectarea-api.md) — GEP: freesasa selectArea() 从 tuple 列表改为单字符串格式，TypeError: expected bytes 的排查与修复
-- [Docker 不可达时回退宿主机原生执行](gep-docker-native-hybrid.md) — GEP: 中国大陆 Docker Hub 不可达时用 conda 环境直接调用，环境变量控制切换，实际比 Docker-in-Docker 更快
-- [结构预测置信度级联影响](gep-pipeline-confidence-cascade.md) — GEP: ESMFold 对重复/长序列 pLDDT < 0.5 使下游 SASA/A3D 评估不可靠；pLDDT 质量门控与分域策略
-- [ToxinPred3 单线程并发限制](gep-toxinpred3-concurrency-limit.md) — GEP: sklearn ExtraTrees 挂死根因；`asyncio.wait_for` 不可靠 vs `requests` socket 超时；小批次+连续超时检测+服务重启策略
-- [TemStaPro 预筛减少 GPU 瓶颈](gep-temstapro-prescreen-gpu-bottleneck.md) — GEP: CPU 服务预筛取 Top30% 喂 GPU；50K→15K 节省 70% GPU 时间；BepiPred3 46h→9.5h
-- [OmegaFold 同步推理阻塞事件循环](gep-omegafold-sync-inference-blocking.md) — GEP: async def 中同步 PyTorch 推理阻塞 uvicorn 事件循环；客户端 Semaphore 串行化；服务端 run_in_executor 修复方案
-- [Docker 容器桥接 IP 直连](gep-docker-container-bridge-ip.md) — GEP: docker-proxy 在 httpx 长连接下的间歇性故障；docker inspect 获取 bridge IP 绕过代理；诊断方法（宿主机 vs 容器内 curl）
-- [双通道 Top/Bottom 排选设计](gep-dual-channel-top-bottom-pipeline.md) — GEP: Top/Bottom 双通道贯穿全流程；分选依据单一维度；各自独立排名；阴性对照设计
-- [BepiPred3 GPU 超时系统调优](gep-bepipred3-gpu-timeout-tuning.md) — GEP: Semaphore/timeout/batch 三维联动调优；GPU 串行推理 Semaphore=1 最优；17%→100%
-- [asyncio.gather 异常传播陷阱](gep-asyncio-gather-exception-safety.md) — GEP: 单个 task 异常导致全部任务被取消；双层隔离策略（return_exceptions + 独立 try/except）
-- [MHCflurry 模型下载失败处理](gep-mhcflurry-model-download.md) — GEP: 国内 GitHub 不可达时通过 ghproxy 下载 156MB 模型；`--release` 参数缺失修复；COPY 替代在线下载
-- [流水线脚本静默挂起诊断](gep-silent-progress-hang-diagnosis.md) — GEP: 脚本存活+容器正常工作但无进度日志的 7 步诊断法；docker-proxy 连接挂死对长耗时服务的选择性影响；`{SERVICE}_HOST` 桥接 IP 修复
+> **English** | [中文](MEMORY.zh.md)
+
+- [GPU Memory Contention](gpu-memory-contention.zh.md) — GEP: OOM troubleshooting and avoidance strategies when multiple GPU microservices share 48GB of VRAM
+- [Structure Service Patterns](structure-service-pattern.zh.md) — GEP: standardization patterns for Docker images, CUDA, model caching, and package naming in structure prediction microservices
+- [Git Worktree & Merge Resolution](git-worktree-and-merge.zh.md) — GEP: worktree isolation for parallel multi-branch development and predictable merge conflict resolution
+- [Microservice Network Binding Strategy](microservice-host-binding.zh.md) — GEP: all services bind to 0.0.0.0, with Docker Compose port mapping controlling the exposure scope
+- [ESMFold Dependency Version Matrix](gep-esmfold-dependency-matrix.zh.md) — GEP: ESMFold dependency version matrix; IPA key mismatch and strict=False; cascading dependency upgrade strategy
+- [ESMFold Docker Three-Layer Build Pattern](gep-esmfold-docker-build.zh.md) — GEP: three-layer Dockerfile structure; verified version matrix for CUDA 12.1 + Python 3.10; bypassing key checks during model loading
+- [Multi-Layer Dependency Chain Troubleshooting Methodology](gep-dependency-troubleshooting-methodology.zh.md) — GEP: full stack trace → process of elimination → bidirectional attempts → cascading upgrades → runtime patches, a general troubleshooting strategy
+- [Docker-outside-Docker Path Resolution](docker/docker-outside-docker-paths.zh.md) — GEP: separating host volume paths from container paths when calling nested docker.sock
+- [Installing the Docker CLI Inside a Container](docker/docker-cli-in-container.zh.md) — GEP: mount the host docker binary instead of installing Docker inside the container
+- [Docker Compose Build Atomicity Flaw](docker/compose-atomic-build.zh.md) — GEP: one failed service rolls back the whole multi-service build; build in batches instead
+- [slim Image Missing C Extension Build Dependencies](docker/slim-image-build-deps.zh.md) — GEP: python:slim needs gcc/python3-dev/pkg-config to compile native extensions
+- [Dockerfile COPY Omission Audit](docker/dockerfile-copy-audit.zh.md) — GEP: batch-scan Dockerfiles to ensure shared files (utils.py/template/) are COPYed
+- [docker-compose dockerfile Path Consistency](docker/dockerfile-path-compose.zh.md) — GEP: the dockerfile path is relative to the build context, including a batch validation script
+- [Batch Audit Strategy for Build Failures](docker/batch-failure-audit.zh.md) — GEP: a full audit instead of round-by-round CI fixes, greatly shortening the multi-service debugging cycle
+- [Docker latest Tag Version Uncertainty](docker/latest-tag-pinning.zh.md) — GEP: pin specific versions to avoid breaking changes in :latest
+- [Docker Hub Unreachable in China](docker/docker-hub-china-mirror.zh.md) — GEP: how to configure the DaoCloud registry mirror
+- [Python Namespace Shadowing](docker/python-namespace-shadowing.zh.md) — GEP: troubleshooting and fixing the tools/ subdirectory shadowing the project-level namespace package
+- [PyTorch CUDA Cache Residual Blocking](gep-pytorch-cuda-cache-gpu-memory-leak.zh.md) — GEP: CUDA context holds 34GB after process exit and does not release it; docker stop is ineffective; kill -9 is the only fix; start GPU services on demand
+- [Dockerizing a Legacy Python 2.7 Service](gep-python2.7-docker-micromamba.zh.md) — GEP: create a Python 2.7 conda environment with the micromamba static binary; GHCR is reachable; miniconda2/python:2.7-slim are both dead
+- [Waveflow Remote API Proxy Microservice Pattern](gep-waveflow-remote-api-service.zh.md) — GEP: wrap the Tamarind.bio REST API as a local structure prediction microservice; tool-type URL routing; ZIP result extraction; API response format adaptation
+- [Weight Iteration and Data-Driven Decisions](gep-weight-iteration-data-driven.zh.md) — GEP: construct_composite spread is only 0.011 in Top90; run the data first, inspect the distribution, then set weights; EDA replaces assumptions
+- [Pipeline Stage Orchestration and Checkpoint Recovery](gep-pipeline-stage-orchestration.zh.md) — GEP: independent script architecture, JSON checkpoints for interrupt recovery, output directory conventions, STATUS.md as a global progress pointer
+- [freesasa 2.2.1 selectArea API Incompatible](gep-freesasa-selectarea-api.zh.md) — GEP: freesasa selectArea() changed from a list of tuples to a single-string format, troubleshooting and fixing TypeError: expected bytes
+- [Fallback to Host-Native Execution When Docker Is Unreachable](gep-docker-native-hybrid.zh.md) — GEP: when Docker Hub is unreachable in mainland China, call directly from a conda environment, switching via environment variables; actually faster than Docker-in-Docker
+- [Impact of Structure Prediction Confidence Cascades](gep-pipeline-confidence-cascade.zh.md) — GEP: ESMFold pLDDT < 0.5 on repetitive/long sequences makes downstream SASA/A3D evaluation unreliable; pLDDT quality gating and domain-splitting strategy
+- [ToxinPred3 Single-Threaded Concurrency Limit](gep-toxinpred3-concurrency-limit.zh.md) — GEP: root cause of sklearn ExtraTrees hangs; `asyncio.wait_for` unreliable vs `requests` socket timeout; small batches + consecutive timeout detection + service restart strategy
+- [TemStaPro Pre-Screening to Reduce the GPU Bottleneck](gep-temstapro-prescreen-gpu-bottleneck.zh.md) — GEP: CPU service pre-screens top 30% to feed the GPU; 50K→15K saves 70% GPU time; BepiPred3 46h→9.5h
+- [OmegaFold Synchronous Inference Blocks the Event Loop](gep-omegafold-sync-inference-blocking.zh.md) — GEP: synchronous PyTorch inference inside async def blocks the uvicorn event loop; client-side Semaphore serialization; server-side run_in_executor fix
+- [Direct Connection via Docker Container Bridge IP](gep-docker-container-bridge-ip.zh.md) — GEP: intermittent docker-proxy failures with httpx long connections; get the bridge IP with docker inspect to bypass the proxy; diagnostic method (curl on host vs. inside container)
+- [Dual-Channel Top/Bottom Selection Design](gep-dual-channel-top-bottom-pipeline.zh.md) — GEP: Top/Bottom dual channels run through the entire pipeline; channel split based on a single dimension; independent rankings; negative control design
+- [BepiPred3 GPU Timeout Systematic Tuning](gep-bepipred3-gpu-timeout-tuning.zh.md) — GEP: joint tuning along three axes of Semaphore/timeout/batch; Semaphore=1 is optimal for serial GPU inference; 17%→100%
+- [asyncio.gather Exception Propagation Pitfall](gep-asyncio-gather-exception-safety.zh.md) — GEP: a single task exception cancels all tasks; two-layer isolation strategy (return_exceptions + independent try/except)
+- [MHCflurry Model Download Failure Handling](gep-mhcflurry-model-download.zh.md) — GEP: download the 156MB model through ghproxy when GitHub is unreachable in China; fix for the missing `--release` parameter; COPY instead of online download
+- [Diagnosing Silent Progress Hangs in Pipeline Scripts](gep-silent-progress-hang-diagnosis.zh.md) — GEP: a 7-step diagnostic method for when the script is alive and the container works but no progress is logged; selective impact of docker-proxy connection hangs on long-running services; `{SERVICE}_HOST` bridge IP fix

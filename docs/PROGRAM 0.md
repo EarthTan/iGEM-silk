@@ -1,262 +1,256 @@
-# PROGRAM.md — 丝素蛋白融合功能肽设计平台（探索性方案）
+> **English** | [中文](PROGRAM%200.zh.md)
 
-> **版本**: v0.2-exploratory  
-> **状态**: 方向探讨阶段，保留多元路径，非终稿  
-> **背景**: 本文档基于原 OxidShield 计划（AI驱动模块化功能肽设计）的技术积累，结合当前湿实验转向（丝素蛋白骨架 + 功能短肽），梳理 Dry Lab 的支撑方向与开放问题。
+# PROGRAM.md — Silk Fibroin Fusion Functional Peptide Design Platform (exploratory plan)
 
----
-
-## 一、项目背景与方向调整
-
-### 1.1 原计划回顾
-
-原 OxidShield 计划的核心逻辑是：通过机器学习预测短肽在六种功效维度（抗氧化、抗糖化、促胶原、抗菌、抗炎、抗黑色素、透皮递送）上的得分，再通过"融合引擎"遍历 `短肽A + linker + 短肽B` 的组合空间，筛选最优嵌合体。
-
-该思路的核心挑战是：短肽之间的简单连接缺乏稳定的三维骨架，影响活性暴露与体内稳定性。
-
-### 1.2 新方向的核心转变
-
-当前湿实验转向提供了一个更具工程意义的框架：
-
-> **以丝素蛋白功能片段作为结构骨架（scaffold），将功能短肽插入/融合其中，利用丝素蛋白的自组装能力与生物相容性，同时借助功能肽实现特定的护肤功效（抗氧化 / 抗黑色素沉积）。**
-
-这一转变的意义在于：
-- 丝素蛋白天然具有良好的**皮肤相容性**与**β-sheet自组装形成膜的能力**，适合外用护肤场景
-- 已有大量文献证实丝素蛋白功能片段可在大肠杆菌中重组表达（参见 Heidebrecht & Scheibel, 2013），为湿实验提供了可操作的起点
-- Dry Lab 的任务转变为：**帮助湿实验在插入位点、插入方式、功能肽选择上做出更有依据的初筛决策**
+> **Version**: v0.2-exploratory  
+> **Status**: direction-exploration stage; multiple paths are retained; not a final draft  
+> **Background**: This document builds on the technical accumulation of the original OxidShield plan (AI-driven modular functional peptide design) and combines it with the current wet-lab pivot (silk fibroin scaffold + short functional peptides) to lay out the supporting directions and open questions for the Dry Lab.
 
 ---
 
-## 二、核心科学问题
+## I. Project background and direction adjustment
 
-本项目目前面临两个相互关联的核心设计问题，以下分别展开探讨。
+### 1.1 Review of the original plan
+
+The core logic of the original OxidShield plan was: use machine learning to predict the scores of short peptides across six efficacy dimensions (antioxidant, anti-glycation, collagen-promoting, antibacterial, anti-inflammatory, anti-melanin, transdermal delivery), then use a "fusion engine" to traverse the combinatorial space of `short peptide A + linker + short peptide B` and screen for the best chimera.
+
+The core challenge of that approach was that simple connections between short peptides lack a stable three-dimensional scaffold, which affects activity exposure and in vivo stability.
+
+### 1.2 The core shift of the new direction
+
+The current wet-lab pivot provides a framework with more engineering significance:
+
+> **Use a silk fibroin functional fragment as the structural scaffold, insert/fuse functional short peptides into it, exploit the self-assembly capability and biocompatibility of silk fibroin, and at the same time use the functional peptide to achieve a specific skincare efficacy (antioxidant / anti-melanin deposition).**
+
+The significance of this shift is:
+- Silk fibroin naturally has good **skin compatibility** and **the ability to self-assemble into films via β-sheets**, making it suitable for topical skincare scenarios
+- A large body of literature confirms that silk fibroin functional fragments can be recombinantly expressed in E. coli (see Heidebrecht & Scheibel, 2013), providing an operable starting point for the wet lab
+- The Dry Lab's task becomes: **help the wet lab make better-grounded primary-screening decisions on insertion site, insertion mode, and functional peptide choice**
 
 ---
 
-### 问题一：如何在 silk backbone 上融合功能肽，而不破坏 β-sheet，并保证功能肽有效暴露？
+## II. Core scientific questions
 
-#### 2.1 丝素蛋白结构的关键约束
+The project currently faces two interrelated core design questions, each discussed below.
 
-根据蜘蛛拖曳丝（MA silk）的已知结构（Heidebrecht & Scheibel, 2013）：
+---
 
-| 结构域 | 特征 | 功能 |
+### Question 1: How can a functional peptide be fused onto the silk backbone without disrupting β-sheets, while ensuring effective exposure of the functional peptide?
+
+#### 2.1 Key constraints of silk fibroin structure
+
+According to the known structure of spider dragline silk (MA silk) (Heidebrecht & Scheibel, 2013):
+
+| Domain | Characteristics | Function |
 |--------|------|------|
-| 富含丙氨酸的聚丙氨酸区（poly-Ala） | 形成结晶 β-sheet | 提供高拉伸强度 |
-| GGX / GPGXX 重复序列 | 形成无定形弹性基质 | 提供延展性与灵活性 |
-| N端结构域（NTD） | α-helix 五聚体，pH 敏感 | 控制蛋白储存与组装启动 |
-| C端结构域（CTD） | α-helix，二聚化 | 控制 β-sheet 取向与组装 |
+| Alanine-rich poly-alanine region (poly-Ala) | Forms crystalline β-sheets | Provides high tensile strength |
+| GGX / GPGXX repeat sequences | Form an amorphous elastic matrix | Provide extensibility and flexibility |
+| N-terminal domain (NTD) | α-helix pentamer, pH-sensitive | Controls protein storage and initiation of assembly |
+| C-terminal domain (CTD) | α-helix, dimerization | Controls β-sheet orientation and assembly |
 
-**插入位点的核心矛盾**：若插入结晶 β-sheet 区域（polyAla），极可能打断 β-sheet 堆积，导致力学结构崩溃；若插入无定形区（GGX linker），结构扰动较小，但功能肽能否充分暴露在蛋白质表面仍不确定。
+**The core contradiction of insertion sites**: if the peptide is inserted into the crystalline β-sheet region (polyAla), it is highly likely to interrupt β-sheet packing and cause the mechanical structure to collapse; if it is inserted into the amorphous region (GGX linker), the structural perturbation is smaller, but whether the functional peptide can be sufficiently exposed on the protein surface remains uncertain.
 
-#### 2.2 可能的插入位点策略（保留多元探索）
+#### 2.2 Possible insertion site strategies (retaining multiple explorations)
 
-**策略 A：GGX 无定形区插入**
+**Strategy A: insertion into the GGX amorphous region**
 
-将功能肽插入相邻 β-sheet 结晶区之间的柔性 GGX 间隔区。此策略对 β-sheet 扰动最小，但需要评估功能肽的空间暴露程度。
-
-```
-[poly-Ala]...[GGX]...[功能肽]...[GGX]...[poly-Ala]
-```
-
-优势：不破坏晶体区；缺点：功能肽可能被包埋在无定形基质中。
-
-**策略 B：末端域插入（NTD/CTD 改造）**
-
-将功能肽拼接于 NTD 或 CTD 的外侧，利用末端域本身暴露于溶液界面的特性，保证功能肽的暴露性。该策略在已有文献中有结构工程先例（如 RGD 功能化蜘蛛丝蛋白, Wohlrab et al., 2012）。
+Insert the functional peptide into the flexible GGX spacer between adjacent β-sheet crystalline regions. This strategy perturbs β-sheets the least, but the spatial exposure of the functional peptide must be evaluated.
 
 ```
-[功能肽]---[NTD]---[重复核心]---[CTD]---[功能肽]
+[poly-Ala]...[GGX]...[functional peptide]...[GGX]...[poly-Ala]
 ```
 
-优势：末端自然暴露；缺点：NTD/CTD 二聚化行为可能受影响，进而影响蛋白组装。
+Advantages: does not disrupt the crystalline region; drawback: the functional peptide may be buried in the amorphous matrix.
 
-**策略 C：独立 linker 融合（短丝素片段作为 scaffold）**
+**Strategy B: terminal domain insertion (NTD/CTD engineering)**
 
-不使用完整丝素蛋白，而仅使用若干重复模块（如 4–8 个重复单元）作为骨架，功能肽通过柔性 linker（如 GGGGS × n）连接于序列两端或内部。
+Splice the functional peptide onto the outside of the NTD or CTD, exploiting the fact that the terminal domains themselves are exposed at the solution interface, thereby ensuring exposure of the functional peptide. This strategy has structural engineering precedents in the existing literature (for example, RGD-functionalized spider silk proteins, Wohlrab et al., 2012).
 
-优势：分子量可控，表达难度降低；缺点：短片段自组装能力可能不足。
+```
+[functional peptide]---[NTD]---[repeat core]---[CTD]---[functional peptide]
+```
 
-#### 2.3 如何评估功能肽的暴露性
+Advantages: the termini are naturally exposed; drawback: the dimerization behavior of the NTD/CTD may be affected, which in turn affects protein assembly.
 
-**计算手段（AI 辅助）：**
+**Strategy C: fusion via independent linkers (short silk fragments as the scaffold)**
 
-- **AlphaFold2 / ESMFold 结构预测**：对拟设计的融合蛋白进行结构预测，观察功能肽区域是否处于暴露的 loop 或 surface 区域，还是被埋入蛋白内部。
-- **SASA（溶剂可及表面积）计算**：通过 PyMOL 或 FreeSASA 对预测结构计算功能肽残基的 SASA 值，评估暴露程度。
-- **分子动力学模拟（可选）**：若条件允许，使用 GROMACS 对融合蛋白进行短时 MD 模拟，评估功能肽构象的动态稳定性。
+Instead of using the full silk fibroin protein, use only a few repeat modules (for example, 4–8 repeat units) as the backbone, with the functional peptide connected at either end of the sequence or internally through a flexible linker (such as GGGGS × n).
 
-> ⚠️ **开放问题**：AlphaFold 对高度重复序列（如丝素蛋白重复核心）的预测可信度存疑，可能需要使用专为纤维蛋白设计的预测工具或截断序列进行替代评估。
+Advantages: molecular weight is controllable and expression difficulty is reduced; drawback: the self-assembly capability of short fragments may be insufficient.
 
-**实验验证思路（Dry Lab 提供预测，湿实验验证）：**
+#### 2.3 How to evaluate the exposure of the functional peptide
 
-- 荧光标记功能肽末端，观察重组蛋白成膜后荧光是否可检测
-- 蛋白酶可及性实验：成膜蛋白经蛋白酶处理后，功能肽是否被降解（暴露则降解，包埋则保护）
+**Computational means (AI-assisted):**
+
+- **AlphaFold2 / ESMFold structure prediction**: predict the structure of the proposed fusion protein and observe whether the functional peptide region lies in an exposed loop or surface region, or is buried inside the protein.
+- **SASA (solvent-accessible surface area) calculation**: use PyMOL or FreeSASA to compute the SASA values of the functional peptide residues on the predicted structure and evaluate the degree of exposure.
+- **Molecular dynamics simulation (optional)**: if conditions permit, use GROMACS to run a short MD simulation of the fusion protein and evaluate the dynamic stability of the functional peptide conformation.
+
+> ⚠️ **Open question**: AlphaFold's prediction confidence for highly repetitive sequences (such as the silk fibroin repeat core) is questionable; prediction tools designed specifically for fibrous proteins, or truncated sequences, may be needed as substitutes for evaluation.
+
+**Experimental validation ideas (Dry Lab provides predictions, wet lab validates):**
+
+- Fluorescently label the end of the functional peptide and observe whether the fluorescence is detectable after the recombinant protein forms a film
+- Protease accessibility assay: after the film-forming protein is treated with a protease, check whether the functional peptide is degraded (exposed means degraded, buried means protected)
 
 ---
 
-### 问题二：Inclusion body → Refolding 后功能是否保留？如何选择可保留功能的肽？
+### Question 2: Is function retained after inclusion body → refolding? How should peptides whose function can be retained be selected?
 
-#### 2.3 E. coli 表达的现实限制
+#### 2.3 Real-world constraints of E. coli expression
 
-大量文献（Heidebrecht & Scheibel, 2013; Xia et al., 2010）确认，丝素蛋白在 E. coli 中表达时极易形成 inclusion body（IB），原因包括：
-- 序列高度重复，导致 tRNA pool 耗尽
-- 蛋白质疏水性强，易聚集
+A large body of literature (Heidebrecht & Scheibel, 2013; Xia et al., 2010) confirms that silk fibroin very readily forms inclusion bodies (IBs) when expressed in E. coli, for reasons including:
+- The sequence is highly repetitive, leading to depletion of the tRNA pool
+- The protein is strongly hydrophobic and readily aggregates
 
-标准流程为：裂解细胞 → 洗涤 IB → 溶解（通常用盐酸胍 6M 或脲素 8M）→ 透析/稀释复性（refolding） → 功能评估。
+The standard workflow is: lyse cells → wash IBs → dissolve (usually with 6M guanidine hydrochloride or 8M urea) → dialysis/dilution refolding → functional assessment.
 
-**Refolding 过程中的核心风险：**
+**Key risks during refolding:**
 
-- 丝素蛋白 β-sheet 结构在复性过程中重新折叠，可能**将插入的功能肽包埋在 β-sheet stack 内部**
-- 功能肽本身如含有强疏水性残基，可能在复性过程中发生**错误聚集**，丧失活性
+- The silk fibroin β-sheet structure refolds during renaturation and may **bury the inserted functional peptide inside the β-sheet stack**
+- If the functional peptide itself contains strongly hydrophobic residues, it may undergo **incorrect aggregation** during refolding and lose activity
 
-#### 2.4 功能肽的选择策略（Which）
+#### 2.4 Functional peptide selection strategy (Which)
 
-选择插入功能肽时，需综合考虑以下维度：
+When selecting the functional peptide to insert, the following dimensions must be considered together:
 
-| 维度 | 考量点 |
+| Dimension | Consideration |
 |------|--------|
-| 功能效力 | 抗氧化活性（DPPH/ABTS IC50）；酪氨酸酶抑制活性（抗黑色素） |
-| 结构兼容性 | 是否含有破坏 β-sheet 的脯氨酸富集区域（Pro 本身会阻断 β-sheet，这可能是有利的，使插入位点保持柔性）|
-| 亲水性 | 功能肽应偏亲水，以在复性后保持溶液暴露 |
-| 长度 | 建议 5–15 个氨基酸，过长可能干扰骨架折叠 |
-| 已验证文献 | 优先选择已有活性数据的功能肽序列，减少未知风险 |
+| Functional potency | Antioxidant activity (DPPH/ABTS IC50); tyrosinase inhibitory activity (anti-melanin) |
+| Structural compatibility | Whether it contains proline-rich regions that disrupt β-sheets (Pro itself blocks β-sheets, which may be favorable, keeping the insertion site flexible)|
+| Hydrophilicity | The functional peptide should be relatively hydrophilic so that it remains solvent-exposed after refolding |
+| Length | 5–15 amino acids is recommended; excessively long peptides may interfere with backbone folding |
+| Validated literature | Prefer functional peptide sequences that already have activity data, reducing unknown risk |
 
-**候选功能肽方向（待进一步文献调研）：**
+**Candidate functional peptide directions (pending further literature review):**
 
-- **抗氧化**：富含 His、Tyr、Trp 残基的短肽（如 YWDHINNPEVYF 类序列）；来源于胶原或大豆水解物的活性片段
-- **抗黑色素**：含铜离子螯合基团（His-His 二肽）或酪氨酸酶竞争性抑制序列
+- **Antioxidant**: short peptides rich in His, Tyr, and Trp residues (such as YWDHINNPEVYF-like sequences); active fragments derived from collagen or soy hydrolysate
+- **Anti-melanin**: sequences containing copper-chelating groups (His-His dipeptide) or competitive tyrosinase inhibition
 
-#### 2.5 Refolding 后功能保留的评估与 AI 辅助（How）
+#### 2.5 Evaluation of function retention after refolding and AI assistance (How)
 
-**Dry Lab 可提供的支撑：**
+**Support the Dry Lab can provide:**
 
-1. **功能肽亲水性/疏水性预测**：使用 Biopython 计算功能肽的 Grand Average of Hydropathicity (GRAVY) 值，倾向于选择 GRAVY < 0 的亲水性肽
+1. **Hydrophilicity/hydrophobicity prediction for the functional peptide**: use Biopython to compute the Grand Average of Hydropathicity (GRAVY) value of the functional peptide; prefer hydrophilic peptides with GRAVY < 0
 
-2. **功能肽在融合蛋白中的二级结构预测**：通过 PSIPRED 或 ESMFold 预测融合后功能肽区域的二级结构——若功能肽在融合蛋白中被预测为 β-sheet 的一部分，则该设计需重新考虑
+2. **Secondary structure prediction for the functional peptide within the fusion protein**: use PSIPRED or ESMFold to predict the secondary structure of the functional peptide region after fusion — if the functional peptide is predicted to be part of a β-sheet in the fusion protein, that design must be reconsidered
 
-3. **机器学习辅助筛选（沿用原 OxidShield 框架）**：
-   - 针对目标功能（抗氧化、抗黑色素）训练二分类预测模型
-   - 特征工程：氨基酸组成 + 理化性质（MW、PI、GRAVY、instability index）+ ESM-2 嵌入
-   - 对候选功能肽序列进行打分，优先推荐预测活性高且结构兼容的序列
-   - 此模块直接复用原 OxidShield 的数据收集与模型训练流程
+3. **Machine-learning-assisted screening (reusing the original OxidShield framework)**:
+   - Train binary classification prediction models for the target functions (antioxidant, anti-melanin)
+   - Feature engineering: amino acid composition + physicochemical properties (MW, PI, GRAVY, instability index) + ESM-2 embeddings
+   - Score candidate functional peptide sequences and preferentially recommend sequences with high predicted activity and structural compatibility
+   - This module directly reuses the data collection and model training workflow of the original OxidShield
 
-4. **Refolding 友好性的启发式规则（硬编码预筛选）**：
-   - 排除净电荷极端（< -3 或 > +3）的功能肽（影响蛋白整体 PI，干扰 IB 溶解条件）
-   - 排除含有多个相邻 Cys 残基的肽（非预期二硫键形成）
-   - 优先含有少量 Pro 的肽（在插入位点制造局部 β-sheet 中断，有助于功能肽暴露）
+4. **Heuristic rules for refolding friendliness (hard-coded pre-screening)**:
+   - Exclude functional peptides with extreme net charge (< -3 or > +3) (this affects the overall PI of the protein and interferes with IB solubilization conditions)
+   - Exclude peptides containing multiple adjacent Cys residues (unintended disulfide bond formation)
+   - Prefer peptides containing a small number of Pro residues (creating a local β-sheet interruption at the insertion site, which helps expose the functional peptide)
 
 ---
 
-## 三、Dry Lab 工程架构（调整后）
+## III. Dry Lab engineering architecture (after adjustment)
 
-### 3.1 整体流程
+### 3.1 Overall workflow
 
 ```
-[数据层]
-  ├── 功能肽活性数据库（抗氧化 / 酪氨酸酶抑制）
-  └── 丝素蛋白结构文献 & 已验证表达序列
+[Data layer]
+  ├── Functional peptide activity database (antioxidant / tyrosinase inhibition)
+  └── Silk fibroin structure literature & validated expression sequences
 
-[预测模型层]
-  ├── 功能活性预测（ML：XGBoost / MLP，延续原框架）
-  └── 结构兼容性预测（ESMFold + SASA 计算）
+[Prediction model layer]
+  ├── Functional activity prediction (ML: XGBoost / MLP, continuing the original framework)
+  └── Structural compatibility prediction (ESMFold + SASA calculation)
 
-[设计决策层]
-  ├── 插入位点评分器（Which region: NTD / GGX loop / CTD）
-  ├── 功能肽候选排序（结合活性预测 + 结构兼容性 + refolding 友好性）
-  └── 构建体方案输出（融合蛋白序列 + 插入位点注记）
+[Design decision layer]
+  ├── Insertion site scorer (Which region: NTD / GGX loop / CTD)
+  ├── Functional peptide candidate ranking (combining activity prediction + structural compatibility + refolding friendliness)
+  └── Construct plan output (fusion protein sequence + insertion site annotation)
 
-[评估反馈层]
-  └── 湿实验数据回流 → 模型更新（后期）
+[Evaluation feedback layer]
+  └── Wet-lab data flows back → model update (later stage)
 ```
 
-### 3.2 模块优先级（当前阶段）
+### 3.2 Module priorities (current stage)
 
-| 优先级 | 模块 | 说明 |
+| Priority | Module | Explanation |
 |--------|------|------|
-| P0 | 功能肽候选筛选 | 利用现有 OxidShield 框架输出候选序列 |
-| P0 | 结构相容性评估 | AlphaFold/ESMFold 对 1–3 个构建体设计的初步预测 |
-| P1 | 插入位点分析 | 分析不同插入位置对功能肽 SASA 的影响 |
-| P2 | Refolding 条件预测 | 分析融合蛋白 PI、疏水区分布，建议复性缓冲液条件 |
-| P3 | 全栈平台开发 | 后期，将上述功能整合为可交互的 web 工具 |
+| P0 | Functional peptide candidate screening | Use the existing OxidShield framework to output candidate sequences |
+| P0 | Structural compatibility assessment | Preliminary AlphaFold/ESMFold predictions for 1–3 construct designs |
+| P1 | Insertion site analysis | Analyze the effect of different insertion positions on the SASA of the functional peptide |
+| P2 | Refolding condition prediction | Analyze the PI and hydrophobic region distribution of the fusion protein and recommend refolding buffer conditions |
+| P3 | Full-stack platform development | Later stage; integrate the above functions into an interactive web tool |
 
 ---
 
-## 四、开放问题与不确定性（需持续讨论）
+## IV. Open questions and uncertainties (require ongoing discussion)
 
-以下问题目前尚无明确答案，需通过文献调研、计算探索与湿实验反馈逐步收敛：
+The following questions currently have no clear answers and must be progressively resolved through literature review, computational exploration, and wet-lab feedback:
 
-1. **丝素蛋白骨架的选择**：使用蜘蛛 MA silk 片段（MaSp1/MaSp2）还是蚕丝丝素蛋白（B. mori fibroin）？两者在已验证的表达系统和皮肤应用数据上有所不同，需进一步评估。
+1. **Choice of silk fibroin backbone**: use spider MA silk fragments (MaSp1/MaSp2) or silkworm silk fibroin (B. mori fibroin)? The two differ in validated expression systems and skin application data, and require further evaluation.
 
-2. **重复模块数量**：使用多少个 (GAGAGAGX)n 或 (GGX)n 重复单元？重复数决定了分子量与成膜能力，但也影响表达难度（MW > 100 kDa 的蛋白在 E. coli 中极难正确折叠）。
+2. **Number of repeat modules**: how many (GAGAGAGX)n or (GGX)n repeat units should be used? The repeat number determines molecular weight and film-forming ability, but also affects expression difficulty (proteins with MW > 100 kDa are extremely difficult to fold correctly in E. coli).
 
-3. **功能肽插入数量（How many）**：每条蛋白链插入 1 个还是多个功能肽？多个插入可能增强功效，但也增加结构扰动风险。目前没有足够的计算或实验依据做出判断。
+3. **Number of functional peptide insertions (How many)**: should one or multiple functional peptides be inserted per protein chain? Multiple insertions may enhance efficacy but also increase the risk of structural perturbation. There is currently not enough computational or experimental evidence to make a judgment.
 
-4. **linker 设计**：连接功能肽与丝素骨架的 linker 长度与柔性如何选择？刚性 linker（如 EAAAK）vs 柔性 linker（如 GGGGS × 3）对功能肽暴露的影响。
+4. **Linker design**: how should the length and flexibility of the linker connecting the functional peptide to the silk fibroin backbone be chosen? The effect of rigid linkers (such as EAAAK) vs flexible linkers (such as GGGGS × 3) on functional peptide exposure.
 
-5. **体外功能测试标准**：refolding 后蛋白的抗氧化活性测试（DPPH / ABTS），酪氨酸酶抑制测试的实验条件是否与文献数据可比？
+5. **In vitro functional testing standards**: are the experimental conditions for the antioxidant activity assay (DPPH / ABTS) and the tyrosinase inhibition assay of the refolded protein comparable with literature data?
 
 ---
 
-## 五、与原 OxidShield 框架的技术继承关系
+## V. Technical inheritance relationship with the original OxidShield framework
 
-| 原框架模块 | 当前方案中的对应 |
+| Original framework module | Corresponding item in the current plan |
 |-----------|-----------------|
-| 抗氧化功能肽 ML 预测模型 | 直接复用，用于功能肽候选初筛 |
-| ESM-2 嵌入特征工程 | 复用，用于功能肽表示 |
-| Optuna 超参数优化 | 复用 |
-| 融合引擎（枚举 + 打分） | **调整**：不再枚举 `肽A + linker + 肽B`，而是枚举 `插入位点 × 功能肽 × linker 类型` 的组合 |
-| 全栈平台（React + FastAPI） | **延期**，当前阶段优先计算分析，平台开发在验证阶段后推进 |
+| Antioxidant functional peptide ML prediction model | Reused directly, for primary screening of functional peptide candidates |
+| ESM-2 embedding feature engineering | Reused, for functional peptide representation |
+| Optuna hyperparameter optimization | Reused |
+| Fusion engine (enumeration + scoring) | **Adjusted**: no longer enumerate `peptide A + linker + peptide B`, but instead enumerate combinations of `insertion site × functional peptide × linker type` |
+| Full-stack platform (React + FastAPI) | **Deferred**; at the current stage computational analysis takes priority, and platform development proceeds after the validation stage |
 
 ---
 
-## 六、近期行动项（待讨论确认）
+## VI. Near-term action items (pending discussion and confirmation)
 
-- [ ] 确定丝素蛋白骨架序列（MaSp1 / MaSp2 / B. mori fibroin，几个重复单元）
-- [ ] 检索抗氧化 & 酪氨酸酶抑制功能肽文献，建立候选序列池
-- [ ] 对 2–3 个代表性设计方案运行 AlphaFold/ESMFold 结构预测，评估功能肽暴露性
-- [ ] 确认湿实验的 refolding 方案，以便 Dry Lab 计算 PI / 疏水图谱时使用对应条件
-- [ ] 明确 Dry Lab 输出的最终形式：序列文件 + 插入位点注记 + 结构预测报告
+- [ ] Determine the silk fibroin backbone sequence (MaSp1 / MaSp2 / B. mori fibroin, how many repeat units)
+- [ ] Search the literature on antioxidant & tyrosinase-inhibitory functional peptides and build a candidate sequence pool
+- [ ] Run AlphaFold/ESMFold structure prediction on 2–3 representative design plans and evaluate functional peptide exposure
+- [ ] Confirm the wet-lab refolding protocol so that the Dry Lab can use the corresponding conditions when computing PI / hydrophobic profiles
+- [ ] Define the final form of the Dry Lab output: sequence file + insertion site annotation + structure prediction report
 
 ---
 
-*本文档为探索性草案，所有设计方向均有待实验和计算结果的进一步验证与收敛。*
+*This document is an exploratory draft; all design directions await further validation and convergence from experimental and computational results.*
 
 
 
 
+# CONTEXT.md  (formal decision on the general direction)
 
+Okay, so this is our plan now.
 
+The single-function modules stay unchanged — mainly the microservices in tools.
 
-# CONTEXT.md  (对于大致方向的正式决定)
+As for the fusion engine, I have decided to use the super-enumeration method as the core logic.
 
-Okay, 现在我们的方案是这样的。
+Our target pigment protein is already confirmed to exist. After finding the functional peptide we want to insert, our core logic is as follows:
 
-单功能模块维持不变，主要是tools里面做的那些微服务。
+1. Insert at each position one by one (enumeration method)
+   (a) Suppose the pigment protein has length 1000; then there are 1001 positions at which the functional peptide could be inserted.
+   (b) We enumerate all 1001 schemes and observe the state of the fusion in each case.
 
-融合引擎方面，我决定使用超级枚举法作为核心逻辑。
+2. Combined insertion of multiple functional peptides
+   (a) Besides single-point insertion, we can also try inserting two functional peptides together.
+   (b) Or insert the same functional peptide twice in a row.
+   (c) This yields several thousand or even tens of thousands of combination schemes.
 
-我们的目标色素蛋白是已经确定存在的。在找到想要插入的功能肽之后，我们核心逻辑如下：
+3. Subsequent screening optimization
+   On top of enumeration, we can also add screening conditions, for example:
+   (a) Avoid restriction enzyme cut sites
+   (b) Avoid Beta sheets (β-sheets)
 
-1. 逐个位置插入（枚举法）
-   (a) 假设色素蛋白长度为 1000，那么功能肽插入的位置就有 1001 种。
-   (b) 我们将这 1001 种方案全部进行枚举，观察其融合态的情况。
+Overall, our core logic is to evaluate the specific behavior of the fusion state by enumerating all possible insertion positions and combination modes.
 
-2. 多功能肽组合插入
-   (a) 除了单点插入，还可以尝试将两个功能肽组合在一起插入。
-   (b) 或者将同一个功能肽重复两遍插入。
-   (c) 从而形成几千甚至上万种组合方案。
+So how do I judge whether this fusion state is acceptable?
 
-3. 后续筛选优化
-   在枚举的基础上，我们还可以增加筛选条件，例如：
-   (a) 避开酶切位点
-   (b) 避开 Beta 折叠（β-sheet）
-
-总的来说，我们的核心逻辑就是通过枚举所有可能的插入位置和组合方式，来评估融合态的具体表现。
-
-那么，我该如何判断这个融合态是否合格呢？
-
-我也了解到有一个叫 SAS 的工具，在 reference 里面提到可以查看它的暴露程度。
-
-
-
-
-
+I also learned about a tool called SAS; the reference mentions that it can be used to check the degree of exposure.

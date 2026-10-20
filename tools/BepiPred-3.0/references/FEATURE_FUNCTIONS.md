@@ -1,14 +1,16 @@
-# BepiPred-3.0 特征提取函数
+> **English** | [中文](FEATURE_FUNCTIONS.zh.md)
 
-本文档提供 BepiPred-3.0 输出结果的特征提取和后处理函数。
+# BepiPred-3.0 Feature Extraction Functions
 
-## 特征提取函数
+This document provides feature extraction and post-processing functions for BepiPred-3.0 output.
+
+## Feature Extraction Functions
 
 ```python
 import pandas as pd
 
 def extract_epitope_features(csv_path, threshold=0.1512):
-    """从 BepiPred 输出提取特征"""
+    """Extract features from BepiPred output"""
     df = pd.read_csv(csv_path)
 
     return {
@@ -20,29 +22,29 @@ def extract_epitope_features(csv_path, threshold=0.1512):
     }
 
 def calculate_epitope_penalty(csv_path, threshold=0.1512):
-    """计算表位惩罚分数（用于融合引擎）"""
+    """Compute the epitope penalty score (for the fusion engine)"""
     df = pd.read_csv(csv_path)
 
     high_epitope_ratio = (df['BepiPred-3.0 score'] > threshold).mean()
     max_score = df['BepiPred-3.0 score'].max()
 
-    # 惩罚分数
+    # Penalty score
     penalty = high_epitope_ratio * 0.5 + max_score * 0.5
     return penalty
 
 def epitope_based_filter(csv_path, max_epitope_ratio=0.3, max_score_threshold=0.5):
-    """基于表位预测的粗筛"""
+    """Coarse screening based on epitope prediction"""
     df = pd.read_csv(csv_path)
 
     epitope_ratio = (df['BepiPred-3.0 score'] > 0.1512).mean()
     max_score = df['BepiPred-3.0 score'].max()
 
     if epitope_ratio > max_epitope_ratio or max_score > max_score_threshold:
-        return False  # 不通过筛选
-    return True  # 通过筛选
+        return False  # does not pass the filter
+    return True  # passes the filter
 ```
 
-## 使用示例
+## Usage Example
 
 ```python
 from pathlib import Path
@@ -50,40 +52,40 @@ from bp3_feature_functions import extract_epitope_features, calculate_epitope_pe
 
 csv_path = Path("output/raw_output.csv")
 
-# 提取特征
+# Extract features
 features = extract_epitope_features(csv_path)
 print(f"Max epitope score: {features['max_epitope_score']}")
 print(f"Epitope ratio: {features['epitope_ratio']}")
 
-# 计算惩罚分数
+# Compute the penalty score
 penalty = calculate_epitope_penalty(csv_path)
 print(f"Epitope penalty: {penalty}")
 
-# 粗筛判断
+# Coarse screening decision
 passed = epitope_based_filter(csv_path)
 print(f"Filter passed: {passed}")
 ```
 
-## 函数返回值说明
+## Function Return Values
 
-### extract_epitope_features 返回值
+### extract_epitope_features return value
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |------|------|------|
-| `max_epitope_score` | float | 所有残基的最大表位分数 |
-| `mean_epitope_score` | float | 所有残基的平均表位分数 |
-| `epitope_residue_count` | int | 超过阈值的表位残基数量 |
-| `epitope_ratio` | float | 表位残基占总残基的比例 |
-| `max_linear_score` | float | 最大线性表位分数 |
+| `max_epitope_score` | float | Maximum epitope score over all residues |
+| `mean_epitope_score` | float | Mean epitope score over all residues |
+| `epitope_residue_count` | int | Number of epitope residues above the threshold |
+| `epitope_ratio` | float | Fraction of epitope residues among all residues |
+| `max_linear_score` | float | Maximum linear epitope score |
 
-### calculate_epitope_penalty 返回值
+### calculate_epitope_penalty return value
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |------|------|------|
-| `penalty` | float | 惩罚分数，范围 0-1。越高表示免疫原性风险越大 |
+| `penalty` | float | Penalty score, range 0-1. Higher means greater immunogenicity risk |
 
-### epitope_based_filter 返回值
+### epitope_based_filter return value
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |------|------|------|
-| `passed` | bool | True=通过筛选，False=被拒绝 |
+| `passed` | bool | True = passes the filter, False = rejected |

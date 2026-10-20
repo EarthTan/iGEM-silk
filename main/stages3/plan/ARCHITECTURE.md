@@ -1,389 +1,391 @@
-# Stages3 流水线架构
+> **English** | [中文](ARCHITECTURE.zh.md)
 
-> 版本: v1.0 — 2026-05-15
-> 执行环境: 单机 Linux | 128G RAM | RTX 3090 24G | SSD
-> 数据量级: 千万到亿级序列
+# Stages3 Pipeline Architecture
+
+> Version: v1.0 — 2026-05-15
+> Execution environment: single Linux machine | 128G RAM | RTX 3090 24G | SSD
+> Data scale: tens of millions to hundreds of millions of sequences
 
 ---
 
-## 一、总体架构
+## 1. Overall Architecture
 
-### 架构的三个层次
+### The Three Layers of the Architecture
 
-stages3 的架构分为三个层次，每一层的职责明确分离：
+The stages3 architecture is divided into three layers, with a clear separation of responsibilities at each layer:
 
 ```
-┌─────────────────────────────────────────────────┐
-│                    编排层                        │
-│        Pipeline Orchestration Layer              │
-│  每个 Stage 独立运行，通过数据库交接数据            │
-│  检查点控制流程，进度追踪驱动恢复                  │
-├─────────────────────────────────────────────────┤
-│                    执行层                        │
-│         Execution Layer                          │
-│  并发调度：批量请求微服务 → 收集结果 → 写入 DB    │
-│  asyncio 事件循环驱动，httpx 异步 HTTP 通信       │
-│  错误隔离：单条失败不影响全局                      │
-├─────────────────────────────────────────────────┤
-│                    服务层                        │
-│         Microservice Layer                       │
-│  16 个 Docker 微服务，统一 API 接口              │
-│  通过 Docker Compose 编排，health check 保证可用  │
-│  GPU 服务串行，CPU 服务可以并行                 │
-└─────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                            Orchestration Layer                             │
+│                        Pipeline Orchestration Layer                        │
+│  Each Stage runs independently, handing off data via the database          │
+│  Checkpoints control the flow; progress tracking drives recovery           │
+├────────────────────────────────────────────────────────────────────────────┤
+│                              Execution Layer                               │
+│                              Execution Layer                               │
+│  Concurrency: batch-request microservices → collect results → write to DB  │
+│  Driven by the asyncio event loop; httpx handles async HTTP communication  │
+│  Error isolation: a single failure does not affect the rest                │
+├────────────────────────────────────────────────────────────────────────────┤
+│                               Service Layer                                │
+│                             Microservice Layer                             │
+│  16 Docker microservices behind a unified API                              │
+│  Orchestrated by Docker Compose; health checks ensure availability         │
+│  GPU services run serially; CPU services can run in parallel               │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 分层职责详解
+### Layer Responsibilities in Detail
 
-**编排层** 负责"做什么"：
-- 决定当前该跑哪个 stage
-- 从 checkpoint 表恢复进度
-- 将流程推进到下一个 stage
-- 生成进度报告和统计数据
+The **orchestration layer** is responsible for "what to do":
+- Deciding which stage to run now
+- Restoring progress from the checkpoint table
+- Advancing the flow to the next stage
+- Generating progress reports and statistics
 
-**执行层** 负责"怎么做"：
-- 读取待处理的候选列表
-- 并发调度微服务请求
-- 处理超时、重试、异常
-- 将结果写入数据库
-- 更新检查点
+The **execution layer** is responsible for "how to do it":
+- Reading the list of candidates to process
+- Concurrently dispatching microservice requests
+- Handling timeouts, retries, and exceptions
+- Writing results to the database
+- Updating checkpoints
 
-**服务层** 负责"提供服务"：
-- 接受请求并返回预测结果
-- 维护 services health
-- 管理模型加载和 GPU 资源
+The **service layer** is responsible for "providing services":
+- Accepting requests and returning predictions
+- Maintaining service health
+- Managing model loading and GPU resources
 
-### 与 stages2 的区别
+### Differences from stages2
 
-| 维度 | stages2 | stages3 |
+| Dimension | stages2 | stages3 |
 |------|---------|---------|
-| 数据传递 | CSV 文件 | DuckDB 数据库 |
-| 进度恢复 | 手动检查输出文件 | checkpoint 表自动恢复 |
-| 并发控制 | 脚本内手动管理 | 执行层统一调度 |
-| 权重策略 | 固定权重 | 方差感知动态权重 |
-| 错误容忍 | 双层隔离（已修） | 标准化隔离模式 |
-| 微服务部署 | 时而 Docker 时而宿主机 | 强制 Docker |
+| Data handoff | CSV files | DuckDB database |
+| Progress recovery | Manual inspection of output files | Automatic recovery from checkpoint table |
+| Concurrency control | Manually managed inside scripts | Unified scheduling by the execution layer |
+| Weighting strategy | Fixed weights | Variance-aware dynamic weights |
+| Error tolerance | Two-level isolation (fixed) | Standardized isolation pattern |
+| Microservice deployment | Sometimes Docker, sometimes host machine | Docker mandatory |
 
 ---
 
-## 二、执行流程
+## 2. Execution Flow
 
-### 六大阶段的拓扑关系
+### Topology of the Six Stages
 
-阶段之间的依赖关系是线性的——每个阶段依赖前一个阶段的输出。但在每个阶段内部，存在大量的并行机会。
-
-```
-Stage 0 (预处理)
-  │ 输出: candidates 表
-  ▼
-Stage 1 (轻量初筛)
-  │ 输出: stage1_scores + stage1_passed
-  ▼
-Stage 2 (全量评分)
-  │ 输出: stage2_scores + score_distribution + weight_config
-  ▼
-Stage 3 (构造枚举)
-  │ 输出: constructs + construct_scores
-  ▼
-Stage 4 (3D 结构)
-  │ 输出: structure_jobs + PDB 文件
-  ▼
-Stage 5 (PDB 评估)
-  │ 输出: pdb_eval
-  ▼
-Stage 6 (最终排名)
-  │ 输出: final_ranking + 报告
-```
-
-### 阶段内部的批处理模式
-
-每个阶段内部遵循相同的批处理模式：
+Dependencies between stages are linear—each stage depends on the output of the previous stage. Within each stage, however, there is ample opportunity for parallelism.
 
 ```
-循环:
-  1. 从数据库读取一批待处理的 candidate（例如 10 万条）
-  2. 并发调用相应的微服务（batch 或单个 endpoint）
-  3. 收集结果，记录失败
-  4. 将结果写入数据库中的对应表
-  5. 更新 checkpoint（记录已处理的 candidate_id 范围）
-  6. 如果还有更多候选，回到步骤 1
-  7. 如果没有更多候选，进入聚合分析阶段
+Stage 0 (preprocessing)
+  │ output: candidates table
+  ▼
+Stage 1 (lightweight primary screening)
+  │ output: stage1_scores + stage1_passed
+  ▼
+Stage 2 (full scoring)
+  │ output: stage2_scores + score_distribution + weight_config
+  ▼
+Stage 3 (construct enumeration)
+  │ output: constructs + construct_scores
+  ▼
+Stage 4 (3D structure)
+  │ output: structure_jobs + PDB files
+  ▼
+Stage 5 (PDB evaluation)
+  │ output: pdb_eval
+  ▼
+Stage 6 (final ranking)
+  │ output: final_ranking + reports
 ```
 
-### 聚合分析阶段
+### Batch Pattern Within a Stage
 
-在每个评分阶段之后，有一个聚合分析步骤：
+Each stage follows the same internal batch pattern:
 
 ```
-在 Stage 1-2-5-6 完成后:
-  1. 从对应的分数表读取所有有效分数
-  2. 计算每个服务的分布统计（均值、标准差、百分位数）
-  3. 计算 winsorized 标准差（去掉上下 1%）
-  4. 写入 score_distribution 表
-  5. 计算方差感知权重并写入 weight_config 表
-  6. 应用权重生成排名
+loop:
+  1. Read a batch of pending candidates from the database (e.g., 100k)
+  2. Concurrently call the relevant microservices (batch or single endpoint)
+  3. Collect results, record failures
+  4. Write results into the corresponding table in the database
+  5. Update the checkpoint (record the range of processed candidate_ids)
+  6. If more candidates remain, return to step 1
+  7. If no candidates remain, enter the aggregation analysis phase
+```
+
+### Aggregation Analysis Phase
+
+After each scoring stage there is an aggregation analysis step:
+
+```
+After Stage 1-2-5-6 complete:
+  1. Read all valid scores from the corresponding score tables
+  2. Compute distribution statistics per service (mean, standard deviation, percentiles)
+  3. Compute the winsorized standard deviation (trim the top and bottom 1%)
+  4. Write to the score_distribution table
+  5. Compute variance-aware weights and write them to the weight_config table
+  6. Apply the weights to produce the ranking
 ```
 
 ---
 
-## 三、单机并行策略
+## 3. Single-Machine Parallelism Strategy
 
-### 瓶颈分析
+### Bottleneck Analysis
 
-运行千万到亿级序列的 pipeline，瓶颈在不同阶段不同：
+For a pipeline running tens of millions to hundreds of millions of sequences, the bottleneck differs by stage:
 
-| 阶段 | 瓶颈类型 | 瓶颈原因 | 缓解方式 |
+| Stage | Bottleneck type | Cause of the bottleneck | Mitigation |
 |------|---------|---------|---------|
-| Stage 0 | I/O + CPU | 220G FASTA 扫描 + CD-HIT 聚类 | 多线程读取 + 按块并行 |
-| Stage 1 | 网络 I/O | HTTP 请求微服务 | 并发请求 + batch API |
-| Stage 2 | 网络 I/O | 7 个服务 × 数百万候选 | 同上 + 更大的 batch size |
-| Stage 3 | CPU | 序列组装 + 2 个服务 | 轻量，候选数少 |
-| Stage 4 | GPU | 单 GPU 串行推理 | 无法并行，接受等待 |
-| Stage 5 | 网络 I/O | PDB 文件传输 + 2 个服务 | batch API |
+| Stage 0 | I/O + CPU | 220G FASTA scan + CD-HIT clustering | Multi-threaded reading + block-level parallelism |
+| Stage 1 | Network I/O | HTTP requests to microservices | Concurrent requests + batch API |
+| Stage 2 | Network I/O | 7 services × millions of candidates | Same as above + larger batch size |
+| Stage 3 | CPU | Sequence assembly + 2 services | Lightweight, few candidates |
+| Stage 4 | GPU | Serial inference on a single GPU | Cannot parallelize; accept the wait |
+| Stage 5 | Network I/O | PDB file transfer + 2 services | batch API |
 
-### 网络 I/O 的并行策略
+### Parallelism Strategy for Network I/O
 
-stages3 的核心并行策略是针对网络 I/O 的——大部分时间花在等微服务的 HTTP 响应上。
+The core parallelism strategy of stages3 targets network I/O—most of the time is spent waiting for HTTP responses from microservices.
 
-**微服务调用方式的选择**:
+**Choosing the microservice call style**:
 
-stages2 的经验表明，对于不同的服务类型，batch API 和 single API 各有适用场景：
+Our stages2 experience shows that batch API and single API each fit different service types:
 
-| 服务 | 推荐方式 | 说明 |
+| Service | Recommended approach | Notes |
 |------|---------|------|
-| AnOxPePred (轻量) | batch API | 每条耗时 < 100ms，batch 可减少 HTTP 开销 |
-| BepiPred-3.0 (GPU) | batch API | GPU 推理在 batch 下效率更高 |
-| pLM4CPPs (GPU, 大模型) | single API | 大模型加载开销大，串行更稳定 |
-| ToxinPred3 (sklearn) | single API | 线程安全问题，必须串行化 |
-| 其他 CPU 服务 | batch API | 纯 CPU 计算，batch 效率更高 |
+| AnOxPePred (lightweight) | batch API | < 100ms per sequence; batching reduces HTTP overhead |
+| BepiPred-3.0 (GPU) | batch API | GPU inference is more efficient in batches |
+| pLM4CPPs (GPU, large model) | single API | Large models are expensive to load; serial is more stable |
+| ToxinPred3 (sklearn) | single API | Thread-safety issues; must be serialized |
+| Other CPU services | batch API | Pure CPU computation; batching is more efficient |
 
-**并发控制**:
+**Concurrency control**:
 
-所有微服务请求共享一个统一的 httpx.AsyncClient 连接池，连接池大小限制为 50。
+All microservice requests share a single httpx.AsyncClient connection pool, capped at 50 connections.
 
-执行层的核心调度逻辑：
-- 读取一批 N 个待处理候选（N 根据服务类型调整）
-- 用 asyncio 并发发出所有请求
-- 对于轻量服务，N = 50-100（高并发）
-- 对于 GPU 服务，N = 10-20（限制并发，避免服务端过载）
-- 收集结果，处理异常，写入数据库
+The core scheduling logic of the execution layer:
+- Read a batch of N pending candidates (N depends on the service type)
+- Fire all requests concurrently with asyncio
+- For lightweight services, N = 50-100 (high concurrency)
+- For GPU services, N = 10-20 (limit concurrency to avoid overloading the server)
+- Collect results, handle exceptions, write to the database
 
-**关键设计**: 不对每个服务单独开一个阶段循环，而是**一批候选同时请求所有相关服务**。例如在 Stage 2，一批 100 个候选同时请求 7 个服务，等待最慢的那个完成，然后写库。
+**Key design**: instead of a separate stage loop for each service, **one batch of candidates queries all relevant services at the same time**. For example, in Stage 2 a batch of 100 candidates queries 7 services concurrently, waits for the slowest one to finish, then writes to the database.
 
-### CPU 绑定的并行
+### CPU-Bound Parallelism
 
-对于 CD-HIT 等 CPU 密集型任务：
-- CD-HIT 自身支持多线程（-T 参数）
-- 如果可能，先将候选按长度分桶，每桶单独运行 CD-HIT 实例
+For CPU-intensive tasks such as CD-HIT:
+- CD-HIT natively supports multithreading (the `-T` flag)
+- Where possible, first bucket candidates by length and run a separate CD-HIT instance per bucket
 
-对于 FASTA 解析：
-- 使用 Python 的 mmap 做超大文件的内存映射
-- 多线程分块读取（每个块 1G）
-- 每个线程独立解析自己的块，遇到跨块序列时特殊处理
+For FASTA parsing:
+- Use Python's mmap to memory-map very large files
+- Read in blocks with multiple threads (1G per block)
+- Each thread parses its own block independently, with special handling for sequences that span block boundaries
 
 ---
 
-## 四、错误隔离与恢复
+## 4. Error Isolation and Recovery
 
-### 错误分类
+### Error Classification
 
-| 错误类型 | 示例 | 处理方式 |
+| Error type | Example | Handling |
 |---------|------|---------|
-| 临时性错误 | 网络超时、服务暂时无响应 | 自动重试（最多 3 次，间隔递增） |
-| 永久性错误 | 模型加载失败、服务停机 | 跳过该条候选，记录错误原因 |
-| 系统级错误 | 磁盘满、内存耗尽、GPU OOM | 暂停 pipeline，等待手动介入 |
-| 数据错误 | 序列格式错误、无效字符 | 跳过该条候选，记录到错误日志 |
+| Transient errors | Network timeout, service temporarily unresponsive | Automatic retry (up to 3 times, with increasing intervals) |
+| Permanent errors | Model loading failure, service down | Skip the candidate, record the cause |
+| System-level errors | Disk full, out of memory, GPU OOM | Pause the pipeline and wait for manual intervention |
+| Data errors | Malformed sequence, invalid characters | Skip the candidate, record it in the error log |
 
-### 批处理中的错误隔离
+### Error Isolation in Batch Processing
 
-stages2 的经验已经证明：在批量处理中，**单条失败绝不应该影响其他任务**。
+stages2 experience has already proven: in batch processing, **a single failure must never affect the other tasks**.
 
-标准化隔离模式（描述性说明）：
+The standardized isolation pattern (described in words):
 
-每一批候选的请求流程中：
-1. 所有请求并发发出
-2. 无论单个请求成功或失败，都必须有返回（超时也算返回）
-3. 返回异常的不参与分数计算，但记录在错误日志中
-4. 成功的结果正常写入数据库
-5. 这一批全部结束后，再继续下一批
+Within the request flow for each batch of candidates:
+1. All requests are fired concurrently
+2. Every request must return, whether it succeeds or fails (a timeout also counts as a return)
+3. Requests that return an exception do not participate in score computation but are recorded in the error log
+4. Successful results are written to the database as usual
+5. Only after the whole batch finishes does the next batch begin
 
-这种模式在 stages2 的 round05 中被验证——即使中间有些 construct 的 OmegaFold 预测失败，其余 89 个不受影响。
+This pattern was validated in round05 of stages2—even when OmegaFold prediction failed for some constructs in the process, the remaining 89 were unaffected.
 
-### 中断恢复
+### Interruption Recovery
 
-stages3 的中断恢复能力比 stages2 更强：
+stages3's interruption recovery is stronger than stages2's:
 
-**场景 1: 脚本在 Stage 2 中途被中断**
+**Scenario 1: the script is interrupted midway through Stage 2**
 
-恢复时：
-1. checkpoint 表显示 Stage 2 的状态为 "running"
-2. 查询 stage2_scores 表，找到已处理的最大 candidate_id
-3. 从下一个 candidate_id 继续处理
-4. 已经存在的候选记录不会重复处理（upsert 语义）
+On recovery:
+1. The checkpoint table shows Stage 2's status as "running"
+2. Query the stage2_scores table to find the largest candidate_id already processed
+3. Continue from the next candidate_id
+4. Existing candidate records are not processed again (upsert semantics)
 
-**场景 2: 某个微服务长期不可用**
+**Scenario 2: a microservice is unavailable for a long time**
 
-处理方式：
-1. 超过重试次数后，将该服务的分数列为 NULL
-2. 在 score_distribution 中，NULL 列不参与标准差计算
-3. 对应服务的权重为 0，自动从综合分数中排除
-4. pipeline 继续运行，不会阻塞
+Handling:
+1. After the retry count is exceeded, set that service's score column to NULL
+2. In score_distribution, NULL columns do not participate in standard deviation computation
+3. The corresponding service's weight is 0, automatically excluded from the composite score
+4. The pipeline keeps running and does not block
 
-**场景 3: GPU 内存耗尽**
+**Scenario 3: GPU out of memory**
 
-处理方式：
-1. 捕获 CUDA OOM 异常
-2. 清理 GPU 缓存（torch.cuda.empty_cache()）
-3. 等待 30 秒让 GPU 释放
-4. 重试一次
-5. 如果还是 OOM，跳过当前任务
+Handling:
+1. Catch the CUDA OOM exception
+2. Clear the GPU cache (torch.cuda.empty_cache())
+3. Wait 30 seconds for the GPU to release memory
+4. Retry once
+5. If it is still OOM, skip the current task
 
 ---
 
-## 五、内存管理
+## 5. Memory Management
 
-### 内存预算
+### Memory Budget
 
-| 用途 | 预算 | 说明 |
+| Purpose | Budget | Notes |
 |------|------|------|
-| 操作系统和其他进程 | 16G | 系统占用 |
-| Docker 微服务 | 16G | 多个服务并发，每个 ~1-2G |
-| DuckDB 内存模式 | 32G | 设置内存限制，防止 OOM |
-| CD-HIT 聚类 | 32G | 索引 3000 万条短序列 |
-| Pipeline 脚本 | 16G | Python 运行时 + 数据缓存 |
-| **合计** | **~112G** | 留 ~16G 余量 |
+| Operating system and other processes | 16G | System overhead |
+| Docker microservices | 16G | Several services concurrently, ~1-2G each |
+| DuckDB in-memory mode | 32G | Set a memory limit to prevent OOM |
+| CD-HIT clustering | 32G | Index 30 million short sequences |
+| Pipeline scripts | 16G | Python runtime + data cache |
+| **Total** | **~112G** | Leaves ~16G headroom |
 
-### DuckDB 内存控制
+### DuckDB Memory Control
 
-DuckDB 默认使用内存模式，但可以设置内存限制。设置方式：`SET memory_limit = '32GB'`。超过限制时自动 spill 到磁盘，不会崩溃。
+DuckDB uses in-memory mode by default, but a memory limit can be set. To set it: `SET memory_limit = '32GB'`. When the limit is exceeded, it spills to disk automatically instead of crashing.
 
-### 大文件处理
+### Large File Handling
 
-对于 200G+ 的 FASTA 文件，不使用 readlines() 等一次性加载的方法。改为：
-- mmap 内存映射：文件在虚拟地址空间中映射，系统自动管理页缓存
-- 流式迭代器：逐行读取，处理完即丢弃
+For FASTA files of 200G+, do not use readlines() or other load-everything-at-once approaches. Instead:
+- mmap memory mapping: the file is mapped into the virtual address space, and the OS manages the page cache automatically
+- Streaming iterator: read line by line, discard each line once processed
 
-### 数据库写入频率
+### Database Write Frequency
 
-千万级写入的一个陷阱是事务日志膨胀。解决方案：
-- 每批处理完成后 commit 一次（一批 ~10 万条）
-- 不使用逐条 INSERT，使用批量 INSERT
+One trap of writing tens of millions of rows is transaction log bloat. Solutions:
+- Commit once after each batch finishes (~100k rows per batch)
+- Do not use row-by-row INSERT; use batch INSERT
 
 ---
 
-## 六、日志与监控
+## 6. Logging and Monitoring
 
-### 三級日志系统
+### Three-Level Logging System
 
-| 级别 | 输出 | 内容 |
+| Level | Output | Content |
 |------|------|------|
-| 控制台（info） | 终端 | 阶段进展、完成度百分比、发现的问题 |
-| 文件（debug） | `output3/logs/<stage>.log` | 详细信息、每条异常记录、HTTP 请求日志 |
-| 检查点 | 数据库 checkpoint 表 | 结构化进度数据 |
+| Console (info) | Terminal | Stage progress, completion percentage, issues found |
+| File (debug) | `output3/logs/<stage>.log` | Details, per-record exception entries, HTTP request logs |
+| Checkpoint | Database checkpoint table | Structured progress data |
 
-### 关键监控指标
+### Key Monitoring Metrics
 
-每次运行完一个阶段后，自动生成监控报告：
+After each stage run, a monitoring report is generated automatically:
 
-| 指标 | 来源 | 意义 |
+| Metric | Source | Meaning |
 |------|------|------|
-| 处理速率（条/秒） | 计时器 | 评估完成时间 |
-| 成功率（%） | 成功请求 / 总请求 | 服务健康度 |
-| 各分数分布 | score_distribution 表 | 区分度评估 |
-| 错误分布 | 异常日志 | 问题定位 |
-| 权重变化 | weight_config 表 | 特征重要性 |
+| Throughput (rows/s) | Timer | Estimate time to completion |
+| Success rate (%) | Successful requests / total requests | Service health |
+| Score distributions | score_distribution table | Assessment of discriminative power |
+| Error distribution | Exception log | Problem localization |
+| Weight changes | weight_config table | Feature importance |
 
 ---
 
-## 七、Docker 集成
+## 7. Docker Integration
 
-### 标准启动序列
+### Standard Startup Sequence
 
-pipeline 运行前的标准启动序列（作为 stage 脚本的前置条件）：
-
-```
-步骤 1: 检查 Docker daemon 是否运行
-步骤 2: 检查 docker-compose.yml 是否存在
-步骤 3: 检查所有服务的 Docker 镜像是否已构建
-步骤 4: 启动 Docker Compose（如果未运行）
-步骤 5: 轮询所有服务的 health endpoint，直到全部就绪
-步骤 6: 如果 60 秒后仍有服务未就绪，打印失败信息并退出
-步骤 7: 记录 DOCKER_RUNNING=true 到内存，后续脚本检查此标志
-```
-
-### 服务发现
-
-stages2 使用 `main/config.py:service_url()` 获取服务地址。stages3 扩展这个机制：
-
-默认 URL 为 Docker bridge IP（自动检测）+ Docker 内部端口。检测流程：
+The standard startup sequence before a pipeline run (a precondition for the stage scripts):
 
 ```
-服务地址解析逻辑:
-  1. 尝试 Docker bridge IP 检测（docker inspect 获取）
-  2. 如果成功，使用 bridge IP
-  3. 如果失败（非 Docker 环境），回退到 127.0.0.1
-  4. 如果设置了 {NAME}_HOST 环境变量，覆盖以上所有
+Step 1: Check whether the Docker daemon is running
+Step 2: Check whether docker-compose.yml exists
+Step 3: Check whether the Docker images for all services are built
+Step 4: Start Docker Compose (if not running)
+Step 5: Poll the health endpoint of every service until all are ready
+Step 6: If any service is still not ready after 60 seconds, print the failure and exit
+Step 7: Record DOCKER_RUNNING=true in memory; subsequent scripts check this flag
 ```
 
-此逻辑在客户端连接初始化时执行一次并缓存。
+### Service Discovery
+
+stages2 uses `main/config.py:service_url()` to obtain service addresses. stages3 extends this mechanism:
+
+The default URL is the Docker bridge IP (auto-detected) + the internal Docker port. Detection flow:
+
+```
+Service address resolution logic:
+  1. Try Docker bridge IP detection (obtained via docker inspect)
+  2. On success, use the bridge IP
+  3. On failure (non-Docker environment), fall back to 127.0.0.1
+  4. If the {NAME}_HOST environment variable is set, it overrides all of the above
+```
+
+This logic runs once when the client connection is initialized and is then cached.
 
 ---
 
-## 八、方差感知权重的集成位置
+## 8. Where Variance-Aware Weighting Fits In
 
-方差感知权重是整个 stages3 架构的"智能"部分。它在架构中的位置：
+Variance-aware weighting is the "intelligent" part of the entire stages3 architecture. Its place in the architecture:
 
 ```
-┌──────────────────────────────────────────┐
-│           执行层（普通批处理）              │
-│  大批量评分 → 原始分数写入 stage2_scores  │
-└─────────────────┬────────────────────────┘
-                  ▼
-┌──────────────────────────────────────────┐
-│        聚合分析器（Analytics Engine）       │
-│  读取 score_distribution → 计算 σ         │
-│  → 归一化权重 → 写入 weight_config        │
-│  → 应用权重生成排名 → 写入 stage2_ranking │
-└──────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│            Execution Layer (plain batch processing)            │
+│   Large-batch scoring → raw scores written to stage2_scores    │
+└────────────────────────────────┬───────────────────────────────┘
+                                 ▼
+┌────────────────────────────────────────────────────────────────┐
+│            Aggregation Analyzer (Analytics Engine)             │
+│              Read score_distribution → compute σ               │
+│           → normalize weights → write weight_config            │
+│   → apply weights to produce ranking → write stage2_ranking    │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-聚合分析器是一个独立的组件（不嵌入在批处理循环中），它在每个评分阶段完成后运行。这样做的好处：
+The aggregation analyzer is a separate component (not embedded in the batch loop); it runs after each scoring stage completes. The benefits of this approach:
 
-1. **关注点分离**: 批处理只管拿原始分数，不管分数怎么用
-2. **可重入性**: 可以在任何时间点重新计算权重和排名（如调整了 winsorization 参数后）
-3. **可审计性**: weight_config 表记录了每次权重计算的结果，可以追溯
+1. **Separation of concerns**: batch processing only obtains raw scores and does not care how they are used
+2. **Re-entrancy**: weights and rankings can be recomputed at any point in time (e.g., after adjusting the winsorization parameters)
+3. **Auditability**: the weight_config table records the result of every weight computation and can be traced
 
 ---
 
-## 九、s tages2 到 stages3 的演进路线图
+## 9. Evolution Roadmap from stages2 to stages3
 
-### 增量重构，非重写
+### Incremental Refactoring, Not a Rewrite
 
-stages3 不是从零开始。大部分 stages2 的脚本内容可以复用：
+stages3 does not start from scratch. Most of the stages2 scripts can be reused:
 
-| stages2 脚本 | stages3 中的变化 |
+| stages2 script | Change in stages3 |
 |-------------|----------------|
-| step00_integrate.py | 替换为数据预处理（CD-HIT + 长度筛选 + DB 写入） |
-| round01_lightweight.py | 保留评分逻辑，改用 DB 读写 |
-| round02_scoring.py | 保留评分逻辑，添加方差权重计算 |
-| round03_heavy.py | 可合并到新的 Stage 2 |
-| round04_enumerate.py | 基本可复用，改用 DB 输出 |
-| round05_3d.py | 基本可复用 |
-| round06_pdb_eval.py | 基本可复用 |
-| round07_final.py | 保留输出逻辑 |
+| step00_integrate.py | Replaced by data preprocessing (CD-HIT + length filter + DB write) |
+| round01_lightweight.py | Keep the scoring logic; switch to DB reads and writes |
+| round02_scoring.py | Keep the scoring logic; add variance weight computation |
+| round03_heavy.py | Can be merged into the new Stage 2 |
+| round04_enumerate.py | Largely reusable; switch the output to DB |
+| round05_3d.py | Largely reusable |
+| round06_pdb_eval.py | Largely reusable |
+| round07_final.py | Keep the output logic |
 
-最核心的重构工作：
-1. 数据传递方式：从 CSV 改为 DuckDB
-2. 添加聚合分析器组件
-3. 添加 checkpoint 系统
-4. 统一 Docker 启动序列
-5. 技术问题的服务端修复
+The most essential refactoring work:
+1. Data handoff: from CSV to DuckDB
+2. Add the aggregation analyzer component
+3. Add the checkpoint system
+4. Unify the Docker startup sequence
+5. Server-side fixes for technical issues
 
-### 开发顺序
+### Development Order
 
-1. 安装验证：CD-HIT + DuckDB
-2. 基础设施：db.py 接口模块、config.py 扩展、checkpoint 系统
-3. 数据预处理：FASTA 解析器、CD-HIT wrapper、长度筛选
-4. 评分阶段：迁移 round01 → round02 的逻辑到新架构，集成方差权重
-5. 后续阶段：迁移 round04 → round07 的逻辑
-6. 报告生成：基于数据库的统计报告和最终输出
+1. Installation validation: CD-HIT + DuckDB
+2. Infrastructure: db.py interface module, config.py extensions, checkpoint system
+3. Data preprocessing: FASTA parser, CD-HIT wrapper, length filtering
+4. Scoring stages: migrate the round01 → round02 logic to the new architecture and integrate variance weighting
+5. Subsequent stages: migrate the round04 → round07 logic
+6. Report generation: database-backed statistical reports and final output

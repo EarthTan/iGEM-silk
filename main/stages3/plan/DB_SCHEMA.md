@@ -1,104 +1,106 @@
-# Stages3 数据库方案
+> **English** | [中文](DB_SCHEMA.zh.md)
 
-> 版本: v1.0 — 2026-05-15
-> 数据库: DuckDB（嵌入列式数据库）
-> 文件: `output3/pipeline.db`
+# Stages3 Database Design
+
+> Version: v1.0 — 2026-05-15
+> Database: DuckDB (embedded columnar database)
+> File: `output3/pipeline.db`
 
 ---
 
-## 一、为什么选择 DuckDB
+## 1. Why DuckDB
 
-经过对多种方案的评估，DuckDB 是 stages3 最合适的选择：
+After evaluating several options, DuckDB is the most suitable choice for stages3:
 
-| 特性 | DuckDB | SQLite | PostgreSQL |
+| Feature | DuckDB | SQLite | PostgreSQL |
 |------|--------|--------|------------|
-| 部署方式 | 嵌入，无服务进程 | 嵌入，无服务进程 | 需要服务进程 |
-| 文件格式 | 单文件 | 单文件 | 需要数据目录 |
-| 并行查询 | ✅ 自动多线程 | ❌ 单线程 | ✅ 但需配置 |
-| 列式存储 | ✅ 分析型查询快 | ❌ 行式存储 | ❌ 行式存储 |
-| 内存模式 | ✅ 全内存或磁盘 | ❌ 仅磁盘 | ❌ 仅磁盘 |
-| JSON 支持 | ✅ 原生 | ⚠️ 扩展 | ✅ |
-| 安装 | pip install duckdb | 内置 | 需要 apt install |
+| Deployment | Embedded, no server process | Embedded, no server process | Requires a server process |
+| File format | Single file | Single file | Requires a data directory |
+| Parallel queries | ✅ Automatic multithreading | ❌ Single-threaded | ✅ But requires configuration |
+| Columnar storage | ✅ Fast analytical queries | ❌ Row-oriented storage | ❌ Row-oriented storage |
+| In-memory mode | ✅ Fully in-memory or on disk | ❌ Disk only | ❌ Disk only |
+| JSON support | ✅ Native | ⚠️ Extension | ✅ |
+| Installation | pip install duckdb | Built in | Requires apt install |
 
-**对比结论**: DuckDB 是专为数据分析场景设计的嵌入式数据库。对于 stages3 的使用场景——写入数千万行数据、做聚合分析（AVG, STDDEV, PERCENTILE）、导出为 CSV——DuckDB 的性能比 SQLite 快 10-100 倍，同时保持了单文件、零部署的简便性。
+**Conclusion**: DuckDB is an embedded database designed specifically for data analytics. For stages3's use case—writing tens of millions of rows, running aggregation analysis (AVG, STDDEV, PERCENTILE), exporting to CSV—DuckDB is 10-100× faster than SQLite while keeping the simplicity of a single file and zero deployment.
 
-SQLite 虽然是 Python 自带的行式数据库，但它的设计目标（事务型 OLTP）与我们的使用场景（分析型 OLAP）完全不匹配。数千万行的聚合查询在 SQLite 上需要数分钟，在 DuckDB 上只需数秒。
+Although SQLite is a row-oriented database that ships with Python, its design goal (transactional OLTP) is a complete mismatch for our use case (analytical OLAP). An aggregation query over tens of millions of rows takes minutes on SQLite but only seconds on DuckDB.
 
 ---
 
-## 二、表结构总览
+## 2. Table Overview
 
-整个 pipeline 使用同一个 DuckDB 文件，包含以下表：
+The entire pipeline uses a single DuckDB file containing the following tables:
 
 ```
 pipeline.db
-├── candidates          ← Stage 0 输出: 预处理后的候选肽段池
-├── stage1_scores       ← Stage 1 输出: 轻量初筛的分数
-├── stage1_passed       ← Stage 1 通过者（视图或物化表）
-├── stage2_scores       ← Stage 2 输出: 全量评分结果
-├── stage2_ranking      ← Stage 2 排名
-├── constructs          ← Stage 3 输出: 构造枚举
-├── construct_scores    ← Stage 3 分数: SoDoPE + TemStaPro
-├── structure_jobs      ← Stage 4 状态: 结构预测任务跟踪
-├── structure_results   ← Stage 4 输出: 结构预测结果
-├── pdb_eval            ← Stage 5 输出: SASA + Aggrescan3D
-├── final_ranking       ← Stage 6 输出: 最终排名
-├── score_distribution  ← 全局: 所有分数分布统计
-├── weight_config       ← 全局: 方差感知权重的赋值记录
-└── checkpoint          ← 全局: 检查点 / 断点续跑状态
+├── candidates          ← Stage 0 output: preprocessed candidate peptide pool
+├── stage1_scores       ← Stage 1 output: lightweight primary screening scores
+├── stage1_passed       ← Stage 1 passers (view or materialized table)
+├── stage2_scores       ← Stage 2 output: full scoring results
+├── stage2_ranking      ← Stage 2 ranking
+├── constructs          ← Stage 3 output: construct enumeration
+├── construct_scores    ← Stage 3 scores: SoDoPE + TemStaPro
+├── structure_jobs      ← Stage 4 state: structure prediction job tracking
+├── structure_results   ← Stage 4 output: structure prediction results
+├── pdb_eval            ← Stage 5 output: SASA + Aggrescan3D
+├── final_ranking       ← Stage 6 output: final ranking
+├── score_distribution  ← Global: distribution statistics for all scores
+├── weight_config       ← Global: assignment records for variance-aware weights
+└── checkpoint          ← Global: checkpoint / resume state
 ```
 
 ---
 
-## 三、各表详细设计
+## 3. Detailed Table Designs
 
-### candidates（候选肽段池）
+### candidates (candidate peptide pool)
 
-这是整个 pipeline 的核心基础表，其他所有表都引用它的 `candidate_id`。
+This is the core base table of the entire pipeline; every other table references its `candidate_id`.
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| candidate_id | BIGINT | 自增主键 |
-| source | VARCHAR | "uniprot" 或 "mgy" |
-| source_id | VARCHAR | 原始 FASTA ID |
-| header | VARCHAR | 完整的 FASTA header（用于追溯） |
-| sequence | VARCHAR | 氨基酸序列 |
-| length | SMALLINT | 长度 |
-| is_standard_aa | BOOLEAN | 是否只含 20 种标准氨基酸 |
-| cluster_id | VARCHAR | CD-HIT 簇 ID |
-| cluster_rep | BOOLEAN | 是否是 CD-HIT 簇的代表序列 |
+| candidate_id | BIGINT | Auto-increment primary key |
+| source | VARCHAR | "uniprot" or "mgy" |
+| source_id | VARCHAR | Original FASTA ID |
+| header | VARCHAR | Full FASTA header (for provenance) |
+| sequence | VARCHAR | Amino acid sequence |
+| length | SMALLINT | Length |
+| is_standard_aa | BOOLEAN | Whether it contains only the 20 standard amino acids |
+| cluster_id | VARCHAR | CD-HIT cluster ID |
+| cluster_rep | BOOLEAN | Whether it is the representative sequence of a CD-HIT cluster |
 
-**索引**: (source, source_id) 唯一索引，避免重复导入。
-**分区策略**: 按 source 分区（uniprot / mgy），可以针对不同数据源单独处理。
+**Index**: unique index on (source, source_id) to prevent duplicate imports.
+**Partitioning strategy**: partition by source (uniprot / mgy), so that different data sources can be processed separately.
 
-### stage1_scores（轻量初筛分数）
+### stage1_scores (lightweight primary screening scores)
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| candidate_id | BIGINT | 关联 candidates |
-| anoxpepred_score | FLOAT | AnOxPePred 预测值 |
-| anoxpepred_success | BOOLEAN | 调用是否成功 |
-| algpred2_score | FLOAT | AlgPred2 预测值 |
-| algpred2_success | BOOLEAN | 调用是否成功 |
-| scored_at | TIMESTAMP | 评分时间 |
+| candidate_id | BIGINT | References candidates |
+| anoxpepred_score | FLOAT | AnOxPePred prediction |
+| anoxpepred_success | BOOLEAN | Whether the call succeeded |
+| algpred2_score | FLOAT | AlgPred2 prediction |
+| algpred2_success | BOOLEAN | Whether the call succeeded |
+| scored_at | TIMESTAMP | Scoring time |
 
-**用途**: 记录 Stage 1 的原始分数。即使候选肽在 AlgPred2 上被淘汰，也保留其 AnOxPePred 分数用于事后分析。
+**Purpose**: record the raw Stage 1 scores. Even if a candidate peptide is eliminated by AlgPred2, its AnOxPePred score is retained for post-hoc analysis.
 
-### stage1_passed（Stage 1 通过者）
+### stage1_passed (Stage 1 passers)
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| candidate_id | BIGINT | 主键，关联 candidates |
-| anoxpepred_score | FLOAT | 保留用于 Stage 2 |
-| passed_reason | VARCHAR | "passed" 或淘汰原因 |
+| candidate_id | BIGINT | Primary key, references candidates |
+| anoxpepred_score | FLOAT | Retained for use in Stage 2 |
+| passed_reason | VARCHAR | "passed" or the elimination reason |
 
-**筛选条件**: AlgPred2 < 0.30（非过敏原）。AnOxPePred 不做硬阈值，留在 Stage 2 中用相对排名处理。
+**Filter condition**: AlgPred2 < 0.30 (non-allergen). AnOxPePred has no hard threshold and is instead handled by relative ranking in Stage 2.
 
-### stage2_scores（全量评分结果）
+### stage2_scores (full scoring results)
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| candidate_id | BIGINT | 关联 candidates |
+| candidate_id | BIGINT | References candidates |
 | anoxpepred_score | FLOAT | |
 | bepipred3_score | FLOAT | |
 | plm4cpps_score | FLOAT | |
@@ -106,157 +108,157 @@ pipeline.db
 | temstapro_score | FLOAT | |
 | sodope_score | FLOAT | |
 | mhcflurry_score | FLOAT | |
-| toxinpred3_score | FLOAT | 用于绝对排除 |
-| hemopi2_score | FLOAT | 用于绝对排除 |
-| ..._success | BOOLEAN | 各服务的成功标志（每个列对应一个 *_success 列） |
+| toxinpred3_score | FLOAT | Used for absolute exclusion |
+| hemopi2_score | FLOAT | Used for absolute exclusion |
+| ..._success | BOOLEAN | Success flag for each service (each column has a corresponding *_success column) |
 | scored_at | TIMESTAMP | |
 
-这个表会有大量列（~20 列），这是合理的——DuckDB 的列式存储对这种宽表处理得很好。
+This table will have a large number of columns (~20), which is reasonable—DuckDB's columnar storage handles such wide tables very well.
 
-### score_distribution（分数分布统计）
+### score_distribution (score distribution statistics)
 
-这个表不是运行的必需数据，而是做**方差感知权重**的核心输入。
+This table is not data required for running the pipeline; it is the core input for **variance-aware weighting**.
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| id | BIGINT | 自增主键 |
-| stage_name | VARCHAR | "stage1" 或 "stage2" 或 "final" |
-| service_name | VARCHAR | 服务名，如 "anoxpepred" |
-| count | BIGINT | 有效样本数 |
-| mean | FLOAT | 均值 |
-| stddev | FLOAT | **标准差（核心指标）** |
-| min | FLOAT | 最小值 |
-| p01 | FLOAT | 第 1 百分位（去极端值） |
-| p05 | FLOAT | 第 5 百分位 |
-| p25 | FLOAT | 下四分位 |
-| p50 | FLOAT | 中位数 |
-| p75 | FLOAT | 上四分位 |
-| p95 | FLOAT | 第 95 百分位 |
-| p99 | FLOAT | 第 99 百分位 |
-| max | FLOAT | 最大值 |
-| winsorized_stddev | FLOAT | **截尾后的标准差（更稳健）** |
-| computed_weight | FLOAT | 基于方差分配的权重 |
+| id | BIGINT | Auto-increment primary key |
+| stage_name | VARCHAR | "stage1" or "stage2" or "final" |
+| service_name | VARCHAR | Service name, e.g. "anoxpepred" |
+| count | BIGINT | Number of valid samples |
+| mean | FLOAT | Mean |
+| stddev | FLOAT | **Standard deviation (core metric)** |
+| min | FLOAT | Minimum |
+| p01 | FLOAT | 1st percentile (extremes removed) |
+| p05 | FLOAT | 5th percentile |
+| p25 | FLOAT | Lower quartile |
+| p50 | FLOAT | Median |
+| p75 | FLOAT | Upper quartile |
+| p95 | FLOAT | 95th percentile |
+| p99 | FLOAT | 99th percentile |
+| max | FLOAT | Maximum |
+| winsorized_stddev | FLOAT | **Standard deviation after trimming (more robust)** |
+| computed_weight | FLOAT | Weight assigned based on variance |
 | computed_at | TIMESTAMP | |
 
-**winsorized_stddev 的计算**: 去掉上下 1% 极端值后计算的标准差。这是为了避免个别离群值放大或缩小某个服务的感知区分度。
+**Computation of winsorized_stddev**: the standard deviation computed after removing the top and bottom 1% extreme values. This avoids individual outliers inflating or deflating a service's perceived discriminative power.
 
-### weight_config（权重配置记录）
+### weight_config (weight configuration records)
 
-记录每个阶段的权重赋值过程，保证**可复现性**和**可审计性**。
+Records the weight assignment process for each stage, ensuring **reproducibility** and **auditability**.
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| id | BIGINT | 自增主键 |
-| stage_name | VARCHAR | "stage2" 或 "stage6" |
-| total_candidates | BIGINT | 参与权重计算的候选数 |
-| weight_formula | VARCHAR | 使用的公式: "stddev_normalized" 或 "winsorized_stddev_normalized" |
-| weights | JSON | 各服务权重的完整 JSON |
-| distribution_snapshot | JSON | 各服务分布统计的完整 JSON |
+| id | BIGINT | Auto-increment primary key |
+| stage_name | VARCHAR | "stage2" or "stage6" |
+| total_candidates | BIGINT | Number of candidates participating in the weight computation |
+| weight_formula | VARCHAR | Formula used: "stddev_normalized" or "winsorized_stddev_normalized" |
+| weights | JSON | Full JSON of the weights of each service |
+| distribution_snapshot | JSON | Full JSON of the distribution statistics of each service |
 | created_at | TIMESTAMP | |
 
-### constructs（构造枚举表）
+### constructs (construct enumeration table)
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| construct_id | BIGINT | 自增主键 |
-| candidate_id | BIGINT | 关联 candidates |
-| linker | VARCHAR | 连接子类型: "flexible" 或 "rigid" |
-| position | VARCHAR | 融合位置: "N", "internal", "C" |
-| scaffold_seq | VARCHAR | 丝蛋白骨架序列 |
-| linker_seq | VARCHAR | 连接子序列 |
-| peptide_seq | VARCHAR | 功能肽段序列 |
-| full_sequence | VARCHAR | 完整 construct 氨基酸序列 |
+| construct_id | BIGINT | Auto-increment primary key |
+| candidate_id | BIGINT | References candidates |
+| linker | VARCHAR | Linker type: "flexible" or "rigid" |
+| position | VARCHAR | Fusion position: "N", "internal", "C" |
+| scaffold_seq | VARCHAR | Silk protein scaffold sequence |
+| linker_seq | VARCHAR | Linker sequence |
+| peptide_seq | VARCHAR | Functional peptide sequence |
+| full_sequence | VARCHAR | Full construct amino acid sequence |
 
-### checkpoint（检查点表）
+### checkpoint (checkpoint table)
 
-断点续跑的核心。
+The core of resume-from-interruption.
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |----|------|------|
-| stage | VARCHAR | 阶段名 |
-| step | VARCHAR | 子步骤名 |
+| stage | VARCHAR | Stage name |
+| step | VARCHAR | Sub-step name |
 | status | VARCHAR | "running" / "done" / "failed" |
-| total_items | BIGINT | 本步骤总处理数 |
-| processed_items | BIGINT | 已处理数 |
-| error_message | VARCHAR | 失败时的错误信息 |
+| total_items | BIGINT | Total number of items to process in this step |
+| processed_items | BIGINT | Number already processed |
+| error_message | VARCHAR | Error message on failure |
 | started_at | TIMESTAMP | |
 | completed_at | TIMESTAMP | |
 | updated_at | TIMESTAMP | |
 
 ---
 
-## 四、检查点与断点续跑机制
+## 4. Checkpoint and Resume Mechanism
 
-### 设计原则
+### Design Principles
 
-1. **幂等性**: 每个阶段的输出只取决于输入数据，不受之前运行的影响
-2. **细粒度**: 每处理完一批（如 10 万条）就更新一次 checkpoint
-3. **可审计**: checkpoint 表中记录了每个阶段的开始、结束和错误信息
+1. **Idempotency**: each stage's output depends only on the input data and is unaffected by previous runs
+2. **Fine granularity**: update the checkpoint after each processed batch (e.g., 100k rows)
+3. **Auditability**: the checkpoint table records the start, end, and error information of each stage
 
-### 恢复流程
+### Recovery Flow
 
 ```
-检查点系统:
+Checkpoint system:
 
-阶段开始时:
+At stage start:
   checkpoint.upsert(stage="stage1", status="running", started_at=now())
 
-恢复运行时:
+When resuming a run:
   status = checkpoint.get("stage1")?.status
   if status == "done":
-      skip → 进入 Stage 2
+      skip → proceed to Stage 2
   elif status == "running":
-      查询已处理的最大 candidate_id
-      从断点处继续
-  elif status is None 或 status == "failed":
-      重新开始 Stage 1
+      query the largest processed candidate_id
+      continue from the breakpoint
+  elif status is None or status == "failed":
+      restart Stage 1
 
-阶段完成时:
+At stage completion:
   checkpoint.upsert(stage="stage1", status="done", completed_at=now())
 ```
 
 ---
 
-## 五、读写接口范式
+## 5. Read/Write Interface Paradigm
 
-所有数据库操作通过统一的接口模块 `main/stages3/db.py` 访问，Pipeline 脚本不直接构造 SQL 查询。
+All database operations are accessed through the unified interface module `main/stages3/db.py`; pipeline scripts do not construct SQL queries directly.
 
-推荐的自然语言风格接口（说明用途，不列代码）：
+Recommended natural-language-style interface (describes the purpose, no code):
 
-- **初始化数据库**: 创建 pipeline.db 文件，运行所有 CREATE TABLE 语句
-- **写入候选肽池**: 批量插入候选人记录，自动去重
-- **记录分数**: 批量写入 stage 分数表，按 candidate_id 关联
-- **读取待处理候选**: 查询尚未完成当前阶段的候选名单
-- **更新检查点**: 记录当前处理进度到 checkpoint 表
-- **计算分布统计**: 运行针对指定表的聚合查询，返回标准差和各百分位数
-- **计算权重**: 根据分布统计表，读取标准差，计算归一化权重
-- **生成排名**: 将权重应用到分数表，计算加权综合得分，排序输出
+- **Initialize the database**: create the pipeline.db file and run all CREATE TABLE statements
+- **Write the candidate peptide pool**: batch-insert candidate records with automatic deduplication
+- **Record scores**: batch-write to the stage score tables, associated by candidate_id
+- **Read pending candidates**: query the list of candidates that have not yet completed the current stage
+- **Update checkpoints**: record the current processing progress in the checkpoint table
+- **Compute distribution statistics**: run aggregation queries against the specified table and return the standard deviation and each percentile
+- **Compute weights**: read the standard deviations from the distribution statistics table and compute normalized weights
+- **Generate rankings**: apply the weights to the score table, compute the weighted composite score, and output a sorted ranking
 
 ---
 
-## 六、性能与空间估算
+## 6. Performance and Space Estimates
 
-### 存储空间
+### Storage Space
 
-| 表 | 预估行数 | 预估大小 |
+| Table | Estimated rows | Estimated size |
 |----|---------|---------|
-| candidates | 2000-6000 万 | ~2-6 GB |
-| stage1_scores | 2000-6000 万 | ~3-9 GB |
-| stage2_scores | 200-600 万（通过 Stage 1 后） | ~1-3 GB |
-| constructs | 2-5 万（Top 候选） | ~50 MB |
-| 其他 + 索引 | — | ~1 GB |
-| **总计** | | **~10-20 GB** |
+| candidates | 20-60 million | ~2-6 GB |
+| stage1_scores | 20-60 million | ~3-9 GB |
+| stage2_scores | 2-6 million (after passing Stage 1) | ~1-3 GB |
+| constructs | 20-50k (top candidates) | ~50 MB |
+| Others + indexes | — | ~1 GB |
+| **Total** | | **~10-20 GB** |
 
-DuckDB 的单文件设计以及列式压缩使得实际磁盘占用远小于行式数据库。
+DuckDB's single-file design and columnar compression make the actual disk footprint far smaller than that of a row-oriented database.
 
-### 查询性能预期
+### Expected Query Performance
 
-| 操作 | 数据量 | 预期时间 |
+| Operation | Data volume | Expected time |
 |------|--------|---------|
-| 写入 100 万条 | 100 万 | < 1s |
-| 计算 5000 万条序列的 stddev | 5000 万 | ~2-5s |
-| 按排名取 Top 1000 | 500 万 | < 1s |
-| 导出 10 万条到 CSV | 10 万 | < 1s |
-| 带 JOIN 的复合查询 | 500 万 | ~1-2s |
+| Write 1 million rows | 1 million | < 1s |
+| Compute stddev over 50 million sequences | 50 million | ~2-5s |
+| Fetch the Top 1000 by ranking | 5 million | < 1s |
+| Export 100k rows to CSV | 100k | < 1s |
+| Composite query with JOIN | 5 million | ~1-2s |
 
-DuckDB 的列式存储意味着聚合计算（标准差、百分位数等）只读取需要的列，不扫描整行数据。
+DuckDB's columnar storage means aggregation computations (standard deviation, percentiles, etc.) read only the columns they need and do not scan entire rows.

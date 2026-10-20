@@ -1,105 +1,107 @@
+> **English** | [中文](what-is-GROMACS.zh.md)
+
 # GRAMACS 
 
 The official git repo URL: https://github.com/gromacs/gromacs
 
-## 先从输入输出讲清楚 GROMACS MD 是干什么的
+## First, What GROMACS MD Does, Explained Through Inputs and Outputs
 
-**一句话定义**：GROMACS 是把一个静态的 3D 分子结构"放进水里泡一段时间，然后录视频"的工具。
-
----
-
-### 输入
-
-```
-1. 一个 PDB 文件（你的融合蛋白的三维坐标，每个原子的 x,y,z 位置）
-   ↑ 通常来自 AlphaFold / ESMFold 预测，或晶体结构
-
-2. 力场参数（告诉程序每个化学键的弹性、每对原子之间的静电/范德华作用）
-   常用：CHARMM36m、AMBER ff19SB
-
-3. 模拟参数（温度 300K、压力 1 bar、模拟多长时间 e.g. 100 纳秒）
-```
-
-### 输出
-
-```
-1. 轨迹文件（.xtc）
-   → 每隔 N 皮秒，记录一次所有原子的坐标
-   → 100 ns 模拟大约有 10,000 帧"快照"，合起来就是一段分子运动的视频
-
-2. 从轨迹里分析出的统计量：
-   - RMSD：结构整体是否稳定（偏离初始结构多少？）
-   - RMSF：哪些残基在抖动？哪些很刚性？
-   - SASA 随时间变化：功能肽平均有多少表面积暴露在水里？
-   - 二级结构比例随时间变化：功能肽插入后 β-sheet 有没有被破坏？
-```
-
-**关键理解**：AlphaFold/ESMFold 给你的是一张**照片**（静态结构）。GROMACS 给你的是一段**视频**（分子在真实溶液环境里的动态行为）。
+**One-sentence definition**: GROMACS is a tool that "puts a static 3D molecular structure into water, soaks it for a while, and records a video."
 
 ---
 
-## 对你们这个项目，GROMACS MD 有没有用？
-
-**结论先说：主流程用不上，但最终验证阶段可以用 1–2 次。**
-
-原因是你们方案的规模决定的：
-
-你的核心逻辑是**超级枚举**——一个 1000 aa 的丝素蛋白，单点插入就有 1001 种方案，两个功能肽组合就是百万量级。GROMACS 模拟一个融合蛋白**至少需要数小时到数天**（取决于序列长度和模拟时长）。这在你的筛选阶段完全不可行。
-
-你们真正需要的是下面这条流水线：
+### Input
 
 ```
-1001 种插入位点
+1. A PDB file (the 3D coordinates of your fusion protein: the x,y,z position of every atom)
+   ↑ usually from AlphaFold / ESMFold prediction, or a crystal structure
+
+2. Force field parameters (tell the program the stiffness of each chemical bond and the electrostatic/van der Waals interaction between each pair of atoms)
+   Common choices: CHARMM36m, AMBER ff19SB
+
+3. Simulation parameters (temperature 300K, pressure 1 bar, how long to simulate, e.g. 100 nanoseconds)
+```
+
+### Output
+
+```
+1. Trajectory file (.xtc)
+   → every N picoseconds, the coordinates of all atoms are recorded
+   → a 100 ns simulation has roughly 10,000 "snapshot" frames, which together form a video of molecular motion
+
+2. Statistics analyzed from the trajectory:
+   - RMSD: is the overall structure stable (how far has it deviated from the initial structure?)
+   - RMSF: which residues are wiggling? which are rigid?
+   - SASA over time: how much surface area of the functional peptide is on average exposed to water?
+   - Secondary structure fractions over time: after the functional peptide is inserted, has the β-sheet been disrupted?
+```
+
+**Key insight**: AlphaFold/ESMFold give you a **photograph** (a static structure). GROMACS gives you a **video** (how the molecule behaves dynamically in a real solution environment).
+
+---
+
+## For Your Project, Is GROMACS MD Useful?
+
+**The conclusion up front: you don't need it in the main workflow, but you can use it once or twice in the final validation stage.**
+
+The reason is determined by the scale of your design:
+
+Your core logic is **massive enumeration** — for a 1000 aa silk fibroin, single-point insertion alone gives 1001 options, and combining two functional peptides puts you in the millions. GROMACS takes **at least hours to days** to simulate one fusion protein (depending on sequence length and simulation length). That is completely infeasible during your screening stage.
+
+What you actually need is the following pipeline:
+
+```
+1001 insertion sites
       ↓
-  ESMFold 批量预测结构（每条序列约 1–10 秒）
+  Batch structure prediction with ESMFold (~1–10 seconds per sequence)
       ↓
-  静态 SASA 计算（FreeSASA 或 PyMOL，秒级）
+  Static SASA calculation (FreeSASA or PyMOL, seconds)
       ↓
-  二级结构检查（功能肽区域是否被预测为 β-sheet？）
+  Secondary structure check (is the functional peptide region predicted as β-sheet?)
       ↓
-  序列级硬筛选（避开酶切位点、Pro 含量、电荷等）
+  Sequence-level hard filtering (avoid protease cleavage sites, Pro content, charge, etc.)
       ↓
-  输出 Top 5–10 候选方案
+  Output the Top 5–10 candidate designs
       ↓
-  [可选] 对这几个方案跑 GROMACS，验证 SASA 在溶液中是否真的稳定
+  [Optional] Run GROMACS on these few designs to verify that SASA is really stable in solution
 ```
 
 ---
 
-## 你提到的 SASA：不需要 MD 也能算
+## The SASA You Mentioned: You Don't Need MD to Compute It
 
-这是一个重要的区分。SASA 有两种用法：
+This is an important distinction. SASA has two uses:
 
-| 用法 | 工具 | 计算对象 | 意义 |
+| Use | Tool | Computed on | Meaning |
 |---|---|---|---|
-| **静态 SASA** | FreeSASA、PyMOL `get_sasa` | 单张 PDB 结构 | 这个结构下功能肽有多少面积暴露 |
-| **动态平均 SASA** | GROMACS 轨迹分析 | 10000 帧快照的均值 | 溶液中功能肽平均暴露面积 |
+| **Static SASA** | FreeSASA, PyMOL `get_sasa` | A single PDB structure | How much area of the functional peptide is exposed in this structure |
+| **Dynamic average SASA** | GROMACS trajectory analysis | Mean over 10,000 snapshot frames | Average exposed area of the functional peptide in solution |
 
-对于你们的枚举筛选阶段，**静态 SASA 完全够用**，而且可以批量自动化。
+For your enumeration and screening stage, **static SASA is entirely sufficient**, and it can be batch-automated.
 
-**实际操作**：ESMFold 预测结构 → 保存 PDB → 用 FreeSASA 命令行批量算 → 对比各插入位点的功能肽残基 SASA 值，取最高的方案。
+**In practice**: predict structures with ESMFold → save PDBs → batch-compute with the FreeSASA command line → compare the functional peptide residue SASA values across insertion sites and take the design with the highest value.
 
 ```bash
-# 安装
+# Install
 pip install freesasa
 
-# Python 里批量算
+# Batch computation in Python
 import freesasa
 structure = freesasa.Structure("fusion_pos42.pdb")
 result = freesasa.calc(structure)
-# 对功能肽残基求和，得到暴露面积
+# Sum over the functional peptide residues to get the exposed area
 ```
 
 ---
 
-## GROMACS 在你们项目里的合理定位
+## The Reasonable Role of GROMACS in Your Project
 
-它适合出现在项目的**最后验证阶段**，不是筛选阶段：
+It belongs in the project's **final validation stage**, not the screening stage:
 
-- 经过枚举 + 静态 SASA + ML 打分，你们最终确定 2–3 个最优构建体（insertion site × 功能肽 × linker 类型）
-- 对这 2–3 个跑 GROMACS，50–100 ns 模拟，验证功能肽在溶液中的动态暴露行为
-- 这个结果可以作为 wiki 的计算依据，也能支撑你们向湿实验组推荐"哪个方案最值得先合成验证"
+- After enumeration + static SASA + ML scoring, you settle on 2–3 optimal constructs (insertion site × functional peptide × linker type)
+- Run GROMACS on these 2–3 constructs with a 50–100 ns simulation to verify the dynamic exposure behavior of the functional peptide in solution
+- These results can serve as the computational evidence for the wiki, and they also support your recommendation to the wet-lab team of "which design is most worth synthesizing and validating first"
 
-对 iGEM 来说，这部分还有一个额外价值：**MD 轨迹可视化（VMD 动画）本身就是很好的展示素材**，评委看得懂，视觉冲击也强。
+For iGEM, this part has an extra benefit: **MD trajectory visualization (VMD animations) is itself great presentation material** — judges understand it, and it has strong visual impact.
 
-总结一句话：GROMACS 对你们不是流水线工具，是**最终候选的压测工具**。主流程的枚举筛选靠的是 ESMFold + 静态 SASA + 序列级规则，这三件事都能批量自动化，才能处理你们几千到上万量级的候选方案。
+In one sentence: for you, GROMACS is not a pipeline tool; it is a **stress-testing tool for the final candidates**. The enumeration screening in the main workflow relies on ESMFold + static SASA + sequence-level rules — all three can be batch-automated, which is the only way to handle your thousands-to-tens-of-thousands of candidate designs.

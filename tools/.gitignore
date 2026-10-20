@@ -2,4 +2,3 @@ logs/
 tests/
 test*.md
 esm_cache/
-!test*.en.md

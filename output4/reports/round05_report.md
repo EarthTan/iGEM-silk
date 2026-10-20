@@ -1,40 +1,42 @@
-# Round 5: OmegaFold 3D 结构预测报告
+> **English** | [中文](round05_report.zh.md)
 
-## 范围
+# Round 5: OmegaFold 3D Structure Prediction Report
 
-| 通道 | 数量 | 筛选标准 |
+## Scope
+
+| Channel | Count | Screening criterion |
 |------|------|---------|
-| Top 通道 | 150 | SoDoPE+TemStaPro 综合分最高 |
-| Bottom 通道 | 100 | SoDoPE+TemStaPro 综合分最高 |
-| **总计** | **250** | 不限制位置 (N/C/Both)，高分优先 |
+| Top channel | 150 | highest SoDoPE+TemStaPro composite score |
+| Bottom channel | 100 | highest SoDoPE+TemStaPro composite score |
+| **Total** | **250** | no position restriction (N/C/Both), highest score first |
 
-## 结果
+## Results
 
-运行时间: 02:04 → 08:12 (6.13h)
+Runtime: 02:04 → 08:12 (6.13h)
 
-| 项目 | 数值 |
+| Item | Value |
 |------|------|
-| 待预测 | 250 |
-| 成功 | **250/250 (100%)** |
-| 失败 | 0 |
-| 总耗时 | 22,082s (368.0 min ≈ 6.13h) |
-| 吞吐量 | ~0.68 cons/min (90s/cons) |
+| To predict | 250 |
+| Succeeded | **250/250 (100%)** |
+| Failed | 0 |
+| Total time | 22,082s (368.0 min ≈ 6.13h) |
+| Throughput | ~0.68 cons/min (90s/cons) |
 
-### pLDDT 分布
+### pLDDT distribution
 
-| 指标 | 数值 |
+| Metric | Value |
 |------|------|
-| 平均 | 0.4205 |
-| 最小值 | 0.3742 |
-| 最大值 | 0.4950 |
+| Mean | 0.4205 |
+| Min | 0.3742 |
+| Max | 0.4950 |
 
-## 分析
+## Analysis
 
-1. **100% 成功率**：所有 250 个 constructs 均成功生成 PDB + pLDDT 分数
-2. **pLDDT 范围 0.37-0.50**：符合 OmegaFold 在 silk 融合蛋白上的预期表现（CLAUDE.md 记录的 ~0.41），优于 ESMFold (<0.30)
-3. **6.13h 总耗时**：在 8h 限制内 ✅，实际吞吐与预估一致（90s/cons）
-4. **pLDDT 区分度有限**：跨度仅 0.12 (0.37-0.50)，在 250 个候选上排序区分力中等
+1. **100% success rate**: all 250 constructs successfully produced a PDB + pLDDT score
+2. **pLDDT range 0.37-0.50**: consistent with the expected behavior of OmegaFold on silk fusion proteins (~0.41 as recorded in CLAUDE.md), better than ESMFold (<0.30)
+3. **6.13h total time**: within the 8h limit ✅, actual throughput matching the estimate (90s/cons)
+4. **Limited pLDDT discriminating power**: the spread is only 0.12 (0.37-0.50), giving moderate ranking resolution across 250 candidates
 
-## 后续
+## Follow-up
 
-Round 5 输出作为 Round 6 (SASA + Aggrescan3D) 的输入。
+The Round 5 output serves as input to Round 6 (SASA + Aggrescan3D).

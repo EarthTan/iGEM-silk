@@ -1,71 +1,73 @@
-# 肽毒性生物学背景
+> **English** | [中文](biological_background.zh.md)
 
-## 毒肽的一般特征
+# Biological Background of Peptide Toxicity
 
-### 结构特征
+## General Characteristics of Toxic Peptides
 
-| 特征 | 说明 | 典型例子 |
+### Structural Characteristics
+
+| Feature | Description | Typical example |
 |-----|------|---------|
-| **短链** | 通常 5-50 个氨基酸 | 蜂毒肽 (26aa) |
-| **阳离子性** | 高比例 K、R 残基 | 抗菌肽 |
-| **两亲性** | 亲水/疏水区域分离 | 穿孔肽 |
-| **酰胺化 C 端** | C 端酰胺化增强活性 | 多种毒素肽 |
+| **Short chain** | Usually 5-50 amino acids | Melittin (26aa) |
+| **Cationicity** | High proportion of K, R residues | Antimicrobial peptides |
+| **Amphiphilicity** | Segregated hydrophilic/hydrophobic regions | Pore-forming peptides |
+| **Amidated C-terminus** | C-terminal amidation enhances activity | Various toxic peptides |
 
-### 氨基酸组成特点
+### Amino Acid Composition Characteristics
 
-- **阳离子氨基酸** (K, R, H)：促进与细胞膜负电荷相互作用
-- **疏水氨基酸** (A, V, I, L, F)：介导膜插入
-- **芳香族氨基酸** (W, Y, F)：影响受体结合和毒性
+- **Cationic amino acids** (K, R, H): promote interaction with the negative charges of the cell membrane
+- **Hydrophobic amino acids** (A, V, I, L, F): mediate membrane insertion
+- **Aromatic amino acids** (W, Y, F): affect receptor binding and toxicity
 
-## 毒性预测的生物学基础
+## Biological Basis of Toxicity Prediction
 
-### 作用机制
+### Mechanism of Action
 
-1. **膜作用机制**
-   - 阳离子肽与细菌细胞膜负电荷相互作用
-   - 疏水区域插入膜内部
-   - 形成孔道导致细胞裂解
+1. **Membrane action mechanism**
+   - Cationic peptides interact with the negative charges of the bacterial cell membrane
+   - Hydrophobic regions insert into the membrane interior
+   - Pores form and cause cell lysis
 
 2. **MERCI Motif**
-   - 基于已知毒素序列模式的匹配
-   - 对已知毒素类型高特异性
-   - 快速筛选大量序列
+   - Matching based on known toxin sequence patterns
+   - High specificity for known toxin types
+   - Fast screening of large numbers of sequences
 
-### 预测挑战
+### Prediction Challenges
 
-| 挑战 | 说明 |
+| Challenge | Description |
 |------|------|
-| **假阳性风险** | 某些治疗性抗菌肽可能被误判为有毒 |
-| **物种特异性** | 不同物种的毒素可能具有不同特征 |
-| **浓度效应** | 低浓度可能无毒，高浓度有毒 |
-| **新毒素** | 只能检测已知毒素 motif，新毒素可能漏检 |
+| **False positive risk** | Some therapeutic antimicrobial peptides may be misjudged as toxic |
+| **Species specificity** | Toxins from different species may have different characteristics |
+| **Concentration effects** | May be non-toxic at low concentration and toxic at high concentration |
+| **Novel toxins** | Only known toxin motifs can be detected; novel toxins may be missed |
 
-## AAC/DPC 特征的生物学意义
+## Biological Significance of AAC/DPC Features
 
-### AAC (氨基酸组成)
+### AAC (Amino Acid Composition)
 
-反映序列的整体氨基酸分布：
-- 阳离子氨基酸比例高 → 可能具有抗菌活性，但也可能有毒
-- 疏水氨基酸比例高 → 影响细胞膜穿透能力
-- 芳香族氨基酸 → 可能影响受体结合
+Reflects the overall amino acid distribution of the sequence:
+- High proportion of cationic amino acids → may have antibacterial activity, but may also be toxic
+- High proportion of hydrophobic amino acids → affects the ability to penetrate cell membranes
+- Aromatic amino acids → may affect receptor binding
 
-### DPC (二肽组成)
+### DPC (Dipeptide Composition)
 
-反映相邻氨基酸的相互作用：
-- 某些二肽 motif 是毒素的特征标记
-- 反映序列的局部结构偏好
-- 可捕捉氨基酸间的相互作用
+Reflects interactions between adjacent amino acids:
+- Certain dipeptide motifs are characteristic markers of toxins
+- Reflects the local structural preferences of the sequence
+- Can capture interactions between amino acids
 
-## 在融合肽设计中的考虑
+## Considerations in Fusion Peptide Design
 
-融合肽的毒性评估需要特别关注：
+Toxicity assessment of fusion peptides requires particular attention to:
 
-1. ** linker 区域**：可能引入新的毒性 motif
-2. **各组分比例**：融合后各组分的暴露程度
-3. **整体理化性质**：净电荷、疏水性变化
-4. **浓度效应**：实际使用浓度下的毒性
+1. **Linker regions**: may introduce new toxic motifs
+2. **Proportions of components**: the degree of exposure of each component after fusion
+3. **Overall physicochemical properties**: net charge, changes in hydrophobicity
+4. **Concentration effects**: toxicity at the actual working concentration
 
-## 参考资料
+## References
 
 - Rathore AS, et al. (2024) ToxinPred3.0. Computers in Biology and Medicine
 - Sharma N, et al. (2022) ToxinPred2. Briefings in Bioinformatics

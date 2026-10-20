@@ -1,5 +1,5 @@
 ---
-name: slim 镜像缺少 C 扩展编译依赖 v1.0
+name: slim Image Missing C Extension Build Dependencies v1.0
 author: Claude Code
 created: 2026-05-13
 version: 1.0.0
@@ -7,50 +7,52 @@ tags: [docker, slim-image, build-deps, c-extensions, pip, iGEM-silk]
 validated: true
 ---
 
-# Gene Capsule: slim 镜像缺少 C 扩展编译依赖
+> **English** | [中文](slim-image-build-deps.zh.md)
+
+# Gene Capsule: slim Image Missing C Extension Build Dependencies
 
 ## Experience
 
-**问题类型**: slim 基础镜像缺少 C 扩展编译所需的头文件和工具链，pip install 安装含原生扩展的包时报错。
+**Problem type**: The slim base image lacks the headers and toolchain needed to compile C extensions, so pip install fails when installing packages with native extensions.
 
-**核心策略**: 所有 slim 镜像 Dockerfile 中如涉及 pip 安装原生扩展，标准配置应包括编译依赖：`gcc python3-dev pkg-config`。
+**Core strategy**: In any slim-image Dockerfile that installs native extensions via pip, the standard configuration should include the build dependencies: `gcc python3-dev pkg-config`.
 
-**关键参数**: `gcc`, `python3-dev`, `pkg-config`
+**Key parameters**: `gcc`, `python3-dev`, `pkg-config`
 
-`python:3.11-slim` 不含 C 扩展编译所需的头文件和工具链。`pip install freesasa` 需要 `python3-dev` 和 `pkg-config`。
+`python:3.11-slim` does not include the headers and toolchain needed to compile C extensions. `pip install freesasa` needs `python3-dev` and `pkg-config`.
 
-### 错误模式
+### Incorrect Pattern
 
 ```dockerfile
 FROM python:3.11-slim
-RUN pip install freesasa    # ❌ 缺少编译依赖，报 fatal error: Python.h: No such file or directory
+RUN pip install freesasa    # ❌ missing build dependencies, reports fatal error: Python.h: No such file or directory
 ```
 
-### 标准配置
+### Standard Configuration
 
 ```dockerfile
 FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc python3-dev pkg-config libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install freesasa    # ✅ 编译通过
+RUN pip install freesasa    # ✅ compiles successfully
 ```
 
 ## Environment Fingerprint
 
-- **任务域**: Python Docker 镜像构建
-- **输入特征**: 使用 `python:slim` 基础镜像 + pip 安装含 C 扩展的包
-- **约束条件**: pip 包依赖原生 C 扩展（如 FreeSASA、numpy 从源码构建等）
-- **不适用**: 纯 Python 包、使用 wheel 安装、或使用完整 `python:3.11` 镜像
+- **Task domain**: Python Docker image builds
+- **Input characteristics**: A `python:slim` base image + pip installation of packages containing C extensions
+- **Constraints**: The pip package depends on native C extensions (e.g. FreeSASA, numpy built from source, etc.)
+- **Not applicable**: Pure Python packages, wheel-based installs, or the full `python:3.11` image
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk SASA 服务 Docker 构建失败
-- **失败案例**: `pip install freesasa` → `fatal error: Python.h: No such file or directory`
-- **修复验证**: 添加 `gcc python3-dev pkg-config` 后编译通过
+- **Validation method**: iGEM-silk SASA service Docker build failure
+- **Failure case**: `pip install freesasa` → `fatal error: Python.h: No such file or directory`
+- **Fix validation**: After adding `gcc python3-dev pkg-config`, it compiles successfully
 
 ## Usage
 
-- **触发条件**: pip install 报 `fatal error: Python.h: No such file or directory` 或 `error: command 'gcc' failed`
-- **调用方式**: 在 `pip install` 之前添加 `apt-get install gcc python3-dev pkg-config`
-- **注意事项**: 安装后清理 apt 缓存 (`rm -rf /var/lib/apt/lists/*`) 以减小镜像体积
+- **Trigger conditions**: pip install reports `fatal error: Python.h: No such file or directory` or `error: command 'gcc' failed`
+- **How to invoke**: Add `apt-get install gcc python3-dev pkg-config` before `pip install`
+- **Caveats**: Clean the apt cache after installing (`rm -rf /var/lib/apt/lists/*`) to reduce the image size

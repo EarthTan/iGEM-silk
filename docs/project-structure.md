@@ -1,5 +1,5 @@
-# iGEM-silk 项目结构图
+> **English** | [中文](project-structure.zh.md)
 
-## 仓库目录结构
+# iGEM-silk Project Structure Diagram
 
-
+## Repository directory structure

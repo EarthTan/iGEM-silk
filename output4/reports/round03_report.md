@@ -1,42 +1,43 @@
-# Round 3 深度评分报告
+> **English** | [中文](round03_report.zh.md)
 
-## 概览
+# Round 3 Deep Scoring Report
 
-深度评分 + ToxinPred3 硬阈值 + 方差加权排名 + GraphCPP 补充评分。
-双阶段设计：Phase 1 跑 5 服务 (BepiPred3/TemStaPro/SoDoPE/pLM4CPPs/ToxinPred3)，
-Phase 2 在 Round 4 候选上补跑 GraphCPP。
+## Overview
 
-| 阶段 | 输入 | 处理量 | 耗时 |
+Deep scoring + ToxinPred3 hard threshold + variance-weighted ranking + GraphCPP supplementary scoring.
+Two-phase design: Phase 1 runs 5 services (BepiPred3/TemStaPro/SoDoPE/pLM4CPPs/ToxinPred3),
+Phase 2 runs GraphCPP on the Round 4 candidates.
+
+| Stage | Input | Processed | Time |
 |------|------|--------|------|
-| Phase 1 (5 服务) | 103,469 | 86,487 通过 ToxinPred3 | ~6.75h |
-| Phase 2 (GraphCPP) | 4,324 | 4,324 全部计分 | ~42min |
-| **合计** | **103,469** | **→ 4,324 排名** | **~7.5h** |
+| Phase 1 (5 services) | 103,469 | 86,487 passed ToxinPred3 | ~6.75h |
+| Phase 2 (GraphCPP) | 4,324 | 4,324 all scored | ~42min |
+| **Total** | **103,469** | **→ 4,324 ranked** | **~7.5h** |
 
-## 输入来源
+## Input sources
 
-| 通道 | Round 2 通过 | 限流上限 | 实际取用 |
+| Channel | Round 2 passed | Rate-limit cap | Actually used |
 |------|-------------|---------|---------|
-| Top (高抗氧化) | 519,524 | 150,000 | 53,469 |
-| Bottom (低抗氧化) | 74,476 | 50,000 | 50,000 |
-| **总计** | **594,000** | **200,000** | **103,469** |
+| Top (high antioxidant) | 519,524 | 150,000 | 53,469 |
+| Bottom (low antioxidant) | 74,476 | 50,000 | 50,000 |
+| **Total** | **594,000** | **200,000** | **103,469** |
 
-Bottom 通道实际不足 50,000，只有 50,000。
+The Bottom channel actually fell short of 50,000 and had only 50,000.
 
-## ToxinPred3 硬阈值
+## ToxinPred3 hard threshold
 
-| 指标 | 数值 |
+| Metric | Value |
 |------|------|
-| 阈值 | ≥0.38 淘汰 |
-| 淘汰数 | 16,982 (16.4%) |
-| 通过数 | 86,487 (83.6%) |
-| 幸存者中 ≥0.38* | 828 (float32 精度残留) |
+| Threshold | ≥0.38 eliminated |
+| Eliminated | 16,982 (16.4%) |
+| Passed | 86,487 (83.6%) |
+| ≥0.38* among survivors | 828 (float32 precision residue) |
 
-\* 由于 DuckDB FLOAT 类型的精度问题，部分 0.38 值存储为 0.37999，
-DELETE 时与 0.38 (float64) 比较通过，但 SELECT 读出时显示略低于 0.38。
+\* Because of precision issues with the DuckDB FLOAT type, some 0.38 values are stored as 0.37999; the DELETE comparison against 0.38 (float64) passes, but a SELECT read-out shows them slightly below 0.38.
 
-## 各服务分数分布 (n=86,487)
+## Score distribution per service (n=86,487)
 
-| 服务 | 非空 | 最小值 | 平均值 | 中位数 | 最大值 | 标准差 |
+| Service | Non-null | Min | Mean | Median | Max | Standard deviation |
 |------|------|--------|--------|--------|--------|--------|
 | BepiPred3 | 86,487 | 0.052 | 0.248 | 0.253 | 0.361 | 0.042 |
 | TemStaPro | 86,487 | 0.001 | 0.507 | 0.514 | 0.987 | 0.170 |
@@ -45,27 +46,27 @@ DELETE 时与 0.38 (float64) 比较通过，但 SELECT 读出时显示略低于 
 | ToxinPred3 | 86,487 | 0.000 | 0.219 | 0.210 | 0.380 | 0.081 |
 | GraphCPP* | 4,324 | 0.022 | 0.647 | 0.691 | 0.999 | 0.224 |
 
-\* GraphCPP 仅在 Phase 2 的 Top 4,324 候选上运行。
+\* GraphCPP runs only on the top 4,324 Phase 2 candidates.
 
-### 关键观察
+### Key observations
 
-- **SoDoPE 方差最大** (SD=0.283) → 获得最高归一化权重
-- **BepiPred3 方差最小** (SD=0.042) → 区分度低，权重低
-- **pLM4CPPs 极度偏斜** (中位数 0.002，均值 0.058) → 大多数肽预测为无穿透性
-- **ToxinPred3 分布集中** (0.08-0.38 区间)，硬阈值有效淘汰了 ~16%
+- **SoDoPE has the largest variance** (SD=0.283) → receives the highest normalized weight
+- **BepiPred3 has the smallest variance** (SD=0.042) → low discriminating power, low weight
+- **pLM4CPPs is extremely skewed** (median 0.002, mean 0.058) → most peptides are predicted non-penetrating
+- **ToxinPred3 is concentrated** (range 0.08-0.38), and the hard threshold effectively eliminates ~16%
 
-## 方差权重 (Phase 1: 4 服务)
+## Variance weights (Phase 1: 4 services)
 
-| 服务 | 归一化权重 |
+| Service | Normalized weight |
 |------|-----------|
 | SoDoPE | 0.3175 |
 | pLM4CPPs | 0.1965 |
 | TemStaPro | 0.1888 |
 | BepiPred3 | 0.0467 |
 
-## 方差权重 (Phase 2: +GraphCPP, 5 服务, Top 4,324)
+## Variance weights (Phase 2: +GraphCPP, 5 services, top 4,324)
 
-| 服务 | 归一化权重 |
+| Service | Normalized weight |
 |------|-----------|
 | SoDoPE | 0.3175 |
 | GraphCPP | 0.2505 |
@@ -73,53 +74,53 @@ DELETE 时与 0.38 (float64) 比较通过，但 SELECT 读出时显示略低于 
 | TemStaPro | 0.1888 |
 | BepiPred3 | 0.0467 |
 
-## 排名分布 (n=4,324)
+## Ranking distribution (n=4,324)
 
-| 指标 | 数值 |
+| Metric | Value |
 |------|------|
-| 最小值 | 0.499 |
-| 平均值 | 0.750 |
-| 中位数 | 0.758 |
-| 最大值 | 0.948 |
+| Min | 0.499 |
+| Mean | 0.750 |
+| Median | 0.758 |
+| Max | 0.948 |
 
-## 通道分布
+## Channel distribution
 
-| 通道 | 数量 | Top composite |
+| Channel | Count | Top composite |
 |------|------|--------------|
-| Top (高抗氧化) | 116 | 0.870 |
-| Bottom (低抗氧化) | 4,208 | 0.948 |
+| Top (high antioxidant) | 116 | 0.870 |
+| Bottom (low antioxidant) | 4,208 | 0.948 |
 
-注意：Bottom 通道的 Top composite 更高 (0.948 > 0.870)，
-因为排名基于多服务加权，不单看 AnOxPePred。
+Note: the Top composite of the Bottom channel is higher (0.948 > 0.870),
+because ranking is based on multi-service weighting rather than on AnOxPePred alone.
 
-## 肽长分布 (排名中)
+## Peptide length distribution (in the ranking)
 
-| 指标 | 数值 |
+| Metric | Value |
 |------|------|
-| 最小值 | 8 aa |
-| 平均值 | 26.8 aa |
-| 中位数 | 27 aa |
-| 最大值 | 30 aa |
+| Min | 8 aa |
+| Mean | 26.8 aa |
+| Median | 27 aa |
+| Max | 30 aa |
 
-## 流程
+## Flow
 
 ```
 round2_passed (594,000)
-  ├── 限流: Top ≤150K + Bottom ≤50K
-  └── 输入: 103,469
-        ├── Phase 1: 5 服务并行评分
-        │     ├── BepiPred3  (GPU, ~7/s, 瓶颈)
+  ├── rate limiting: Top ≤150K + Bottom ≤50K
+  └── input: 103,469
+        ├── Phase 1: 5 services scored in parallel
+        │     ├── BepiPred3  (GPU, ~7/s, bottleneck)
         │     ├── TemStaPro  (GPU, ~166/s)
         │     ├── SoDoPE     (CPU, ~11K/s)
         │     ├── pLM4CPPs   (GPU, ~633/s)
         │     └── ToxinPred3 (CPU×3, ~33/s)
-        ├── ToxinPred3 硬阈值淘汰 16,982
-        ├── SD 加权排名 → 4,324
-        └── Phase 2: GraphCPP 补充评分 (GPU, ~1.7/s)
-              └── 重算含 GraphCPP 排名 → Round 4
+        ├── ToxinPred3 hard threshold eliminates 16,982
+        ├── SD-weighted ranking → 4,324
+        └── Phase 2: GraphCPP supplementary scoring (GPU, ~1.7/s)
+              └── re-rank including GraphCPP → Round 4
 ```
 
-## 执行参数
+## Execution parameters
 
 ```bash
 # Phase 1

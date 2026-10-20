@@ -1,46 +1,48 @@
-# ToxinPred 3.0 安装详细指南
+> **English** | [中文](installation.zh.md)
 
-## 环境准备
+# ToxinPred 3.0 Detailed Installation Guide
 
-### 使用 uv 管理虚拟环境（推荐）
+## Environment Preparation
+
+### Using uv to Manage the Virtual Environment (Recommended)
 
 ```bash
-# 在 ToxinPred3 目录下
+# In the ToxinPred3 directory
 cd ToxinPred3
 uv venv .venv
 source .venv/bin/activate
 ```
 
-### 依赖安装
+### Dependency Installation
 
 ```bash
 uv pip install numpy pandas scikit-learn
 ```
 
-## toxinpred3 包安装（可选）
+## Installing the toxinpred3 Package (Optional)
 
 ```bash
 uv pip install toxinpred3
 ```
 
-安装后验证：
+Verify after installation:
 ```bash
 uv run toxinpred3 -h
 ```
 
-## 独立模块使用
+## Using the Standalone Module
 
-将 `toxinpred_features.py` 复制到项目目录：
+Copy `toxinpred_features.py` into your project directory:
 
 ```bash
 cp skills/toxinpred3/toxinpred_features.py /your/project/path/
 ```
 
-## 常见问题
+## FAQ
 
-### 1. pip 安装被拒绝 (externally-managed-environment)
+### 1. pip install rejected (externally-managed-environment)
 
-**解决方案：** 使用 uv 创建虚拟环境
+**Solution:** create a virtual environment with uv
 
 ```bash
 uv venv .venv
@@ -48,28 +50,28 @@ source .venv/bin/activate
 uv pip install <package>
 ```
 
-### 2. 官方 CLI 报错 ValueError: bad delimiter
+### 2. Official CLI reports ValueError: bad delimiter
 
-**原因：** pandas 版本兼容性问题
+**Cause:** pandas version compatibility issue
 
-**解决方案：** 使用 standalone 模块
+**Solution:** use the standalone module
 
 ```python
 from toxinpred_features import batch_predict_from_file
 batch_predict_from_file("input.fa", "output.csv")
 ```
 
-### 3. Python 3.14+ 模型加载问题
+### 3. Model loading issues on Python 3.14+
 
-**解决方案：** 使用 standalone 模块，不依赖预训练模型
+**Solution:** use the standalone module, which does not depend on a pretrained model
 
-## 目录结构建议
+## Suggested Directory Structure
 
 ```
 your_project/
-├── .venv/                 # 虚拟环境
-├── pyproject.toml         # 项目配置
-├── toxinpred_features.py   # 独立模块
-├── peptides.fa            # 输入文件
-└── predictions.csv        # 输出文件
+├── .venv/                 # Virtual environment
+├── pyproject.toml         # Project configuration
+├── toxinpred_features.py   # Standalone module
+├── peptides.fa            # Input file
+└── predictions.csv        # Output file
 ```

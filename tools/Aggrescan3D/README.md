@@ -1,48 +1,51 @@
-# Aggrescan3D 微服务
+> **English** | [中文](README.zh.md)
 
-Aggrescan3D 是基于 PDB 结构的蛋白聚集倾向分析工具。原工具是 Python 2.7
-standalone/CLI，本服务通过 conda 环境调用 aggrescan 命令。
+# Aggrescan3D Microservice
 
-## 类型
+Aggrescan3D is a tool for analyzing protein aggregation propensity from PDB structures. The
+original tool is a Python 2.7 standalone/CLI; this service invokes the `aggrescan` command
+through a conda environment.
 
-- 微服务类别：`pdb_service`
-- 输入：PDB 文本
-- 输出：结构整体聚集风险分数、链级统计、逐残基 A3D score
-- 默认端口：`8102`
+## Type
 
-## 环境准备
+- Microservice category: `pdb_service`
+- Input: PDB text
+- Output: overall structural aggregation risk score, chain-level statistics, per-residue A3D score
+- Default port: `8102`
 
-Aggrescan3D 依赖 Python 2.7。通过 conda 创建独立环境：
+## Environment Setup
+
+Aggrescan3D depends on Python 2.7. Create a dedicated environment with conda:
 
 ```bash
-# 创建 Python 2.7 环境并安装 aggrescan3d
+# Create a Python 2.7 environment and install aggrescan3d
 conda create -n aggrescan3d python=2.7
 conda install -n aggrescan3d -c lcbio aggrescan3d
 
-# 安装 API wrapper 依赖
+# Install the API wrapper dependencies
 cd tools/Aggrescan3D
 uv sync
 ```
 
-启动服务：
+Start the service:
 
 ```bash
 cd tools/Aggrescan3D
 uv run python service.py
 ```
 
-环境变量：
-- `AGGRESCAN_CONDA_ENV` — conda 环境路径（默认: `/home/lenovo/miniconda3/envs/aggrescan3d`）
+Environment variables:
+- `AGGRESCAN_CONDA_ENV` — conda environment path (default: `/home/lenovo/miniconda3/envs/aggrescan3d`)
 
-## 测试
+## Testing
 
-健康检查：
+Health check:
 
 ```bash
 curl http://127.0.0.1:8102/health
 ```
 
-用已有 PDB 文件测试：
+Testing with an existing PDB file:
 
 ```bash
 python - <<'PY'
@@ -61,13 +64,15 @@ print(json.dumps(r.json(), indent=2, ensure_ascii=False)[:4000])
 PY
 ```
 
-## 输出解释
+## Output Interpretation
 
-`details.residues` 保留 Aggrescan3D 原始逐残基分数；`score` 是服务层为了统一
-API 额外计算的 0-1 聚集风险分数，越高代表聚集风险越高。当前算法用正分残基比例、
-正分平均值和最大热点分数做归一化组合；正式排名时建议把它作为反向指标处理。
+`details.residues` keeps the original Aggrescan3D per-residue scores; `score` is a 0-1
+aggregation risk score additionally computed by the service layer to unify the API, where a
+higher value means a higher aggregation risk. The current algorithm combines the fraction of
+positive-score residues, the mean of the positive scores, and the maximum hotspot score after
+normalization; for formal ranking, it is recommended to treat it as an inverse metric.
 
-原始结果文件来自 Aggrescan3D 的 `A3D.csv`：
+The raw result file comes from Aggrescan3D's `A3D.csv`:
 
 ```text
 protein,chain,residue,residue_name,score

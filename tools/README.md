@@ -1,160 +1,162 @@
-# 微服务
+> **English** | [中文](README.zh.md)
 
-微服务分为三类：
+# Microservices
 
-- **Fasta 评分服务** (`fasta_service`)：输入 FASTA 序列，输出评分结果
-- **3D 结构生成** (`structure_service`)：输入 FASTA 序列，输出三维结构模型（PDB）
-- **PDB 评分服务** (`pdb_service`)：输入 PDB 结构，输出评分结果
+The microservices fall into three categories:
 
-### 服务设计原则
+- **Fasta scoring service** (`fasta_service`): takes FASTA sequences and outputs scoring results
+- **3D structure generation** (`structure_service`): takes FASTA sequences and outputs 3D structure models (PDB)
+- **PDB scoring service** (`pdb_service`): takes PDB structures and outputs scoring results
 
-1. **原作优先**。优先使用工具原作者的代码、设计思路、模型和实现方法，做到原汁原味。这代表了项目的学术背景，避免 AI 幻觉和搪塞工作。
+### Service Design Principles
 
-2. **环境兼容**。本项目主要开发环境为最新版 macOS，实际部署使用 Ubuntu + RTX5880。
-- 为了开发机器上测试API方便：对可 CUDA 加速的工具：配置 Dockerfile 方便 GPU 环境部署；代码自动检测 GPU 可用性并 fallback 到 CPU；仅 GPU 可运行的服务在 CPU 环境下明确报错。
-- 在Ubuntu上实际生产部署的时候，**必须**使用`docker`启动所有微服务。
+1. **Original work first**. Prefer the original authors' code, design ideas, models and implementation methods, staying as faithful as possible. This represents the project's academic grounding and avoids AI hallucination and hand-waving.
 
-3. **模型文件集中管理**。模型文件落在 `tools/<name>/models/`（服务专属）或 `tools/models/`（跨服务共享）。四种来源类型（Git 随仓库 / 首次下载 / pip 包 / 无需模型）详见下方「模型管理」章节。
+2. **Environment compatibility**. The main development environment for this project is the latest macOS; actual deployment uses Ubuntu + RTX5880.
+- To make API testing convenient on the development machine: for tools that can be CUDA-accelerated, configure the Dockerfile for easy GPU-environment deployment; code automatically detects GPU availability and falls back to CPU; services that can run only on GPU report an explicit error in a CPU environment.
+- For actual production deployment on Ubuntu, all microservices **must** be started with `docker`.
 
-4. **统一接口**。使用统一的 API 契约，与 `main/` 核心框架衔接。
+3. **Centralized model file management**. Model files live in `tools/<name>/models/` (service-specific) or `tools/models/` (shared across services). The four source types (Git-tracked with the repository / first-run download / pip package / no model needed) are detailed in the "Model Management" section below.
 
-5. **并发与高通量**。尽量做到高性能高速度预测，提高可处理数量级的范围。
+4. **Unified interface**. Use a unified API contract, interlocking with the `main/` core framework.
 
-### 启动方法
+5. **Concurrency and high throughput**. Aim for high-performance, high-speed prediction to raise the range of processable scales.
 
-单个启动：
+### How to Start
+
+Starting a single service:
 
 ```bash
-# 以 MHCflurry (8005) 为例
+# Take MHCflurry (8005) as an example
 cd tools/MHCflurry
 source .venv/bin/activate
 python service.py
 ```
 
-脚本启动：
+Script startup:
 
 ```bash
-./tools/start_all.sh           # 一键启动全部
-./tools/start_all.sh status    # 查看状态
-./tools/start_all.sh stop      # 停止全部
-# 日志: tools/logs/<name>.log
+./tools/start_all.sh           # Start everything with one command
+./tools/start_all.sh status    # Check status
+./tools/start_all.sh stop      # Stop everything
+# Logs: tools/logs/<name>.log
 ```
 
-Docker 启动：
+Docker startup:
 
 ```bash
 cd tools && docker compose --profile gpu --profile cpu up -d
 ```
 
-### 端口分配表
+### Port Allocation Table
 
-##### Fasta Service（8001+）
+##### Fasta Service (8001+)
 
-| 服务 | 端口 | 范围 | 作用 | 环境 | 模型 |
+| Service | Port | Range | Purpose | Environment | Model |
 |------|------|------|------|------|------|
-| AnOxPePred | 8001 | 短肽 2~30（CNN）/ 中肽 31~50（截断） | 抗氧化活性预测 | GPU/CPU | [Git] CNN · 1.3 MB |
-| BepiPred-3.0 | 8002 | 短肽 ≥5 / 蛋白质 ≤5000 | B 细胞表位预测 | GPU/CPU | [共享] ESM-2 t33 · 2.5 GB |
-| ToxinPred3 | 8003 | 短肽 ≥2 / 蛋白质（无上限） | 毒性预测 | CPU | [pip] ExtraTrees · 2 MB |
-| HemoPI2 | 8004 | 短肽 ≤40（超出截断） | 溶血性预测 | GPU/CPU | [pip] ESM-2 t6 微调 · 30 MB |
-| MHCflurry | 8005 | MHC-I 肽 8~15 | MHC-I 结合亲和力预测 | GPU/CPU | [下载] MHCflurry · 100 MB |
-| pLM4CPPs | 8006 | 短肽 ≥5 / 蛋白质（无上限） | 细胞穿膜肽预测 | GPU/CPU | [共享] ESM-2 t6 · 30 MB + [Git] CNN+scaler · 2 MB |
-| TIPred | 8007 | 短肽 ≥3 / 蛋白质（无上限） | 酪氨酸酶抑制肽预测 | CPU | [—] 启动时合成训练 |
-| AlgPred2 | 8008 | 中肽~蛋白质（长序列优化） | 过敏原性预测 | CPU | [pip] RandomForest · 1 MB |
-| GraphCPP | 8009 | 短肽 5~40（>100 精度下降） | 细胞穿膜肽预测（GNN） | GPU/CPU | [Git] GraphSAGE ckpt · 200 KB |
-| TemStaPro | 8010 | 全范围 | 热稳定性预测（40–65°C） | GPU/CPU | [下载] ProtT5-XL · 2.3 GB + MLP×30 · 80 MB |
-| SoDoPE | 8012 | 全范围 | 溶解度预测（SWI） | CPU | [—] 纯查表+数学运算 |
+| AnOxPePred | 8001 | Short peptides 2~30 (CNN) / medium peptides 31~50 (truncated) | Antioxidant activity prediction | GPU/CPU | [Git] CNN · 1.3 MB |
+| BepiPred-3.0 | 8002 | Short peptides ≥5 / proteins ≤5000 | B-cell epitope prediction | GPU/CPU | [Shared] ESM-2 t33 · 2.5 GB |
+| ToxinPred3 | 8003 | Short peptides ≥2 / proteins (no upper limit) | Toxicity prediction | CPU | [pip] ExtraTrees · 2 MB |
+| HemoPI2 | 8004 | Short peptides ≤40 (truncated beyond that) | Hemolysis prediction | GPU/CPU | [pip] ESM-2 t6 fine-tuned · 30 MB |
+| MHCflurry | 8005 | MHC-I peptides 8~15 | MHC-I binding affinity prediction | GPU/CPU | [Download] MHCflurry · 100 MB |
+| pLM4CPPs | 8006 | Short peptides ≥5 / proteins (no upper limit) | Cell-penetrating peptide prediction | GPU/CPU | [Shared] ESM-2 t6 · 30 MB + [Git] CNN+scaler · 2 MB |
+| TIPred | 8007 | Short peptides ≥3 / proteins (no upper limit) | Tyrosinase inhibitory peptide prediction | CPU | [—] Synthesized and trained at startup |
+| AlgPred2 | 8008 | Medium peptides ~ proteins (optimized for long sequences) | Allergenicity prediction | CPU | [pip] RandomForest · 1 MB |
+| GraphCPP | 8009 | Short peptides 5~40 (>100 accuracy degrades) | Cell-penetrating peptide prediction (GNN) | GPU/CPU | [Git] GraphSAGE ckpt · 200 KB |
+| TemStaPro | 8010 | Full range | Thermal stability prediction (40–65°C) | GPU/CPU | [Download] ProtT5-XL · 2.3 GB + MLP×30 · 80 MB |
+| SoDoPE | 8012 | Full range | Solubility prediction (SWI) | CPU | [—] Pure table lookup + arithmetic |
 
-##### PDB Service（8101+）
+##### PDB Service (8101+)
 
-| 服务 | 端口 | 范围 | 作用 | 环境 | 模型 |
+| Service | Port | Range | Purpose | Environment | Model |
 |------|------|------|------|------|------|
-| SASA | 8101 | 蛋白质/肽（无上限） | 溶剂可及表面积分析 | CPU | [—] FreeSASA 算法 |
-| Aggrescan3D | 8102 | PDB 结构 | 结构聚集倾向分析 | CPU（Docker） | [Docker] A3D 镜像内置 |
+| SASA | 8101 | Proteins/peptides (no upper limit) | Solvent-accessible surface area analysis | CPU | [—] FreeSASA algorithm |
+| Aggrescan3D | 8102 | PDB structures | Structural aggregation propensity analysis | CPU (Docker) | [Docker] Built into the A3D image |
 
-##### Structure Service（8201+）
+##### Structure Service (8201+)
 
-| 服务 | 端口 | 范围 | 作用 | 环境 | 模型 |
+| Service | Port | Range | Purpose | Environment | Model |
 |------|------|------|------|------|------|
-| AlphaFold3 | 8201 | 蛋白质/肽/DNA/RNA/配体 | 3D 生物分子结构预测 | GPU 必需（Docker，仅 Ubuntu） | [Docker] AF3 参数 + 遗传数据库 · TB 级 |
-| PEP-FOLD4 | 8202 | 短肽 5~40 aa | 肽从头结构预测 | CPU（Docker） | [Docker] sOPEP 力场内置 |
-| ESMFold | 8203 | 短肽~蛋白质（无上限） | 快速 3D 结构预测（ESM-2 3B, ~60x AF2） | GPU 必需 | [下载][共享] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB |
-| OmegaFold | 8204 | 短肽~蛋白质（无上限） | PLM + 几何变换器结构预测 | GPU/CPU/MPS | [下载] OmegaFold ~1.5 GB（S3 自动下载） |
-| **Waveflow** | **8205** | **全范围** | **Tamarind.bio 云端代理：URL 指定工具类型（esmfold/omegafold/alphafold 等），无需本地 GPU/模型** | **CPU** | **[—] 纯远程 API，无需本地模型** |
+| AlphaFold3 | 8201 | Proteins/peptides/DNA/RNA/ligands | 3D biomolecular structure prediction | GPU required (Docker, Ubuntu only) | [Docker] AF3 parameters + genetic databases · TB scale |
+| PEP-FOLD4 | 8202 | Short peptides 5~40 aa | De novo peptide structure prediction | CPU (Docker) | [Docker] Built-in sOPEP force field |
+| ESMFold | 8203 | Short peptides ~ proteins (no upper limit) | Fast 3D structure prediction (ESM-2 3B, ~60x AF2) | GPU required | [Download][Shared] ESMFold 3B · 8 GB + ESM-2 t36 · 6 GB |
+| OmegaFold | 8204 | Short peptides ~ proteins (no upper limit) | PLM + geometric transformer structure prediction | GPU/CPU/MPS | [Download] OmegaFold ~1.5 GB (auto-downloaded from S3) |
+| **Waveflow** | **8205** | **Full range** | **Tamarind.bio cloud proxy: the URL specifies the tool type (esmfold/omegafold/alphafold, etc.), no local GPU/model needed** | **CPU** | **[—] Pure remote API, no local model needed** |
 
-### 模型管理
+### Model Management
 
-每个服务的模型文件通过以下五种方式之一获取：
+The model files for each service are obtained in one of the following five ways:
 
-| 来源 | 标签 | 位置 | 示例 |
+| Source | Tag | Location | Example |
 |------|------|------|------|
-| **Git 随仓库** | `[Git]` | `tools/<name>/` 下，直接 git 追踪（< 50 MB） | AnOxPePred CNN、GraphCPP GCN |
-| **首次启动下载** | `[下载]` | `tools/<name>/models/`，`load_model()` 自动下载并 gitignored | MHCflurry、TemStaPro |
-| **pip 包自带** | `[pip]` | `.venv/` 内，随 pip install 安装 | ToxinPred3、HemoPI2、AlgPred2 |
-| **无需模型** | `[—]` | 纯算法或启动时合成训练 | TIPred、SoDoPE、SASA |
-| **Docker 内置** | `[Docker]` | Docker 镜像内，不暴露到宿主机 | PEP-FOLD4、Aggrescan3D、AlphaFold3 |
+| **Git-tracked with the repository** | `[Git]` | Under `tools/<name>/`, tracked directly by git (< 50 MB) | AnOxPePred CNN, GraphCPP GCN |
+| **Downloaded on first startup** | `[Download]` | `tools/<name>/models/`, downloaded automatically by `load_model()` and gitignored | MHCflurry, TemStaPro |
+| **Bundled with the pip package** | `[pip]` | Inside `.venv/`, installed along with pip install | ToxinPred3, HemoPI2, AlgPred2 |
+| **No model needed** | `[—]` | Pure algorithm or synthesized and trained at startup | TIPred, SoDoPE, SASA |
+| **Built into Docker** | `[Docker]` | Inside the Docker image, not exposed to the host machine | PEP-FOLD4, Aggrescan3D, AlphaFold3 |
 
-**共享模型缓存：** `tools/models/` 存放被多个服务共用的模型，避免重复下载。当前共享内容：
+**Shared model cache:** `tools/models/` holds models shared by multiple services to avoid duplicate downloads. Currently shared:
 
 ```
 tools/models/
-  fair-esm/                     ← ESM-2 checkpoints（torch.hub 缓存）
+  fair-esm/                     ← ESM-2 checkpoints (torch.hub cache)
     hub/checkpoints/
-      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + 未来其他服务（已 Git 跟踪 ~29 MB）
-      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + 未来其他服务（首次自动下载 ~2.5 GB）
-      esm2_t36_3B_UR50D.pt      ← ESMFold（ESM-2 3B 主干，首次自动下载 ~5.3 GB）
-      esmfold_3B_v1.pt          ← ESMFold 结构头（首次自动下载 ~2.6 GB）
+      esm2_t6_8M_UR50D.pt       ← pLM4CPPs + future other services (Git-tracked, ~29 MB)
+      esm2_t33_650M_UR50D.pt    ← BepiPred-3.0 + future other services (auto-downloaded on first run, ~2.5 GB)
+      esm2_t36_3B_UR50D.pt      ← ESMFold (ESM-2 3B backbone, auto-downloaded on first run, ~5.3 GB)
+      esmfold_3B_v1.pt          ← ESMFold structure head (auto-downloaded on first run, ~2.6 GB)
   omegafold/
-    model.pt                    ← OmegaFold 权重（首次自动下载 ~1.5 GB）
+    model.pt                    ← OmegaFold weights (auto-downloaded on first run, ~1.5 GB)
 ```
 
-BepiPred-3.0、pLM4CPPs 和 ESMFold 均设置 `TORCH_HOME=tools/models/fair-esm/`，模型只下载一次。首次部署可用 `./tools/migrate_models.sh` 迁移已有文件。
+BepiPred-3.0, pLM4CPPs and ESMFold all set `TORCH_HOME=tools/models/fair-esm/`, so models are downloaded only once. For first-time deployment, `./tools/migrate_models.sh` can migrate existing files.
 
-共享池**仅存放被 ≥2 个服务使用的模型**或者**体积较大的模型**。独有且体积较小模型留在各自 `models/` 目录下，不提前搬入——按需扩容。
+The shared pool **stores only models used by ≥2 services** or **large models**. Models that are unique and small stay in their own `models/` directory and are not moved in ahead of time — scale up on demand.
 
-Docker 部署通过 volume 挂载 `tools/models/` 到容器内对应路径，模型不进入镜像。
+Docker deployment mounts `tools/models/` into the container at the corresponding path via a volume, so models do not enter the image.
 
-### 模型下载与镜像源配置
+### Model Downloads and Mirror Source Configuration
 
-以下模型在首次启动时从海外 CDN 自动下载，在中国大陆网络环境可能失败。
-可通过设置环境变量覆盖下载地址（指向镜像或本地路径）：
+The following models are downloaded automatically from overseas CDNs on first startup and may fail on networks in mainland China.
+The download address can be overridden by setting environment variables (pointing to a mirror or a local path):
 
-| 服务 | 自动下载的模型 | 大小 | 默认源 | 覆盖环境变量 |
+| Service | Auto-downloaded model | Size | Default source | Override environment variable |
 |------|---------------|------|--------|-------------|
 | ESMFold | esmfold_3B_v1.pt | ~2.6 GB | `dl.fbaipublicfiles.com/fair-esm/` (Meta CDN) | `ESMFOLD_MODEL_URL` |
-| BepiPred-3.0 | esm2_t33_650M_UR50D.pt | ~2.5 GB | 同上 | `ESM2_URL` |
+| BepiPred-3.0 | esm2_t33_650M_UR50D.pt | ~2.5 GB | Same as above | `ESM2_URL` |
 | TemStaPro | ProtT5-XL | ~3 GB | HuggingFace `Rostlab/prot_t5_xl_half_uniref50-enc` | `HF_ENDPOINT=https://hf-mirror.com` |
 | OmegaFold | release1.pt | ~1.5 GB | `helixon.s3.amazonaws.com` (AWS S3) | `OMEGAFOLD_WEIGHTS_URL` |
-| HemoPI2 | ESM-2 t6（通过 pip） | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
+| HemoPI2 | ESM-2 t6 (via pip) | ~29 MB | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com` |
 
-镜像源配置示例：
+Mirror source configuration example:
 
 ```bash
-# 使用 HuggingFace 镜像（适用于 ProtT5-XL、HemoPI2 的 ESM-2）
+# Use the HuggingFace mirror (for ProtT5-XL and HemoPI2's ESM-2)
 export HF_ENDPOINT=https://hf-mirror.com
 
-# 使用自定义模型 URL（适用于 ESMFold、BepiPred-3.0 的 fair-esm 模型）
+# Use a custom model URL (for the fair-esm models of ESMFold and BepiPred-3.0)
 export ESMFOLD_MODEL_URL=https://internal-mirror.example.com/models/esmfold_3B_v1.pt
 export ESM2_URL=https://internal-mirror.example.com/models/esm2_t33_650M_UR50D.pt
 
-# 使用自定义 OmegaFold 权重 URL
+# Use a custom OmegaFold weights URL
 export OMEGAFOLD_WEIGHTS_URL=https://internal-mirror.example.com/omegafold/release1.pt
 
-# 预下载方式：手动下载后放到共享缓存
+# Pre-download approach: download manually, then place into the shared cache
 # wget -P tools/models/fair-esm/hub/checkpoints/ \
 #   https://dl.fbaipublicfiles.com/fair-esm/models/esmfold_3B_v1.pt
 ```
 
-### 运行环境说明
+### Runtime Environment Notes
 
-**GPU vs CPU：** 以下服务在 docker-compose 中被标记为 `gpu` profile，但实际支持 CPU 降级运行：
+**GPU vs CPU:** The following services are marked with the `gpu` profile in docker-compose but actually support degraded CPU operation:
 
-- AnOxPePred（TensorFlow 自动设备选择，缺模型时降级为规则）
-- HemoPI2 / MHCflurry / pLM4CPPs / GraphCPP / TemStaPro（PyTorch 自动设备选择）
+- AnOxPePred (TensorFlow automatic device selection, degrades to rules when the model is missing)
+- HemoPI2 / MHCflurry / pLM4CPPs / GraphCPP / TemStaPro (PyTorch automatic device selection)
 
-**仅 Docker 运行的服务：**
-- AlphaFold3 — 需要 NVIDIA Docker + Linux 宿主机，通过 Docker CLI 调用
-- PEP-FOLD4 — 通过 Docker CLI 调用，CPU 即可
-- Aggrescan3D — 依赖 conda Python 2.7 环境，推荐 Docker Compose
+**Services that run only in Docker:**
+- AlphaFold3 — requires NVIDIA Docker + a Linux host machine, invoked via the Docker CLI
+- PEP-FOLD4 — invoked via the Docker CLI, CPU is sufficient
+- Aggrescan3D — depends on a conda Python 2.7 environment, Docker Compose recommended
 
-**外部依赖服务：**
-- Waveflow — 需要 tamarind.bio API 密钥 (`TAMARIND_API_KEY`)，无需本地 GPU/模型
+**Services with external dependencies:**
+- Waveflow — requires a tamarind.bio API key (`TAMARIND_API_KEY`), no local GPU/model needed

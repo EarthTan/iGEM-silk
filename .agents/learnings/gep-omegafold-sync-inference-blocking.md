@@ -1,5 +1,5 @@
 ---
-name: OmegaFold 同步推理阻塞事件循环与并发控制 v1.0
+name: OmegaFold Synchronous Inference Blocking the Event Loop and Concurrency Control v1.0
 author: Claude Code
 created: 2026-05-15
 version: 1.0.0
@@ -7,61 +7,63 @@ tags: [omegafold, async, event-loop, blocking, semaphore, structure-service]
 validated: true
 ---
 
-# Gene Capsule: OmegaFold 同步推理阻塞事件循环与并发控制
+> **English** | [中文](gep-omegafold-sync-inference-blocking.zh.md)
+
+# Gene Capsule: OmegaFold Synchronous Inference Blocking the Event Loop and Concurrency Control
 
 ## Experience
 
-**问题描述**: OmegaFold 微服务的 `predict_structure()` 方法直接在 `async def` 中调用 PyTorch `model(input_data)` 进行同步推理（耗时 90-120s）。这阻塞了 uvicorn 的 asyncio 事件循环，导致服务在处理一个请求期间完全无法响应任何其他请求（/health、/status/{job_id}、/result/{job_id} 全部挂起）。
+**Problem description**: The OmegaFold microservice's `predict_structure()` method calls PyTorch `model(input_data)` directly inside an `async def` for synchronous inference (taking 90-120s). This blocks uvicorn's asyncio event loop, so the service cannot respond to any other request while handling a single request (/health, /status/{job_id}, and /result/{job_id} all hang).
 
-**症状**:
-- 并发 ≥2 时第二个 construct 的 POST /predict/async 超时（httpx 30s timeout）
-- curl 从宿主机请求 health 端点挂起，但 `docker exec` 在容器内请求正常
-- 日志中 OmegaFold 条目全部标记为 "N/A (30s)"，因为 POST 阶段就超时了
+**Symptoms**:
+- With concurrency ≥2, the POST /predict/async of the second construct times out (httpx 30s timeout)
+- curl requests to the health endpoint from the host machine hang, but `docker exec` requests inside the container work normally
+- In the logs every OmegaFold entry is marked "N/A (30s)", because it already timed out at the POST stage
 
-**根因** (templates/structure_service.py):
+**Root cause** (templates/structure_service.py):
 ```python
-# tools/template/structure_service.py — 问题代码
+# tools/template/structure_service.py — problematic code
 async def predict_structure(self, sequence: str) -> StructureResult:
-    # ... 准备数据 ...
-    result = self.model(input_data, predict_with_confidence=True)  # 同步阻塞！90-120s
-    # ... 处理结果 ...
+    # ... prepare data ...
+    result = self.model(input_data, predict_with_confidence=True)  # synchronous blocking! 90-120s
+    # ... process result ...
 ```
-`self.model(...)` 是 PyTorch CUDA 推理，在 async def 中调用时阻塞整个事件循环。uvicorn 是单线程事件循环，无法在等待期间处理其他请求。
+`self.model(...)` is PyTorch CUDA inference; calling it inside an `async def` blocks the entire event loop. uvicorn is a single-threaded event loop and cannot handle other requests while waiting.
 
-### 解决方案
+### Solution
 
-**方案一：客户端 Semaphore（本流程采用）**
+**Option 1: client-side Semaphore (adopted by this pipeline)**
 
 ```python
 # main/stages2/round05_3d.py
-OMEGAFOLD_CONCURRENCY = 1   # 全局串行化
+OMEGAFOLD_CONCURRENCY = 1   # global serialization
 omegafold_sem = asyncio.Semaphore(OMEGAFOLD_CONCURRENCY)
 
 async def timed_predict(service: str, seq: str, cid: str, timeout: float) -> dict:
     if service == "omegafold" and omegafold_sem is not None:
-        async with omegafold_sem:     # 保证同时只有 1 个 OmegaFold 请求
+        async with omegafold_sem:     # ensure only 1 OmegaFold request at a time
             result = await client.predict_structure_async(...)
     else:
         result = await client.predict_structure_async(...)
     return result
 ```
 
-| 参数 | 值 | 说明 |
+| Parameter | Value | Description |
 |------|-----|------|
-| OMEGAFOLD_CONCURRENCY | 1 | 全局并发限制 |
-| 超时 | 14400s (4h) | OmegaFold 单条 ~6min，足够 |
-| 轮询间隔 | 30s | 标准结构预测轮询 |
+| OMEGAFOLD_CONCURRENCY | 1 | Global concurrency limit |
+| Timeout | 14400s (4h) | OmegaFold takes ~6min per sequence, which is sufficient |
+| Polling interval | 30s | Standard structure prediction polling |
 
-**方案二：服务端修复（推荐，但本次未实施）**
+**Option 2: server-side fix (recommended, but not implemented this time)**
 
-将阻塞推理放入 `asyncio.get_event_loop().run_in_executor()` 或 `concurrent.futures.ThreadPoolExecutor`，释放事件循环：
+Move the blocking inference into `asyncio.get_event_loop().run_in_executor()` or a `concurrent.futures.ThreadPoolExecutor` to release the event loop:
 
 ```python
-# 推荐方案：在 service.py 中使用线程池
+# Recommended approach: use a thread pool in service.py
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-executor = ThreadPoolExecutor(max_workers=1)  # GPU 推理仍应串行化
+executor = ThreadPoolExecutor(max_workers=1)  # GPU inference should still be serialized
 
 async def predict_structure(self, sequence: str) -> StructureResult:
     loop = asyncio.get_event_loop()
@@ -69,22 +71,22 @@ async def predict_structure(self, sequence: str) -> StructureResult:
         executor,
         lambda: self.model(input_data, predict_with_confidence=True)
     )
-    # ... 处理结果 ...
+    # ... process result ...
 ```
 
 ### Environment Fingerprint
 
-- **任务域**: 结构预测微服务，async 模式的 FastAPI/uvicorn 服务
-- **输入特征**: PyTorch/TensorFlow 等深度学习框架的同步推理调用
-- **约束条件**: GPU 推理不可取消、单次 60-120s 完成
-- **触发模式**: 异步 Job 模式（POST /predict/async → 轮询 GET /status/{job_id}）
-- **不适用**: CPU 推理 <5s 的轻量模型（影响不大）；已使用 `run_in_executor` 的服务
+- **Task domain**: Structure prediction microservices, FastAPI/uvicorn services in async mode
+- **Input characteristics**: Synchronous inference calls from deep learning frameworks such as PyTorch/TensorFlow
+- **Constraints**: GPU inference is not cancelable and completes in 60-120s per call
+- **Trigger pattern**: Asynchronous job pattern (POST /predict/async → poll GET /status/{job_id})
+- **Not applicable**: Lightweight models with CPU inference <5s (little impact); services that already use `run_in_executor`
 
 ### Audit Record
 
-- **验证方式**: 生产运行 90 个 construct，加 Semaphore 前 OmegaFold 成功率 0/2（首 2 个就超时），加后 90/90 成功
-- **测试用例**:
-  1. CONCURRENCY=2, 无 Semaphore → 第 2 个 OmegaFold 在 30s POST 阶段超时 → N/A
-  2. CONCURRENCY=2, OmegaFold_CONCURRENCY=1 → 90 个全部完成，OmegaFold 串行执行（~6min/条 × 90 = ~9h，与 ESMFold 并行不额外耗时）
-- **成功率**: 90/90 (100%)
-- **局限性**: 客户端 Semaphore 只是绕过了问题，服务端事件循环仍然被阻塞（只是不让并发请求进来）。推荐在 `service.py` 层面修复。
+- **Validation method**: Production run of 90 constructs; before adding the Semaphore the OmegaFold success rate was 0/2 (the first 2 already timed out), after adding it 90/90 succeeded
+- **Test cases**:
+  1. CONCURRENCY=2, no Semaphore → the second OmegaFold times out during the 30s POST stage → N/A
+  2. CONCURRENCY=2, OmegaFold_CONCURRENCY=1 → all 90 completed, OmegaFold executed serially (~6min/item × 90 = ~9h, running in parallel with ESMFold so no extra time is added)
+- **Success rate**: 90/90 (100%)
+- **Limitations**: The client-side Semaphore only bypasses the problem; the server-side event loop is still blocked (it merely prevents concurrent requests from entering). Fixing it at the `service.py` level is recommended.

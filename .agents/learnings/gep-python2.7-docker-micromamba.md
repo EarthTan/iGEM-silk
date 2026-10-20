@@ -1,5 +1,5 @@
 ---
-name: Python 2.7 遗留服务 Docker 化的 micromamba 方案 v1.0
+name: micromamba Approach for Dockerizing a Python 2.7 Legacy Service v1.0
 author: Claude Code
 created: 2026-05-18
 version: 1.0.0
@@ -7,32 +7,34 @@ tags: [python2.7, docker, micromamba, conda, legacy, aggrescan3d, china-network]
 validated: true
 ---
 
-# Gene Capsule: Python 2.7 遗留服务 Docker 化的 micromamba 方案
+> **English** | [中文](gep-python2.7-docker-micromamba.zh.md)
+
+# Gene Capsule: micromamba Approach for Dockerizing a Python 2.7 Legacy Service
 
 ## Experience
 
-**问题描述**: Aggrescan3D 需要 Python 2.7 + conda 包 `lcbio::aggrescan3d`，在 2026 年的 Docker 环境中构建遇到多层失败：
+**Problem description**: Aggrescan3D requires Python 2.7 + the conda package `lcbio::aggrescan3d`, and building it in a 2026 Docker environment hit multiple layers of failure:
 
-1. `continuumio/miniconda2:latest` 从 Docker Hub（DaoCloud 镜像）拉取返回 **403 Forbidden**（镜像已归档）
-2. `python:2.7-slim`（Debian Buster）apt 源返回 **404 Not Found**（Buster 已进入 LTS 归档）
-3. `mambaorg/micromamba:latest` 不在 DaoCloud 镜像加速器白名单，拉取被拒绝
-4. miniforge3 Python=3.13 但 aggrescan3d **仅支持 Python 2.7**
+1. Pulling `continuumio/miniconda2:latest` from Docker Hub (DaoCloud mirror) returned **403 Forbidden** (the image has been archived)
+2. `python:2.7-slim` (Debian Buster) apt sources returned **404 Not Found** (Buster has entered LTS archive)
+3. `mambaorg/micromamba:latest` is not on the DaoCloud mirror accelerator whitelist, so the pull was denied
+4. miniforge3 has Python=3.13 but aggrescan3d **only supports Python 2.7**
 
-**根因**: Docker Hub 在中国大陆访问受限，且 Python 2.7 的官方镜像已从主流仓库中移除。Debian Buster apt 源已归档导致 `apt-get install python` 失败。
+**Root cause**: Docker Hub access is restricted in mainland China, and official Python 2.7 images have been removed from mainstream registries. The Debian Buster apt sources are archived, which makes `apt-get install python` fail.
 
-### 解决方案
+### Solution
 
-**最终方案**: `ghcr.io/mamba-org/micromamba` + 独立 conda 环境
+**Final approach**: `ghcr.io/mamba-org/micromamba` + an independent conda environment
 
 ```
 Base image: ghcr.io/mamba-org/micromamba:latest
-    ↑ 来自 GitHub Container Registry（GHCR），中国大陆可直接访问
-    ↑ micromamba 是静态 C++ 客户端，无需 Python 解释器
+    ↑ from GitHub Container Registry (GHCR), directly reachable from mainland China
+    ↑ micromamba is a static C++ client, no Python interpreter required
 
-在其中创建 Python 2.7 环境：
+Create a Python 2.7 environment inside it:
     micromamba create -y -n a3d -c conda-forge -c lcbio python=2.7 aggrescan3d
     
-激活环境使用：
+Activate the environment with:
     ENV AGGRESCAN_CONDA_ENV=/opt/conda/envs/a3d
     $AGGRESCAN_CONDA_ENV/bin/python service.py
 ```
@@ -42,11 +44,11 @@ FROM ghcr.io/mamba-org/micromamba:latest
 
 USER root
 
-# 创建 Python 2.7 + aggrescan3d 环境
+# create the Python 2.7 + aggrescan3d environment
 RUN micromamba create -y -n a3d -c conda-forge -c lcbio python=2.7 aggrescan3d \
     && micromamba clean -afy
 
-# 安装 uv（用于微服务依赖）
+# install uv (for microservice dependencies)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 WORKDIR /app
@@ -60,46 +62,46 @@ ENV AGGRESCAN_CONDA_ENV=/opt/conda/envs/a3d
 CMD [".venv/bin/python", "service.py"]
 ```
 
-**关键创新**: micromamba 的静态二进制特性使其在任何基础镜像中都能工作，不需要 Python 解释器来安装 conda 包。这解决了"先有鸡还是先有蛋"的问题——需要 Python 2.7 但安装 conda 本身需要 Python。
+**Key innovation**: The static-binary nature of micromamba lets it work in any base image without needing a Python interpreter to install conda packages. This solves the chicken-and-egg problem — Python 2.7 is needed, yet installing conda itself requires Python.
 
-### 镜像源选择决策矩阵
+### Image Source Selection Decision Matrix
 
-| 镜像源 | Python 2.7 | 中国大陆可达 | 白名单 | 结论 |
+| Image source | Python 2.7 | Reachable from mainland China | Whitelist | Conclusion |
 |--------|-----------|------------|--------|------|
-| Docker Hub miniconda2 | ✅ | ❌ DaoCloud 代理 | ✅（DaoCloud 白名单内）| 403 已归档 |
-| Docker Hub python:2.7-slim | ✅ 但 apt 404 | ❌ | ✅ | Buster 已归档 |
-| DaoCloud mambaorg/micromamba | ✅（可创建环境） | ✅ | ❌ **不在白名单！** | 拉取被拒 |
-| **GHCR mamba-org/micromamba** | **✅** | **✅** | **N/A** | **成功** |
-| 原生 pip install | ❌ 无 Python 2.7 | ✅ | N/A | Docker 禁用 |
+| Docker Hub miniconda2 | ✅ | ❌ DaoCloud proxy | ✅ (inside DaoCloud whitelist) | 403, archived |
+| Docker Hub python:2.7-slim | ✅ but apt 404 | ❌ | ✅ | Buster archived |
+| DaoCloud mambaorg/micromamba | ✅ (can create environment) | ✅ | ❌ **not in whitelist!** | Pull denied |
+| **GHCR mamba-org/micromamba** | **✅** | **✅** | **N/A** | **Success** |
+| Native pip install | ❌ no Python 2.7 | ✅ | N/A | Disallowed (Docker-only rule) |
 
-### 类似情况（同一 session 中遇到）
+### Similar Cases (encountered in the same session)
 
-| 服务 | 问题 | 最终方案 |
+| Service | Problem | Final solution |
 |------|------|---------|
-| ToxinPred3 | `scikit-learn==1.2.2` 与 Python 3.13 不兼容 | micromamba 创建 Python 3.8 环境（`python=3.8 scikit-learn=1.2.2`） |
-| AnOxPePred | PyTorch CUDA 占用 34GB 不释放 | 无 Docker 修复，需 kill 进程释放显存 |
+| ToxinPred3 | `scikit-learn==1.2.2` is incompatible with Python 3.13 | micromamba creates a Python 3.8 environment (`python=3.8 scikit-learn=1.2.2`) |
+| AnOxPePred | PyTorch CUDA occupies 34GB and does not release it | No Docker fix; the process must be killed to release GPU memory |
 
 ### Environment Fingerprint
 
-- **任务域**: 遗留 Python 代码的 Docker 容器化
-- **输入特征**: Python 2.x/3.x 依赖，conda-only 包，已弃用的基础镜像
-- **约束条件**: 中国网络环境（Docker Hub 不可达），modern base image（Python 3.13+），无互联网 apt 源
-- **触发模式**: Legacy conda package 在 modern Docker 中构建失败
-- **不适用**: 纯 pip 依赖的现代 Python（直接用 `python:3.11-slim`）；有官方 Docker 镜像的服务；可从源码编译的服务
+- **Task domain**: Docker containerization of legacy Python code
+- **Input characteristics**: Python 2.x/3.x dependencies, conda-only packages, deprecated base images
+- **Constraints**: China network environment (Docker Hub unreachable), modern base image (Python 3.13+), no internet apt sources
+- **Trigger pattern**: A legacy conda package fails to build in modern Docker
+- **Not applicable**: Modern Python with pure pip dependencies (use `python:3.11-slim` directly); services with official Docker images; services that can be compiled from source
 
-### 替代方案
+### Alternatives
 
-1. **conda-pack**: 在有网络的机器上 `conda pack` 打包完整环境，COPY 到镜像中解压
-2. **Nix/Nixpkgs**: 对 Python 2.7 包有更好的版本管理，但学习成本高
-3. **Docker multi-stage**: 先用 continuumio/miniconda3 创建 Python 2.7 环境，再 COPY 到 slim 镜像（需解决 glibc 兼容性）
+1. **conda-pack**: Run `conda pack` on a machine with network access to package the complete environment, then COPY it into the image and extract
+2. **Nix/Nixpkgs**: Better version management for Python 2.7 packages, but with a steep learning curve
+3. **Docker multi-stage**: First create a Python 2.7 environment with continuumio/miniconda3, then COPY it into a slim image (glibc compatibility must be solved)
 
 ### Audit Record
 
-- **验证方式**: Aggrescan3D Docker 镜像构建成功并运行，150 个 PDB 全部评分完成
-- **测试用例**:
-  1. `continuumio/miniconda2:latest` → 403 Forbidden（DaoCloud）
-  2. `python:2.7-slim` → apt 404（Buster 归档）
-  3. `mambaorg/micromamba:latest` via DaoCloud → denied（白名单）
-  4. `ghcr.io/mamba-org/micromamba:latest` via GHCR → **构建成功**
-- **成功率**: 100%（最终方案）
-- **局限性**: micromamba 创建的 Python 2.7 环境仅包含 conda 包，pip 包需要额外处理。aggrescan3d 的 Python 2.7 代码在 modern Linux kernel/glibc 上可能遇到未预期的问题（本次运行未发现）。
+- **Validation method**: The Aggrescan3D Docker image built successfully and ran; all 150 PDBs were scored
+- **Test cases**:
+  1. `continuumio/miniconda2:latest` → 403 Forbidden (DaoCloud)
+  2. `python:2.7-slim` → apt 404 (Buster archived)
+  3. `mambaorg/micromamba:latest` via DaoCloud → denied (whitelist)
+  4. `ghcr.io/mamba-org/micromamba:latest` via GHCR → **build succeeded**
+- **Success rate**: 100% (final approach)
+- **Limitations**: The Python 2.7 environment created by micromamba contains only conda packages; pip packages need extra handling. The Python 2.7 code of aggrescan3d may encounter unexpected issues on modern Linux kernels/glibc (none were found in this run).

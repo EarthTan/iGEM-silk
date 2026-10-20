@@ -1,454 +1,455 @@
-# Pipeline 设计方案
+> **English** | [中文](PLAN.zh.md)
+
+# Pipeline Design Plan
 
 ---
 
-## 一、15 个微服务的实际成本
+## 1. The Real Cost of the 15 Microservices
 
-写方案之前，先摸清我们手头有什么工具、各是什么成本。
+Before writing the plan, let's first get clear on what tools we have on hand and what each of them costs.
 
-### 硬过滤（一票否决，不过就是不过）
+### Hard Filtering (a single veto rejects the candidate)
 
-| 服务 | 模型 | 单条耗时 | 批量吞吐 | 内存 | GPU | 模型大小 | 淘汰阈值 |
-|------|------|----------|----------|------|-----|----------|----------|
-| ToxinPred3 | ExtraTrees (CPU) | <5 ms | ~2000 条/秒 | 300 MB | 不需要 | 2 MB | score ≥ 0.38 |
-| HemoPI2 | ESM-2 t6 微调 | ~30 ms | ~100 条/秒 | 1.5 GB | 可选 | 600 MB | score ≥ 0.55 |
-| AlgPred2 | Random Forest (CPU) | <5 ms | ~2000 条/秒 | 200 MB | 不需要 | 1 MB | score ≥ 0.30 |
+| Service | Model | Per-sequence time | Batch throughput | Memory | GPU | Model size | Elimination threshold |
+|---------|-------|-------------------|------------------|--------|-----|------------|-----------------------|
+| ToxinPred3 | ExtraTrees (CPU) | <5 ms | ~2000 seq/s | 300 MB | Not needed | 2 MB | score ≥ 0.38 |
+| HemoPI2 | ESM-2 t6 fine-tuned | ~30 ms | ~100 seq/s | 1.5 GB | Optional | 600 MB | score ≥ 0.55 |
+| AlgPred2 | Random Forest (CPU) | <5 ms | ~2000 seq/s | 200 MB | Not needed | 1 MB | score ≥ 0.30 |
 
-三个硬过滤中，ToxinPred3 和 AlgPred2 几乎零成本（CPU、毫秒级、几百 MB），HemoPI2 稍重但仍在可接受范围（ESM-2 t6 只有 8M 参数）。
+Of the three hard filters, ToxinPred3 and AlgPred2 cost almost nothing (CPU, millisecond-level, a few hundred MB), while HemoPI2 is a bit heavier but still within an acceptable range (ESM-2 t6 has only 8M parameters).
 
-### 评分服务（参与加权综合评分）
+### Scoring Services (participate in weighted composite scoring)
 
-| 服务 | 模型 | 单条耗时 | 批量吞吐 | 内存 | GPU | 模型大小 | 评分权重 |
-|------|------|----------|----------|------|-----|----------|----------|
-| AnOxPePred | CNN (TF) | <10 ms | ~200 条/秒 | 500 MB | 可选 | 1.3 MB | **0.50** |
-| BepiPred-3.0 | ESM-2 650M + DenseNet | ~200 ms | ~50 条/秒 | **4 GB** | 可选 | **2.5 GB** | 0.20 |
-| pLM4CPPs | ESM-2 t6 + 1D-CNN | ~50 ms | ~200 条/秒 | 1.5 GB | 可选 | 10 MB | 0.15 |
-| MHCflurry | NN 集成 | ~50 ms | ~500 条/秒 | 1 GB | 可选 | 100 MB | 0.10（反向） |
-| GraphCPP | GraphSAGE GNN | **~200 ms** | **~30 条/秒** | 1 GB | 可选 | 200 KB | 0.05 |
-| TemStaPro | **ProtT5-XL 3B** + 30×MLP | **~500 ms** | **~20 条/秒** | **6 GB** | **推荐** | **3 GB** | 未分配 |
+| Service | Model | Per-sequence time | Batch throughput | Memory | GPU | Model size | Scoring weight |
+|---------|-------|-------------------|------------------|--------|-----|------------|----------------|
+| AnOxPePred | CNN (TF) | <10 ms | ~200 seq/s | 500 MB | Optional | 1.3 MB | **0.50** |
+| BepiPred-3.0 | ESM-2 650M + DenseNet | ~200 ms | ~50 seq/s | **4 GB** | Optional | **2.5 GB** | 0.20 |
+| pLM4CPPs | ESM-2 t6 + 1D-CNN | ~50 ms | ~200 seq/s | 1.5 GB | Optional | 10 MB | 0.15 |
+| MHCflurry | NN ensemble | ~50 ms | ~500 seq/s | 1 GB | Optional | 100 MB | 0.10 (inverted) |
+| GraphCPP | GraphSAGE GNN | **~200 ms** | **~30 seq/s** | 1 GB | Optional | 200 KB | 0.05 |
+| TemStaPro | **ProtT5-XL 3B** + 30×MLP | **~500 ms** | **~20 seq/s** | **6 GB** | **Recommended** | **3 GB** | Unassigned |
 
-**备注**：
-- TIPred（酪氨酸酶抑制）是特定功能预测，不属于抗氧化肽的必备属性，不参与评分。
-- SoDoPE（溶解度）移到 construct 级别评估（阶段六），肽级别的溶解度分数对融合蛋白没有参考价值。
+**Notes**:
+- TIPred (tyrosinase inhibition) is a specific-function predictor; it is not an essential attribute of antioxidant peptides, so it does not participate in scoring.
+- SoDoPE (solubility) is moved to construct-level evaluation (Stage 6); peptide-level solubility scores have no reference value for fusion proteins.
 
-关键信息：
-- **AnOxPePred 占 50% 权重**，是抗氧化活性最直接的预测器，且轻量级（<10 ms/条）。
-- **BepiPred-3.0 是重服务**：4 GB 内存、50 条/秒吞吐。跑 25000 条需要 8 分钟。占 20% 权重。
-- **TemStaPro 最重**：6 GB 内存、20 条/秒吞吐、启动下载 3 GB。当前权重表中没有它。**阶段二不一定需要跑 TemStaPro**。
-- **GraphCPP 模型虽小（200 KB）但单条 200 ms**，原因是 RDKit 将氨基酸序列转为分子图的开销。30 条/秒的吞吐对大批量数据是瓶颈。
+Key information:
+- **AnOxPePred carries 50% of the weight**; it is the most direct predictor of antioxidant activity and is lightweight (<10 ms/sequence).
+- **BepiPred-3.0 is a heavy service**: 4 GB memory, 50 seq/s throughput. Running 25000 sequences takes 8 minutes. It carries 20% of the weight.
+- **TemStaPro is the heaviest**: 6 GB memory, 20 seq/s throughput, 3 GB download at startup. It is not in the current weight table. **Stage 2 does not necessarily need to run TemStaPro**.
+- **GraphCPP's model is small (200 KB) but takes 200 ms per sequence**, because of the cost of RDKit converting the amino acid sequence into a molecular graph. Its 30 seq/s throughput is a bottleneck for large batches.
 
-### 3D 结构预测
+### 3D Structure Prediction
 
-| 服务 | 环境 | 单条耗时 | 并发 | 序列限制 | 资源需求 |
-|------|------|----------|------|----------|----------|
-| **ESMFold** | GPU 原生 | **~1–3 分钟** | 3 | 无限制 | **~8 GB 显存**（ESM-2 3B）+ 额外 6 GB 缓存 |
-| AlphaFold3 | GPU Linux Docker | 30–120 分钟 | 1 | 无限制 | **≥24 GB 显存 + TB 级数据库** |
-| PEP-FOLD4 | CPU Docker | 10–30 分钟 | 1 | **5–40 aa** | ~2 GB |
+| Service | Environment | Per-sequence time | Concurrency | Sequence limit | Resource requirement |
+|---------|-------------|-------------------|-------------|----------------|----------------------|
+| **ESMFold** | Native GPU | **~1–3 minutes** | 3 | No limit | **~8 GB VRAM** (ESM-2 3B) + an extra 6 GB cache |
+| AlphaFold3 | GPU Linux Docker | 30–120 minutes | 1 | No limit | **≥24 GB VRAM + TB-scale database** |
+| PEP-FOLD4 | CPU Docker | 10–30 minutes | 1 | **5–40 aa** | ~2 GB |
 
-ESMFold 是主力预测工具：无需 Docker、无需 TB 级数据库、推理速度快（约 AF2 的 60 倍）。AlphaFold3 可用（48 GB 显存），实际一条 6 aa 肽首次运行约 2 小时（含数据库下载/安装），后续预测预计 30–120 分钟。限于团队精力，当前仅维护 ESMFold 和 AF3 两条路线。PEP-FOLD4 只支持 5–40 aa，跑不了全长融合蛋白。
+ESMFold is the primary prediction tool: no Docker needed, no TB-scale database needed, and fast inference (about 60 times that of AF2). AlphaFold3 is available (48 GB VRAM); in practice a single 6 aa peptide took about 2 hours on its first run (including database download/installation), and subsequent predictions are expected to take 30–120 minutes. Given the team's limited capacity, only the ESMFold and AF3 routes are currently maintained. PEP-FOLD4 supports only 5–40 aa and cannot handle full-length fusion proteins.
 
-**Waveflow（端口 8205）**：Tamarind.bio 云端 API 代理，通过 URL 路径指定工具类型（`POST /predict/esmfold`），不需要本地 GPU 和模型权重。相比本地 ESMFold 受网络延迟影响较慢，但可访问 tamarind 平台的全部工具且不需要消耗本地 GPU 显存。适用于无 GPU 环境或需要切换不同工具的场景。
+**Waveflow (port 8205)**: a Tamarind.bio cloud API proxy that specifies the tool type via the URL path (`POST /predict/esmfold`) and needs neither a local GPU nor model weights. It is slower than local ESMFold due to network latency, but it gives access to all tools on the tamarind platform without consuming local GPU VRAM. It suits environments without a GPU or scenarios that need to switch between different tools.
 
-### PDB 评估
+### PDB Evaluation
 
-| 服务 | 环境 | 单条耗时 | 并发 |
-|------|------|----------|------|
-| SASA | CPU (FreeSASA) | **1–5 秒** | 10 |
-| SoDoPE | CPU（数学运算） | **<1 ms** | 极快 |
-| Aggrescan3D | Docker CPU | **1–15 分钟** | 2 |
+| Service | Environment | Per-sequence time | Concurrency |
+|---------|-------------|-------------------|-------------|
+| SASA | CPU (FreeSASA) | **1–5 seconds** | 10 |
+| SoDoPE | CPU (mathematical computation) | **<1 ms** | Extremely fast |
+| Aggrescan3D | Docker CPU | **1–15 minutes** | 2 |
 
-**SoDoPE（溶解度）应用于 construct 级别**：SoDoPE 基于二肽组成查表，对全长融合蛋白（350+ aa）的预测比对短肽更可靠。因此将其从肽级评分移到此处，对最终 construct 做溶解度评估。SoDoPE 极快（<1 ms/条），不构成瓶颈。
+**SoDoPE (solubility) is applied at the construct level**: SoDoPE looks up dipeptide composition, and its predictions for full-length fusion proteins (350+ aa) are more reliable than for short peptides. It is therefore moved from peptide-level scoring to here, to evaluate the solubility of the final construct. SoDoPE is extremely fast (<1 ms/sequence) and is not a bottleneck.
 
-SASA 做功能肽的暴露度分析：埋在内部的肽失效，暴露在表面的肽能工作。Aggrescan3D 做聚集风险分析。三者综合给出 construct 的最终排名。
-
----
-
-## 二、这些数据告诉我们什么
-
-### 第一个结论：便宜的跑了不亏，贵的必须留给少数
-
-25 条/秒的吞吐和 2000 条/秒的吞吐，差异是 80 倍。在 25000 条数据上，意味着不到一分钟和几个小时的差别。所以编排顺序必须按照**单位时间能处理多少条**来排，把吞吐高的放前面。
-
-### 第二个结论：部分服务可以完全省略
-
-TemStaPro 不在权重表中，意味着它不参与最终的加权评分。如果只是为了做参考信息，可以只跑在最终的几十条 construct 上，不跑在全部 25000 条肽上。同理，BepiPred-3.0 虽然占 0.15 权重，但它跑 25000 条要 8 分钟，跑到前 2000 条只要不到一分钟。
-
-### 第三个结论：硬过滤是最大的收益来源
-
-ToxinPred3 + AlgPred2 加起来不到 10 秒就处理完 25000 条。按论文里的比例，大约 20-30% 的肽有毒或致敏。这意味着用不到 10 秒的时间就能排除几千条，后面所有步骤都白赚了。
-
-### 第四个结论：3D 结构预测是天花板，两条路线差距极大
-
-ESMFold 每条 1-3 分钟，50 条 construct 约 50 分钟到 2.5 小时（并发 3）。AlphaFold3 每条 30-120 分钟，50 条要 25-100 小时。两条路线差了 20-40 倍。ESMFold 跑得动就用 ESMFold，跑不动的（超长/复杂序列）才交 AF3。
-
-### 第五个结论：GPU 显存不是问题（48 GB），但 AF3 要独占
-
-48 GB 显存足够 FASTA 评分阶段所有 GPU 服务同时加载（BepiPred 4 GB + TemStaPro 6 GB + 其他轻服务 ≈ 15 GB）。但 AF3 启动时必须独占 GPU——不是显存不够（它用 20+ GB，还剩 20+ GB），而是 AF3 在 Docker 容器内锁定 GPU 设备。所以进入 AF3 前仍然需要关停其他 GPU 服务。ESMFold 不需要——它 ~8 GB 显存，可以和剩余服务共存。
+SASA performs exposure analysis of the functional peptide: a peptide buried inside fails, while a peptide exposed on the surface can work. Aggrescan3D performs aggregation risk analysis. Together the three produce the final ranking of the constructs.
 
 ---
 
-## 三、漏斗设计：四阶段编排
+## 2. What These Numbers Tell Us
 
-### 阶段一：毫秒级过滤
+### Conclusion 1: Running the Cheap Ones Costs Nothing, the Expensive Ones Must Be Reserved for the Few
 
-**参与服务**：ToxinPred3、AlgPred2
+A throughput of 25 seq/s versus 2000 seq/s is an 80-fold difference. On 25000 sequences, that means the difference between under a minute and several hours. So the orchestration order must be determined by **how many sequences can be processed per unit time**, putting the high-throughput ones first.
 
-**预估时间**：25000 条 ÷ 2000 条/秒 × 2 个服务 ≈ 25 秒
+### Conclusion 2: Some Services Can Be Omitted Entirely
 
-**说明**：这两个服务全 CPU、毫秒级推理、模型只有 1-2 MB。先跑它们没有任何负担，但收益巨大——预计排除 3000-5000 条有毒/致敏肽。
+TemStaPro is not in the weight table, which means it does not participate in the final weighted scoring. If it is only for reference information, it can be run on just the final few dozen constructs instead of all 25000 peptides. Likewise, although BepiPred-3.0 carries a weight of 0.15, running it on 25000 sequences takes 8 minutes, while running it on the top 2000 takes less than a minute.
 
-**为什么不一开始就上 HemoPI2**：HemoPI2 加载 ESM-2 t6 需要 1.5 GB 和约 30 秒的模型加载时间。先用 ToxinPred3 和 AlgPred2 排除掉几千条，再用 HemoPI2 处理剩下的，不会增加总时间，但阶段一跑完的这几十秒内已经完成了最重要的安全过滤。
+### Conclusion 3: Hard Filtering Is the Biggest Source of Savings
 
-### 阶段二：快速评分 + 排名
+ToxinPred3 + AlgPred2 together process 25000 sequences in under 10 seconds. According to the proportions in the papers, roughly 20-30% of peptides are toxic or allergenic. That means several thousand sequences can be eliminated in under 10 seconds, and every later step gets that saving for free.
 
-**前提条件**：经过阶段一，剩余约 100-200 条（当前实测 107 条）
+### Conclusion 4: 3D Structure Prediction Is the Ceiling, and the Two Routes Differ Enormously
 
-**参与服务**：AnOxPePred、MHCflurry、pLM4CPPs（可选：BepiPred-3.0）
+ESMFold takes 1-3 minutes per sequence, so 50 constructs take about 50 minutes to 2.5 hours (concurrency 3). AlphaFold3 takes 30-120 minutes per sequence, so 50 constructs take 25-100 hours. The two routes differ by a factor of 20-40. Use ESMFold whenever it can handle the job, and hand only what it cannot handle (ultra-long/complex sequences) to AF3.
 
-**注意**：当前阶段一的输出已经只有 107 条，所以阶段二不需要分层筛选——所有可选服务都可以直接上。
+### Conclusion 5: GPU VRAM Is Not the Problem (48 GB), but AF3 Needs Exclusive Access
 
-**启动策略**：107 条肽量极小，所有服务一次性并行调用。AnOxPePred（500 MB）+ MHCflurry（1 GB）+ pLM4CPPs（1.5 GB）+ BepiPred-3.0（4 GB）同时加载约 7 GB 显存，48 GB 环境无压力。
-
-**预估时间**（107 条）：
-- AnOxPePred：107 ÷ 200 条/秒 ≈ 1 秒
-- MHCflurry：107 ÷ 500 条/秒 ≈ 0.2 秒
-- pLM4CPPs：107 ÷ 200 条/秒 ≈ 0.5 秒
-- BepiPred-3.0：107 ÷ 50 条/秒 ≈ 2 秒
-- **合计约 5-10 秒**（主要是网络延迟和冷启动）
-
-**排序策略**：AnOxPePred（权重 0.50）+ BepiPred（0.20）+ pLM4CPPs（0.15）+ MHCflurry（反向 0.10）+ GraphCPP（0.05）计算加权分。按综合分取前 50-80 条进入阶段三。
-
-**HemoPI2 已在阶段一运行完毕**，不需要在阶段二重复。
-
-**为什么 TIPred 和 SoDoPE 不在阶段二**：
-- TIPred 预测酪氨酸酶抑制——这是特定功能，不属于抗氧化肽的必备属性，不参与评分。
-- SoDoPE 预测溶解度——肽级溶解度对融合蛋白没有参考价值，移到阶段六做 construct 级别评估。
-
-### 阶段三：精确评分（可选）
-
-**前提条件**：经过阶段二，剩余 107 条（当前实测）
-
-**参与服务**：TemStaPro（ProtT5-XL，6 GB 显存，选跑）
-
-**说明**：阶段二已经跑完了全部 5 个评分服务，阶段三仅补充 TemStaPro 热稳定性预测。由于 TemStaPro 需要下载 3 GB 的 ProtT5-XL 模型（HuggingFace 网络可能较慢），此阶段是可选的。
-
-**如果 TemStaPro 可用**：在 top 80 条肽上运行，额外权重 0.05。加入后权重：AnOxPePred 0.50 / BepiPred 0.20 / pLM4CPPs 0.15 / MHCflurry 0.10(反向) / GraphCPP 0.05 / TemStaPro 0.05。
-
-**如果不可用**：跳过，不影响后续流程。
-
-### 阶段四：枚举 + Construct 级 FASTA 评分
-
-枚举逻辑：优选肽 × 6 种 Linker × 3 种位置方案。位置方案包括：
-- 功能肽在 N 端：`[Func] + [Linker] + [Silk] + [His6]`
-- 功能肽在 C 端：`[Silk] + [Linker] + [Func] + [Linker] + [His6]`
-- 两端都放：`[Func] + [Linker] + [Silk] + [Linker] + [Func] + [Linker] + [His6]`
-
-枚举不涉及任何计算，纯字符串拼接，瞬间完成。
-
-**Construct 级 FASTA 评分**：枚举后每个 construct 获得两个分数：
-1. **肽综合分**（从阶段二继承）：AnOxPePred + BepiPred + pLM4CPPs + MHCflurry + GraphCPP 的加权分
-2. **SoDoPE 溶解度分**：预测全长融合蛋白的溶解度（<1 ms/条，极快）
-3. **TemStaPro 热稳定性分**（可选）：如果阶段三跑完了
-
-**排序逻辑——按功能肽分组**：为了与实验设计对齐（选定功能肽后，无论处于哪个 position 都会优化），排序时不再将每个 position 的 construct 视为独立个体，而是按（肽, Linker）分组：
-
-1. 同一肽 × 同一 Linker 的 3 个 position 看作一组
-2. 组内取最高 G-FASTA 综合分代表该组
-3. 按组分排序，选 Top K 组
-4. 每组 3 个 position 全部保留 → 进入 3D 结构预测（K × 3 个 construct）
-
-**G-FASTA 综合分公式**：肽综合分 × 0.60 + SoDoPE × 0.30 + TemStaPro × 0.10（如果可用）
-
-**这样设计的原因**：
-- 实验需要在选定功能肽后，对 N 端、C 端、两端三个位置都做测试形成对照
-- 分组排序确保选入的是一整组（肽, Linker），而非分散的单个 position
-- 3D 结构预测用 ESMFold（够快），三个 position 全部预测没有成本负担
-
-**SoDoPE 的选择理由**：SoDoPE 基于二肽组成查表，不依赖序列长度（<1 ms/条），对全长融合蛋白（380–438 aa）的预测比短肽更可靠。而其他评分服务（AnOxPePred、BepiPred 等）都训练于短肽（5–50 aa），不适合跑全长 construct。
-
-**可选 Linker**：6 种从 linker.fasta 的 10 种中精选（Flex_GGGGSx1/x2、Rigid_EAAAKx1/x2、Helix_AEAAAKEAAAKA、Silk_like_GS），覆盖柔性/刚性/螺旋/丝素衍生。
-
-**输出**：Top K 组 × 3 position = K×3 个 construct 的 FASTA + 评分明细 → 阶段五（3D 结构预测）。
-
-### 阶段五：3D 结构预测
-
-这是瓶颈。ESMFold 把 3D 预测从"几天"拉到了"一小时"，但依然是 pipeline 最贵的步骤。
-
-**工具选择**：
-
-| 工具 | 角色 | 理由 |
-|------|------|------|
-| **ESMFold** | **主力** | ~8 GB 显存、1-3 分钟/条、无需 Docker、无需数据库。对本项目的融合蛋白（350+ aa）是最实用的选择 |
-| AlphaFold3 | 高精度备选 | 48 GB 显存可用，首次运行约 2 小时（含数据库安装），后续每条 30-120 分钟。仅当 ESMFold pLDDT 过低时使用 |
-| PEP-FOLD4 | ❌ 不可用 | 只支持 5–40 aa，融合蛋白 350+ aa 跑不了 |
-
-**并发策略**：结构服务模板默认并发 3（Semaphore(3)）。ESMFold 3 个并发约需 8 GB × 3 = 24 GB 显存。48 GB 环境足够开到 3 甚至更高。实际安全并发数以压力测试为准。
-
-**资源冲突**：ESMFold 是 GPU 原生服务（不需要 Docker），只需关停阶段二/三的重服务释放显存。CPU 服务（ToxinPred3、AlgPred2、TIPred、SoDoPE）可以不关。
-
-**总耗时估算**（48 GB GPU，ESMFold 并发 3，假设单条 2 分钟）：
-- 36 个 construct（K=2）：36 × 2 分钟 ÷ 3 并发 ≈ **24 分钟**
-- 54 个 construct（K=3）：54 × 2 分钟 ÷ 3 并发 ≈ **36 分钟**
-- 如果 AF3 介入（1-2 个 construct）：额外 30-120 分钟/个
-
-**置信度过滤**：ESMFold 输出的 pLDDT 分数作为质量指标。pLDDT < 70 的结构标记为低质量，考虑用 AF3 做最终验证。pLDDT < 50 的结构直接排除。
-
-**缓存**：每个 construct 的结构计算完成后，用序列 SHA256 哈希值缓存 PDB 文件。下次运行相同序列直接读缓存。
-
-**AF3 调用方式**：AlphaFold3 微服务通过 Docker CLI 调用 AF3 容器（见 `tools/AlphaFold3/service.py`），以 async job 模式提交（`POST /predict/async`）并轮询结果（`client.py` 的 `predict_structure_async()` 方法）。pipeline 只需要发请求 + 等结果，不需要直接管理 Docker 容器。
-
-### 阶段六：PDB 评估
-
-3D 结构准备好之后，SASA（1-5 秒/个）和 Aggrescan3D（1-15 分钟/个）评估 construct 的蛋白质层面性质。
-
-SASA 做功能肽的暴露度分析：埋在内部的肽失效，暴露在表面的肽能工作。Aggrescan3D 做聚集风险分析：高风险意味着蛋白不稳定。
-
-**显存**：SASA 和 Aggrescan3D 都是 CPU 服务，和前一阶段的 ESMFold 没有资源冲突。但 Aggrescan3D 通过 Docker 容器运行，需要注意 Docker 服务是否可用。
-
-**总时间**：假设 50 个 construct，SASA 约 2-4 分钟（并发 10），Aggrescan3D 约 25 分钟到 12 小时（并发 2，单条 1-15 分钟）。Aggrescan3D 是这里的新瓶颈——它的耗时可能和 3D 预测相当。
-
-之后汇总肽评分（阶段三）和 PDB 评分（阶段六），加权后生成最终排名报告。
+48 GB of VRAM is enough for all GPU services in the FASTA scoring stage to be loaded at the same time (BepiPred 4 GB + TemStaPro 6 GB + other light services ≈ 15 GB). But AF3 must have the GPU to itself when it starts — not because there is not enough VRAM (it uses 20+ GB, leaving 20+ GB), but because AF3 locks the GPU device inside its Docker container. So other GPU services still need to be shut down before starting AF3. ESMFold does not require this — it needs ~8 GB of VRAM and can coexist with the remaining services.
 
 ---
 
-## 四、GPU 显存管理方案
+## 3. Funnel Design: Four-Stage Orchestration
 
-当前策略依赖 GPU 的显存容量。我们只有一张 GPU，所以必须分时复用。
+### Stage 1: Millisecond-Level Filtering
 
-### 阶段分配
+**Services involved**: ToxinPred3, AlgPred2
 
-| Pipeline 阶段 | GPU 上运行的服务 | 显存占用 | 时长 |
-|---------------|-----------------|----------|------|
-| 阶段一 | 无（全 CPU） | 0 | <1 分钟 |
-| 阶段二 | AnOxPePred, MHCflurry, HemoPI2（可选） | ~3-4 GB | ~6 分钟 |
-| 阶段三 | BepiPred-3.0, pLM4CPPs, GraphCPP | ~6-7 GB | ~5 分钟 |
+**Estimated time**: 25000 sequences ÷ 2000 seq/s × 2 services ≈ 25 seconds
 
-（阶段二、三分两批加载的原因：BepiPred-3.0 的 ESM-2 650M + DenseNet 需要 4 GB，和阶段二的服务同时加载可能撑爆中低端 GPU。拆成两批，每批的显存压力都小。）
+**Explanation**: Both services are fully CPU-based, with millisecond-level inference and models of only 1-2 MB. Running them first imposes no burden but yields huge gains — an estimated 3000-5000 toxic/allergenic peptides are eliminated.
 
-| Pipeline 阶段 | GPU 上运行的服务 | 显存占用 | 时长 |
-|---------------|-----------------|----------|------|
-| 阶段五 | ESMFold（AF3 备选） | **~8 GB × 并发数** | 24–36 分钟（+AF3 可选） |
-| — 过渡 — | 关停阶段二/三的重服务，无需关停 CPU 服务 | — | — |
-| 阶段六 | 无（全 CPU） | 0 | 1-12 小时 |
+**Why not start with HemoPI2**: Loading ESM-2 t6 for HemoPI2 requires 1.5 GB and about 30 seconds of model loading time. Using ToxinPred3 and AlgPred2 to eliminate several thousand sequences first and then processing the remainder with HemoPI2 does not increase total time, yet within those few dozen seconds after Stage 1 finishes, the most important safety filtering is already done.
 
-**关键变化**：不再需要为 AF3 清空整个 GPU。ESMFold 的 ~8 GB 显存需求意味着阶段五可以和阶段六的 CPU 服务共存（甚至可以在 ESMFold 跑完后立即开始 PDB 评估，不浪费等待时间）。
+### Stage 2: Fast Scoring + Ranking
 
-### 一个矛盾点
+**Precondition**: after Stage 1, about 100-200 sequences remain (currently 107 measured)
 
-TemStaPro（ProtT5-XL，6 GB，20 条/秒）是一个尴尬的存在。它不在权重表里，不参与评分，却要吃掉 6 GB 显存。如果只是为了提供热稳定性的参考信息给最终用户，可以用 CPU 模式跑在前 100 条肽上，花个几分钟，不影响显存规划。这个决定取决于用户——如果热稳定性对我们的融合蛋白不重要，干脆不跑。
+**Services involved**: AnOxPePred, MHCflurry, pLM4CPPs (optional: BepiPred-3.0)
+
+**Note**: The current Stage 1 output is already only 107 sequences, so Stage 2 does not need tiered screening — all optional services can be applied directly.
+
+**Startup strategy**: 107 peptides is a tiny volume, so all services are called in parallel at once. Loading AnOxPePred (500 MB) + MHCflurry (1 GB) + pLM4CPPs (1.5 GB) + BepiPred-3.0 (4 GB) at the same time takes about 7 GB of VRAM, no strain in a 48 GB environment.
+
+**Estimated time** (107 sequences):
+- AnOxPePred: 107 ÷ 200 seq/s ≈ 1 second
+- MHCflurry: 107 ÷ 500 seq/s ≈ 0.2 seconds
+- pLM4CPPs: 107 ÷ 200 seq/s ≈ 0.5 seconds
+- BepiPred-3.0: 107 ÷ 50 seq/s ≈ 2 seconds
+- **About 5-10 seconds in total** (mostly network latency and cold start)
+
+**Ranking strategy**: Compute a weighted score from AnOxPePred (weight 0.50) + BepiPred (0.20) + pLM4CPPs (0.15) + MHCflurry (inverted 0.10) + GraphCPP (0.05). Take the top 50-80 sequences by composite score into Stage 3.
+
+**HemoPI2 has already finished running in Stage 1**, so it does not need to be repeated in Stage 2.
+
+**Why TIPred and SoDoPE are not in Stage 2**:
+- TIPred predicts tyrosinase inhibition — that is a specific function and not an essential attribute of antioxidant peptides, so it does not participate in scoring.
+- SoDoPE predicts solubility — peptide-level solubility has no reference value for fusion proteins, so it is moved to Stage 6 for construct-level evaluation.
+
+### Stage 3: Precise Scoring (Optional)
+
+**Precondition**: after Stage 2, 107 sequences remain (currently measured)
+
+**Services involved**: TemStaPro (ProtT5-XL, 6 GB VRAM, optional run)
+
+**Explanation**: Stage 2 has already run all 5 scoring services, so Stage 3 only adds the TemStaPro thermostability prediction. Because TemStaPro must download the 3 GB ProtT5-XL model (HuggingFace network may be slow), this stage is optional.
+
+**If TemStaPro is available**: Run it on the top 80 peptides with an additional weight of 0.05. After inclusion the weights are: AnOxPePred 0.50 / BepiPred 0.20 / pLM4CPPs 0.15 / MHCflurry 0.10 (inverted) / GraphCPP 0.05 / TemStaPro 0.05.
+
+**If it is not available**: Skip it; the later flow is unaffected.
+
+### Stage 4: Enumeration + Construct-Level FASTA Scoring
+
+Enumeration logic: selected peptides × 6 linkers × 3 position schemes. The position schemes are:
+- Functional peptide at the N-terminus: `[Func] + [Linker] + [Silk] + [His6]`
+- Functional peptide at the C-terminus: `[Silk] + [Linker] + [Func] + [Linker] + [His6]`
+- At both ends: `[Func] + [Linker] + [Silk] + [Linker] + [Func] + [Linker] + [His6]`
+
+Enumeration involves no computation at all — pure string concatenation, done instantly.
+
+**Construct-level FASTA scoring**: After enumeration, each construct receives two scores:
+1. **Peptide composite score** (inherited from Stage 2): the weighted score of AnOxPePred + BepiPred + pLM4CPPs + MHCflurry + GraphCPP
+2. **SoDoPE solubility score**: predicts the solubility of the full-length fusion protein (<1 ms/sequence, extremely fast)
+3. **TemStaPro thermostability score** (optional): if Stage 3 has been run
+
+**Ranking logic — grouping by functional peptide**: To align with the experimental design (once a functional peptide is chosen, it will be optimized regardless of which position it occupies), the ranking no longer treats the construct at each position as an independent individual, but groups by (peptide, linker):
+
+1. Treat the 3 positions of the same peptide × the same linker as one group
+2. Within the group, take the highest G-FASTA composite score to represent the group
+3. Sort by group and select the Top K groups
+4. Retain all 3 positions of each group → enter 3D structure prediction (K × 3 constructs)
+
+**G-FASTA composite score formula**: peptide composite score × 0.60 + SoDoPE × 0.30 + TemStaPro × 0.10 (if available)
+
+**Why it is designed this way**:
+- After selecting a functional peptide, experiments need to test all three positions — N-terminus, C-terminus, and both ends — to form a control
+- Group-based ranking ensures that a whole (peptide, linker) group is selected, rather than scattered individual positions
+- 3D structure prediction uses ESMFold (fast enough), so predicting all three positions carries no cost burden
+
+**Rationale for choosing SoDoPE**: SoDoPE looks up dipeptide composition and does not depend on sequence length (<1 ms/sequence); its predictions for full-length fusion proteins (380–438 aa) are more reliable than for short peptides. The other scoring services (AnOxPePred, BepiPred, etc.) were all trained on short peptides (5–50 aa) and are not suitable for running on full-length constructs.
+
+**Optional linkers**: 6 selected from the 10 in linker.fasta (Flex_GGGGSx1/x2, Rigid_EAAAKx1/x2, Helix_AEAAAKEAAAKA, Silk_like_GS), covering flexible/rigid/helical/silk-derived types.
+
+**Output**: Top K groups × 3 positions = K×3 constructs with FASTA + scoring details → Stage 5 (3D structure prediction).
+
+### Stage 5: 3D Structure Prediction
+
+This is the bottleneck. ESMFold pulled 3D prediction from “several days” down to “one hour”, but it is still the most expensive step in the pipeline.
+
+**Tool selection**:
+
+| Tool | Role | Rationale |
+|------|------|-----------|
+| **ESMFold** | **Primary** | ~8 GB VRAM, 1-3 minutes/sequence, no Docker, no database. The most practical choice for this project's fusion proteins (350+ aa) |
+| AlphaFold3 | High-accuracy fallback | 48 GB VRAM available; first run takes about 2 hours (including database installation), then 30-120 minutes per sequence. Use only when ESMFold pLDDT is too low |
+| PEP-FOLD4 | ❌ Not usable | Supports only 5–40 aa; cannot handle 350+ aa fusion proteins |
+
+**Concurrency strategy**: The structure service template defaults to concurrency 3 (Semaphore(3)). Three concurrent ESMFold runs need about 8 GB × 3 = 24 GB of VRAM. A 48 GB environment is enough for 3 or even more. The actual safe concurrency is determined by stress testing.
+
+**Resource conflict**: ESMFold is a native GPU service (no Docker needed), so it is enough to shut down the heavy services of Stages 2/3 to free VRAM. CPU services (ToxinPred3, AlgPred2, TIPred, SoDoPE) can be left running.
+
+**Total time estimate** (48 GB GPU, ESMFold concurrency 3, assuming 2 minutes per sequence):
+- 36 constructs (K=2): 36 × 2 minutes ÷ 3 concurrency ≈ **24 minutes**
+- 54 constructs (K=3): 54 × 2 minutes ÷ 3 concurrency ≈ **36 minutes**
+- If AF3 is involved (1-2 constructs): an additional 30-120 minutes each
+
+**Confidence filtering**: The pLDDT score output by ESMFold serves as the quality metric. Structures with pLDDT < 70 are flagged as low quality and considered for final validation with AF3. Structures with pLDDT < 50 are excluded directly.
+
+**Caching**: After each construct's structure is computed, cache the PDB file by the SHA256 hash of its sequence. The next run reads the cache directly for the same sequence.
+
+**How AF3 is called**: The AlphaFold3 microservice invokes the AF3 container through the Docker CLI (see `tools/AlphaFold3/service.py`), submitting jobs in async job mode (`POST /predict/async`) and polling for results (the `predict_structure_async()` method of `client.py`). The pipeline only needs to send requests and wait for results; it does not need to manage Docker containers directly.
+
+### Stage 6: PDB Evaluation
+
+Once the 3D structures are ready, SASA (1-5 seconds each) and Aggrescan3D (1-15 minutes each) evaluate the protein-level properties of the constructs.
+
+SASA performs exposure analysis of the functional peptide: a peptide buried inside fails, while a peptide exposed on the surface can work. Aggrescan3D performs aggregation risk analysis: high risk means the protein is unstable.
+
+**VRAM**: SASA and Aggrescan3D are both CPU services and do not conflict with ESMFold from the previous stage. However, Aggrescan3D runs through a Docker container, so check whether the Docker service is available.
+
+**Total time**: Assuming 50 constructs, SASA takes about 2-4 minutes (concurrency 10) and Aggrescan3D about 25 minutes to 12 hours (concurrency 2, 1-15 minutes per sequence). Aggrescan3D is the new bottleneck here — its runtime can be comparable to 3D prediction.
+
+After that, the peptide scores (Stage 3) and PDB scores (Stage 6) are aggregated and weighted to produce the final ranking report.
 
 ---
 
-## 五、Adaptive Pipeline 逻辑
+## 4. GPU VRAM Management Plan
 
-我们不知道每一步之后会剩下多少条。所以 pipeline 不能用死数字控制，而是给一个"目标范围 + 调整策略"。
+The current strategy depends on the GPU's VRAM capacity. We have only one GPU, so it must be time-shared.
 
-### 示例流程（基于当前实测数据）
+### Stage Allocation
+
+| Pipeline stage | Services running on the GPU | VRAM usage | Duration |
+|----------------|-----------------------------|------------|----------|
+| Stage 1 | None (all CPU) | 0 | <1 minute |
+| Stage 2 | AnOxPePred, MHCflurry, HemoPI2 (optional) | ~3-4 GB | ~6 minutes |
+| Stage 3 | BepiPred-3.0, pLM4CPPs, GraphCPP | ~6-7 GB | ~5 minutes |
+
+(The reason Stages 2 and 3 load in two batches: BepiPred-3.0's ESM-2 650M + DenseNet needs 4 GB, and loading it together with Stage 2's services may overwhelm low- and mid-range GPUs. Splitting into two batches keeps the VRAM pressure of each batch low.)
+
+| Pipeline stage | Services running on the GPU | VRAM usage | Duration |
+|----------------|-----------------------------|------------|----------|
+| Stage 5 | ESMFold (AF3 fallback) | **~8 GB × concurrency** | 24–36 minutes (+ optional AF3) |
+| — Transition — | Shut down the heavy services of Stages 2/3; CPU services need not be shut down | — | — |
+| Stage 6 | None (all CPU) | 0 | 1-12 hours |
+
+**Key change**: There is no longer any need to clear the entire GPU for AF3. ESMFold's ~8 GB VRAM requirement means Stage 5 can coexist with Stage 6's CPU services (PDB evaluation can even start right after ESMFold finishes, wasting no waiting time).
+
+### One Contradiction
+
+TemStaPro (ProtT5-XL, 6 GB, 20 seq/s) is an awkward presence. It is not in the weight table and does not participate in scoring, yet it consumes 6 GB of VRAM. If it is only meant to provide thermostability reference information to end users, it can be run in CPU mode on the top 100 peptides for a few minutes without affecting VRAM planning. This decision is up to the user — if thermostability is not important for our fusion proteins, simply do not run it.
+
+---
+
+## 5. Adaptive Pipeline Logic
+
+We do not know how many sequences will remain after each step. So the pipeline cannot be controlled by hard-coded numbers; instead it is given a “target range + adjustment strategy”.
+
+### Example Flow (based on current measured data)
 
 ```
-初始：1843 条抗氧化肽（合并 function.csv + function_3.csv）
+Initial: 1843 antioxidant peptides (function.csv + function_3.csv merged)
 
-阶段一（硬过滤，已完成）：
-  输入：1843 条
-  ToxinPred3 淘汰 656 条（毒性）
-  AlgPred2 淘汰 1077 条（致敏）
-  HemoPI2 淘汰 3 条（溶血）
-  输出：107 条 ✅
+Stage 1 (hard filtering, completed):
+  Input: 1843 sequences
+  ToxinPred3 eliminates 656 sequences (toxicity)
+  AlgPred2 eliminates 1077 sequences (allergenicity)
+  HemoPI2 eliminates 3 sequences (hemolysis)
+  Output: 107 sequences ✅
 
-阶段二（快速评分 + 排序）：
-  输入：107 条
-  调用 AnOxPePred + BepiPred + pLM4CPPs + MHCflurry + GraphCPP
-  加权评分后取前 80 条
+Stage 2 (fast scoring + ranking):
+  Input: 107 sequences
+  Call AnOxPePred + BepiPred + pLM4CPPs + MHCflurry + GraphCPP
+  After weighted scoring, take the top 80 sequences
 
-阶段三（精确评分，可选）：
-  如果 TemStaPro 模型就绪：补充热稳定性评分
-  如果未就绪：跳过
+Stage 3 (precise scoring, optional):
+  If the TemStaPro model is ready: add thermostability scores
+  If not ready: skip
 
-阶段四（枚举 + Construct FASTA 评分）：
-  输入：Top 20 肽 × 6 Linker × 3 位置 = 360 construct
-  调用 SoDoPE 对每个 construct 做溶解度评分
-  按（肽, Linker）分组，取组内最高分排序 → 选 Top K 组
-  每组 3 个 position 全部输出 → K×3 个 construct 进 3D
+Stage 4 (enumeration + Construct FASTA scoring):
+  Input: Top 20 peptides × 6 linkers × 3 positions = 360 constructs
+  Call SoDoPE to score the solubility of each construct
+  Group by (peptide, linker), rank by the highest score within each group → select Top K groups
+  Output all 3 positions per group → K×3 constructs go to 3D
 
-阶段五（3D 结构预测）：
-  30 construct × ESMFold（并发 3，~2 min/条）≈ 20 分钟
+Stage 5 (3D structure prediction):
+  30 constructs × ESMFold (concurrency 3, ~2 min/sequence) ≈ 20 minutes
 ```
 
-自适应逻辑的参数可以由用户配置：
-- 默认：枚举 Top 20 肽 → SoDoPE 评分 → 取 top 30 construct 进 3D
-- 激进模式：枚举 Top 80 肽 → 1440 construct，SoDoPE 也很轻松（<1 sec）
-- 保守模式：枚举 Top 10 肽 → 180 construct，减少计算量
+The parameters of the adaptive logic can be configured by the user:
+- Default: enumerate Top 20 peptides → SoDoPE scoring → take the top 30 constructs into 3D
+- Aggressive mode: enumerate Top 80 peptides → 1440 constructs; SoDoPE handles this easily (<1 sec)
+- Conservative mode: enumerate Top 10 peptides → 180 constructs, reducing computation
 
 ---
 
-## 六、"只跑部分阶段"的设计
+## 6. The “Run Only Some Stages” Design
 
-用户可能不需要每次都跑完整流程。比如只想做肽级筛选（阶段一到三），不做 3D 预测。或者已经有 PDB 文件了，只想做 PDB 评估（阶段六）。
+Users may not need to run the full flow every time. For example, they may want only peptide-level screening (Stages 1 to 3) without 3D prediction. Or they may already have PDB files and want only PDB evaluation (Stage 6).
 
-每个阶段的输出都写入 output 目录，格式自描述（包含参数快照）。下次运行时，pipeline 检查 output 目录，如果存在且参数未变，直接跳过该阶段。
+Each stage's output is written to the output directory in a self-describing format (including a parameter snapshot). On the next run, the pipeline checks the output directory and skips that stage directly if it exists and the parameters are unchanged.
 
-这个机制也让调试更友好：阶段一跑完后如果发现配置错了，修好配置后重新运行，pipeline 自动从阶段二开始，不用重跑几千条的过滤。
-
----
-
-## 七、配置项设计
-
-配置项分两类：
-
-筛选策略类（影响 pipeline 的行为）：
-- 功能类型：当前要筛选什么功能的肽（抗氧化、抗菌、抗糖化……）
-- 各阶段的保留目标：阶段二保留百分之几、阶段三期望保留多少条
-- 自适应模式：保守 / 平衡 / 激进
-- 枚举规则：两端是否可以不同肽、是否统一 Linker
-- 权重：各评分服务的权重（有默认值，可覆盖）
-
-运行模式类（不影响筛选结果，只影响运行方式）：
-- 测试模式：只加载 100 或 1000 条，验证流程是否正确
-- 缓存路径、输出路径
-- 跳过哪些阶段（从头跑、从阶段二开始、只跑 PDB 评估……）
-
-这些配置放在 `.env` 文件中，pipeline 启动时读取。所有项都有默认值，用户只需要覆盖需要改的。换功能类型（比如从抗氧化改成抗菌），只需要改 `FUNCTION_TYPE=antimicrobial`。
+This mechanism also makes debugging friendlier: if you find a configuration error after Stage 1 finishes, fix the configuration and rerun, and the pipeline automatically starts from Stage 2 without rerunning the filtering of several thousand sequences.
 
 ---
 
-## 八、实现策略：走一步看一步
+## 7. Configuration Item Design
 
-不尝试一次性实现完整 pipeline。改为逐步构建，每步产出可用的中间结果，根据实际情况调整下一步。
+Configuration items fall into two categories:
 
-### 第一步：阶段一（硬过滤）
+Screening-strategy type (affects pipeline behavior):
+- Function type: which function of peptide to screen for (antioxidant, antimicrobial, anti-glycation, …)
+- Retention targets per stage: what percentage to retain in Stage 2, how many sequences are expected to be retained in Stage 3
+- Adaptive mode: conservative / balanced / aggressive
+- Enumeration rules: whether the two ends may carry different peptides, whether the linker is unified
+- Weights: the weight of each scoring service (defaults exist and can be overridden)
 
-在 `main/pipeline.py` 中实现阶段一的逻辑：加载数据 → 调用 ToxinPred3 + AlgPred2 → 输出过滤后的肽列表。
+Run-mode type (does not affect screening results, only how it runs):
+- Test mode: load only 100 or 1000 sequences to verify that the flow is correct
+- Cache path, output path
+- Which stages to skip (run from scratch, start from Stage 2, run only PDB evaluation, …)
 
-**产出**：安全的肽候选集，写入 `output/stage01/`。
-**可验证**：检查输出中是否排除了已知有毒/致敏肽。
-**耗时**：~25 秒（25000 条）。
-
-### 第二步：阶段二（快速评分 + 排序）
-
-接阶段一的输出（107 条）→ 调用 AnOxPePred + MHCflurry + pLM4CPPs + BepiPred-3.0 + GraphCPP → 加权评分 → 取前 50-80 条。
-
-**注**：TIPred（酪氨酸酶抑制）不参与抗氧化评分。SoDoPE（溶解度）移到 construct 级别评估。
-
-**产出**：排名前 50-80 的功能肽列表，写入 `output/stage02/`。
-**可验证**：排名靠前的肽在抗氧化活性上是否明显优于靠后的。
-**耗时**：~5-10 秒（107 条量极小）。
-
-### 第三步：阶段三（精确评分，可选）
-
-接阶段二的 top 80 → 如果有 TemStaPro 模型就绪，补充热稳定性评分（权重 0.05）；如果未就绪，跳过。
-
-**产出**：可选的重排名结果，写入 `output/stage03/`（如果跳过，阶段四直接从阶段二读数）。
-**耗时**：~5 秒（80 条，如果 TemStaPro 可用）。
-
-### 第四步：阶段四（枚举 + Construct FASTA 评分）
-
-接阶段二的 top 80 → 枚举 Top 20 肽 × 6 Linker × 3 位置 = 360 construct → 调用 SoDoPE 评分 → **按（肽, Linker）分组，组内取最高分** → 选 Top K 组 → 输出全部 position。
-
-每组对应 3 个 position（N/C/Both），全部进入 3D 结构预测。
-目标：K=10 → 30 个 construct；或 K=15 → 45 个 construct（ESMFold 跑得起）。
-
-**产出**：Top K 组 × 3 position = K×3 个 construct（含综合评分、FASTA 序列），写入 `output/stage04/`。
-**可验证**：选中的组在 position 间的分差是否合理（有助于判断哪个位置最优）。
-**耗时**：枚举 < 0.1 秒 + SoDoPE < 1 秒 = 瞬间。
-
-**注**：SoDoPE 移到此处做 construct FASTA 评分，阶段六不再需要重复执行。
-
-### 第五步：阶段五（3D 结构预测）
-
-接阶段四的 top 30 construct → ESMFold 预测 3D 结构 → pLDDT 置信度过滤 → 低置信度构造可选提交 AF3。
-
-**产出**：每个 construct 的 PDB 文件 + 置信度评分，写入 `output/stage05/`。
-**可验证**：PDB 文件是否能被 PyMOL/VMD 正常打开、pLDDT 分布是否合理。
-**耗时**：~20 分钟（ESMFold，30 条，并发 3）。
-
-### 第六步：阶段六（PDB 评估 + 报告）
-
-接阶段五的 PDB 文件 → SASA + Aggrescan3D → 汇总肽评分 + SoDoPE 溶解度 + PDB 评分 → 生成最终排名报告。
-SoDoPE 已在阶段四完成，此处不再重复。
-
-**产出**：最终排名报告（含肽评分、SoDoPE、pLDDT、SASA、Aggrescan3D），写入 `output/stage06/`。
-**可验证**：排名前几的 construct 是否在各方面表现一致。
-**耗时**：~1-12 小时（Aggrescan3D 是瓶颈）。
-
-### 回退策略
-
-任何一步如果发现数据质量、微服务可用性或时间成本与预期不符，都可以：
-- 在该步停下，接受之前的输出作为最终结果
-- 调整参数后从该步重跑（读上一步的缓存）
-- 跳过该步（例如不做 3D 预测）
-
-这个策略保证了每步都有产出，不会出现"写到一半发现全盘推翻"的情况。
+These configurations live in a `.env` file and are read when the pipeline starts. All items have defaults, so users only need to override what they want to change. Switching function type (for example, from antioxidant to antimicrobial) requires changing only `FUNCTION_TYPE=antimicrobial`.
 
 ---
 
-## 九、AI 执行者上下文管理
+## 8. Implementation Strategy: One Step at a Time
 
-本方案的主要执行者是 Claude（AI 代码助手），其上下文窗口有限。每次会话结束后，Claude 的"记忆"仅保留在磁盘上的文件中。以下机制确保执行者能在中断后恢复。
+Do not try to implement the whole pipeline at once. Instead build it step by step, producing usable intermediate results at each step, and adjust the next step based on actual conditions.
 
-### 9.1 外部状态锚点
+### Step 1: Stage 1 (Hard Filtering)
+
+Implement the Stage 1 logic in `main/pipeline.py`: load data → call ToxinPred3 + AlgPred2 → output the filtered peptide list.
+
+**Output**: a safe set of peptide candidates, written to `output/stage01/`.
+**Verifiable**: check whether known toxic/allergenic peptides are excluded from the output.
+**Time**: ~25 seconds (25000 sequences).
+
+### Step 2: Stage 2 (Fast Scoring + Ranking)
+
+Take Stage 1's output (107 sequences) → call AnOxPePred + MHCflurry + pLM4CPPs + BepiPred-3.0 + GraphCPP → weighted scoring → take the top 50-80 sequences.
+
+**Note**: TIPred (tyrosinase inhibition) does not participate in antioxidant scoring. SoDoPE (solubility) is moved to construct-level evaluation.
+
+**Output**: a list of the top 50-80 functional peptides, written to `output/stage02/`.
+**Verifiable**: whether the top-ranked peptides are clearly superior in antioxidant activity to those ranked lower.
+**Time**: ~5-10 seconds (107 sequences is a tiny volume).
+
+### Step 3: Stage 3 (Precise Scoring, Optional)
+
+Take Stage 2's top 80 → if a TemStaPro model is ready, add thermostability scores (weight 0.05); if not ready, skip.
+
+**Output**: optional reranked results, written to `output/stage03/` (if skipped, Stage 4 reads directly from Stage 2).
+**Time**: ~5 seconds (80 sequences, if TemStaPro is available).
+
+### Step 4: Stage 4 (Enumeration + Construct FASTA Scoring)
+
+Take Stage 2's top 80 → enumerate Top 20 peptides × 6 linkers × 3 positions = 360 constructs → call SoDoPE scoring → **group by (peptide, linker), take the highest score within each group** → select the Top K groups → output all positions.
+
+Each group corresponds to 3 positions (N/C/Both), all of which enter 3D structure prediction.
+Targets: K=10 → 30 constructs; or K=15 → 45 constructs (ESMFold can handle it).
+
+**Output**: Top K groups × 3 positions = K×3 constructs (with composite scores and FASTA sequences), written to `output/stage04/`.
+**Verifiable**: whether the score gaps between positions within the selected groups are reasonable (helps determine which position is optimal).
+**Time**: enumeration < 0.1 seconds + SoDoPE < 1 second = instant.
+
+**Note**: SoDoPE is moved to this point to do construct FASTA scoring, so Stage 6 no longer needs to run it again.
+
+### Step 5: Stage 5 (3D Structure Prediction)
+
+Take Stage 4's top 30 constructs → ESMFold predicts 3D structures → pLDDT confidence filtering → low-confidence constructs can optionally be submitted to AF3.
+
+**Output**: a PDB file plus a confidence score for each construct, written to `output/stage05/`.
+**Verifiable**: whether the PDB files open normally in PyMOL/VMD, and whether the pLDDT distribution is reasonable.
+**Time**: ~20 minutes (ESMFold, 30 sequences, concurrency 3).
+
+### Step 6: Stage 6 (PDB Evaluation + Report)
+
+Take Stage 5's PDB files → SASA + Aggrescan3D → aggregate peptide scores + SoDoPE solubility + PDB scores → generate the final ranking report.
+SoDoPE is already done in Stage 4, so it is not repeated here.
+
+**Output**: the final ranking report (including peptide scores, SoDoPE, pLDDT, SASA, Aggrescan3D), written to `output/stage06/`.
+**Verifiable**: whether the top-ranked constructs perform consistently across all aspects.
+**Time**: ~1-12 hours (Aggrescan3D is the bottleneck).
+
+### Fallback Strategy
+
+If at any step the data quality, microservice availability, or time cost turns out to differ from expectations, you can:
+- Stop at that step and accept the previous output as the final result
+- Adjust parameters and rerun from that step (reading the previous step's cache)
+- Skip that step (for example, skip 3D prediction)
+
+This strategy ensures that every step produces output, so the situation never arises where you write half of it and then discover that everything must be overturned.
+
+---
+
+## 9. Context Management for the AI Executor
+
+The main executor of this plan is Claude (an AI coding assistant), whose context window is limited. After each session ends, Claude's “memory” exists only in files on disk. The following mechanisms ensure that the executor can recover after an interruption.
+
+### 9.1 External State Anchors
 
 ```
 output/
-├── STATUS.md              ← 最新状态指针（随时打开即知进度）
+├── STATUS.md              ← latest state pointer (open it anytime to see progress)
 ├── status/
-│   ├── status_2026-05-13_2301.md   ← 时间戳快照，每次变更存档
+│   ├── status_2026-05-13_2301.md   ← timestamped snapshot, archived on every change
 │   ├── status_2026-05-13_2311.md
 │   └── status_2026-05-13_2315.md
-├── stage01_filter/        ← 每阶段独立目录
-│   ├── README.md          ← 该阶段的完整报告（做了什么、为什么、结果是什么）
-│   ├── run.log            ← 原始运行日志
-│   └── round1_toxinpred3/ ← 每轮的详细数据
-│       ├── passed.csv     ← 通过数据
-│       └── failed.csv     ← 淘汰数据（可追溯每条的淘汰原因）
+├── stage01_filter/        ← independent directory per stage
+│   ├── README.md          ← full report for this stage (what was done, why, what the results were)
+│   ├── run.log            ← raw run log
+│   └── round1_toxinpred3/ ← detailed data per round
+│       ├── passed.csv     ← passed data
+│       └── failed.csv     ← eliminated data (the elimination reason for each entry is traceable)
 └── stage02_score/
     └── ...
 ```
 
-**恢复协议**：
-1. 打开 `output/STATUS.md` → 知道当前进度、配置、下一步
-2. 打开最新阶段的 `README.md` → 知道上一步的决策和结果
-3. 读 `passed.csv`（几千字节到几十千字节，远比原始数据小）→ 获得输入数据
-4. 继续下一阶段
+**Recovery protocol**:
+1. Open `output/STATUS.md` → know the current progress, configuration, and next step
+2. Open the latest stage's `README.md` → know the previous step's decisions and results
+3. Read `passed.csv` (a few KB to a few tens of KB, far smaller than the raw data) → obtain the input data
+4. Continue with the next stage
 
-### 9.2 为什么独立脚本
+### 9.2 Why Standalone Scripts
 
-每个阶段是独立的 Python 脚本（`main/stages/stageXX_*.py`），而非一个巨大的 `pipeline.py`：
-- **单脚本可独立运行**：`python -m main.stages.stage01_filter`，不依赖编排器
-- **脚本内容自描述**：顶部有注释说明输入输出和用法
-- **失败隔离**：阶段一失败不影响阶段二的代码
-- **参数灵活**：每个脚本可独立调整参数（阈值、权重等），不影响其他阶段
+Each stage is an independent Python script (`main/stages/stageXX_*.py`) rather than one giant `pipeline.py`:
+- **A single script runs independently**: `python -m main.stages.stage01_filter`, with no dependency on an orchestrator
+- **Script content is self-describing**: comments at the top explain the inputs, outputs, and usage
+- **Failure isolation**: a Stage 1 failure does not affect Stage 2's code
+- **Flexible parameters**: each script can adjust its parameters (thresholds, weights, etc.) independently without affecting other stages
 
-### 9.3 文件即记忆
+### 9.3 Files as Memory
 
-执行者不记忆数据，只记忆路径：
-- 处理过的 1843 条肽 → 不需要记住任何一条序列，只知道它们存在 `output/stage01_filter/`
-- 微服务的返回结果 → 写入 JSON/CSV，不占用对话
-- 淘汰原因 → 写入 failed.csv，每行都有对应轮次的服务名和分数
-- 决策理由 → 写入 README.md，下次回来直接读
+The executor does not remember data, only paths:
+- The 1843 processed peptides → no need to remember any single sequence, just that they exist in `output/stage01_filter/`
+- Microservice responses → written to JSON/CSV, occupying no conversation context
+- Elimination reasons → written to failed.csv, where each row has the corresponding round's service name and score
+- Decision rationale → written to README.md, read directly next time
 
-### 9.4 时间戳审计轨迹
+### 9.4 Timestamped Audit Trail
 
-每次关键操作（阶段完成、配置变更、决策调整）都保存一个带时间戳的 STATUS.md 快照到 `output/status/`。任何人都可以回溯 pipeline 的完整演化过程：第一次跑了什么结果、改了什么参数、第二次有什么不同。
-
----
-
-## 九、开放问题
-
-**ESMFold 的实际推理速度**：1-3 分钟是针对 350+ aa 融合蛋白的估算。首次冷启动（模型加载到 GPU）需要 ~30-60 秒。需要跑一次实测确认真实吞吐。
-
-**ESMFold 的并发安全数**：3 并发需要 ~24 GB 显存，48 GB 环境理论上可以开到 4-5 并发。但如果每个 ESMFold 进程的峰值显存超过 8 GB，需要调低。在实际 GPU 上跑一次压力测试来确定。
-
-**AF3 首次运行 vs 后续运行的时间差**：6 aa 跑了 2 小时，其中多少是数据库安装？后续 350+ aa 的 construct 每条实际要多久？这个数据决定了"关键 construct 用 AF3 验证"是否现实。
-
-**TemStaPro 要不要跑**：它占 6 GB 显存、3 GB 模型、20 条/秒吞吐，但不在权重表里。如果只是为了给最终报告添加热稳定性参考，可以用 CPU 模式跑在最终几十条上。如果不需要，直接跳过，省下十几分钟和 6 GB。
-
-**Aggrescan3D 的单条耗时（1-15 分钟）和并发限制（2）**，在 50 个 construct 上可能跑 4-6 小时。这个时间可能反超 ESMFold 的结构预测时间。如果时间紧张，Aggrescan3D 的评估可以考虑推迟到最终选出 TOP 10 之后再做。
-
-**AlphaFold3 是否还要保留**：硬件可用（48 GB 显存），但 6 aa 跑了 2 小时（含首次数据库安装）。如果后续 350+ aa 每条稳定在 30-60 分钟，仅在 ESMFold pLDDT < 70 的关键 construct 上用 AF3 验证是可行的。如果每次都要 2 小时，那就跳过。
-
-
+Every key operation (stage completion, configuration change, decision adjustment) saves a timestamped snapshot of STATUS.md to `output/status/`. Anyone can trace the pipeline's full evolution: what results the first run produced, what parameters were changed, and what was different the second time.
 
 ---
 
+## 9. Open Questions
+
+**Actual inference speed of ESMFold**: The 1-3 minutes figure is an estimate for 350+ aa fusion proteins. The first cold start (loading the model onto the GPU) takes ~30-60 seconds. A real measurement is needed to confirm the true throughput.
+
+**Safe concurrency for ESMFold**: 3 concurrent runs need ~24 GB of VRAM; a 48 GB environment could theoretically go to 4-5 concurrent runs. But if each ESMFold process peaks above 8 GB of VRAM, that must be lowered. Run a stress test on the actual GPU to determine it.
+
+**Time gap between AF3's first run and later runs**: A 6 aa sequence took 2 hours — how much of that was database installation? How long does each subsequent 350+ aa construct actually take? This data determines whether “validating key constructs with AF3” is realistic.
+
+**Whether to run TemStaPro**: It occupies 6 GB of VRAM, a 3 GB model, and 20 seq/s throughput, but it is not in the weight table. If it is only to add a thermostability reference to the final report, it can be run in CPU mode on the final few dozen sequences. If not needed, simply skip it and save a dozen-plus minutes and 6 GB.
+
+**Aggrescan3D's per-sequence time (1-15 minutes) and concurrency limit (2)** may mean 4-6 hours on 50 constructs. This time may exceed ESMFold's structure prediction time. If time is tight, Aggrescan3D evaluation can be deferred until the final TOP 10 has been selected.
+
+**Whether AlphaFold3 should still be kept**: The hardware is available (48 GB VRAM), but a 6 aa sequence took 2 hours (including the first database installation). If subsequent 350+ aa sequences stabilize at 30-60 minutes each, it is feasible to use AF3 only to validate the key constructs where ESMFold pLDDT < 70. If every run takes 2 hours, skip it.
+
+
+
 ---
 
+---

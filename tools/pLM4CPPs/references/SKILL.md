@@ -1,78 +1,80 @@
 ---
 name: pLM4CPPs
-description: 当需要预测细胞穿膜肽(CPP)、提取ESM2蛋白质语言模型嵌入向量、或评估融合肽的递送潜力时触发此技能。适用于本地批量预测、特征工程、以及与机器学习模型集成。
+description: Trigger this skill when you need to predict cell-penetrating peptides (CPPs), extract ESM2 protein language model embeddings, or evaluate the delivery potential of fusion peptides. Suitable for local batch prediction, feature engineering, and integration with machine learning models.
 created: 2026-04-18
 version: 1.0.1
 last_updated: 2026-04-25
 ---
 
-# pLM4CPPs - 细胞穿膜肽预测工具
+> **English** | [中文](SKILL.zh.md)
 
-## 工具定位
+# pLM4CPPs - Cell-Penetrating Peptide Prediction Tool
 
-### 解决什么问题
-pLM4CPPs 是一个基于蛋白质语言模型（ESM2）的细胞穿膜肽（Cell Penetrating Peptide, CPP）预测工具，提供：
-- **CPP二分类预测**：给定肽序列，输出CPP概率分数（0-1）
-- **ESM2嵌入向量提取**：生成320/480/640/1280维的序列表示向量
-- **批量处理能力**：支持大规模候选肽筛选
+## Tool Positioning
 
-### 适合平台的哪一层
-在 iGEM 融合肽平台中，pLM4CPPs 适合用于：
-1. **递送潜力评估层**：作为"递送/透皮相关"的序列层 proxy
-2. **粗筛层**：在全排列之前剔除明显不具备穿膜能力的候选序列
-3. **特征工程层**：ESM2嵌入向量可作为下游机器学习模型的输入特征
+### What Problem It Solves
+pLM4CPPs is a cell-penetrating peptide (CPP) prediction tool based on a protein language model (ESM2), providing:
+- **CPP binary classification prediction**: given peptide sequences, outputs CPP probability scores (0-1)
+- **ESM2 embedding extraction**: generates 320/480/640/1280-dimensional sequence representation vectors
+- **Batch processing capability**: supports large-scale candidate peptide screening
 
-### 科学背景
-- 论文：Kumar, N., et al. (2025). pLM4CPPs: Protein Language Model-Based Predictor for Cell Penetrating Peptides. J. Chem. Inf. Model. DOI: 10.1021/acs.jcim.4c01338
-- 架构：ESM2嵌入 + 1D-CNN分类器
-- 性能：Accuracy ~92%, AUC ~0.89
+### Which Layer of the Platform It Fits
+In the iGEM fusion peptide platform, pLM4CPPs is suitable for:
+1. **Delivery potential assessment layer**: acts as a sequence-level proxy for "delivery/transdermal-related" properties
+2. **Coarse screening layer**: removes candidate sequences clearly lacking membrane-penetrating ability before full permutation
+3. **Feature engineering layer**: ESM2 embeddings can serve as input features for downstream machine learning models
+
+### Scientific Background
+- Paper: Kumar, N., et al. (2025). pLM4CPPs: Protein Language Model-Based Predictor for Cell Penetrating Peptides. J. Chem. Inf. Model. DOI: 10.1021/acs.jcim.4c01338
+- Architecture: ESM2 embeddings + 1D-CNN classifier
+- Performance: Accuracy ~92%, AUC ~0.89
 
 ---
 
-## 安装方式
+## Installation
 
-### 1. 确保虚拟环境已创建
+### 1. Ensure the virtual environment has been created
 ```bash
 cd pLM4CPPs/
 uv sync
 ```
 
-### 2. 确保依赖已安装
+### 2. Ensure the dependencies are installed
 ```bash
 uv pip install fair-esm tensorflow scikit-learn pandas numpy h5py biopython torch
 ```
 
-### 3. 预训练模型
-预训练模型已包含在克隆的仓库中：
+### 3. Pretrained model
+The pretrained model is already included in the cloned repository:
 ```
 pLM4CPPs-main/models/ESM2-320/best_model_320.h5
 ```
 
-### 依赖列表
-| 包名 | 用途 | 版本要求 |
+### Dependency List
+| Package name | Purpose | Version requirement |
 |------|------|----------|
-| fair-esm | ESM2蛋白质语言模型 | >=2.0.0 |
-| torch | 深度学习框架 | >=2.0.0 |
-| tensorflow/keras | CNN模型推理 | >=2.0.0 |
-| scikit-learn | 数据标准化 | >=1.0.0 |
-| pandas | 数据处理 | >=1.0.0 |
-| numpy | 数值计算 | >=1.20.0 |
-| h5py | 模型文件格式 | >=3.0.0 |
+| fair-esm | ESM2 protein language model | >=2.0.0 |
+| torch | Deep learning framework | >=2.0.0 |
+| tensorflow/keras | CNN model inference | >=2.0.0 |
+| scikit-learn | Data normalization | >=1.0.0 |
+| pandas | Data processing | >=1.0.0 |
+| numpy | Numerical computation | >=1.20.0 |
+| h5py | Model file format | >=3.0.0 |
 
 ---
 
-## 核心脚本
+## Core Scripts
 
-### `predict.py` - 统一预测入口
+### `predict.py` - Unified Prediction Entry Point
 
-这是技能的核心脚本，提供 Python API 和 CLI 两种使用方式。
+This is the core script of the skill, providing both a Python API and a CLI.
 
-#### Python API 使用
+#### Python API Usage
 
 ```python
 from predict import predict_cpp, generate_esm2_embeddings, cpp_prediction_pipeline
 
-# 基础预测
+# Basic prediction
 sequences = [
     ("TAT", "RKKRRQRRR"),
     ("Penetratin", "RQIKIWFQNRRMKWKK"),
@@ -81,41 +83,41 @@ sequences = [
 results = predict_cpp(sequences)
 print(results)
 
-# 输出：
+# Output:
 #         ID         Sequence  CPP_Probability  CPP_Prediction Prediction_Label
 # 0      TAT        RKKRRQRRR          1.000000               1              CPP
 # 1 Penetratin RQIKIWFQNRRMKWKK          0.000000               0          non-CPP
 # 2   PolyArg         RRRRRRRR          1.000000               1              CPP
 
-# 仅生成嵌入向量
+# Generate embeddings only
 embeddings = generate_esm2_embeddings(sequences)
 print(f"Embedding shape: {embeddings.shape}")  # (3, 320)
 
-# 自动管道（模型不可用时使用启发式）
+# Automatic pipeline (uses heuristics when the model is unavailable)
 results = cpp_prediction_pipeline(sequences)
 ```
 
-#### CLI 使用
+#### CLI Usage
 
 ```bash
-# 基础预测
+# Basic prediction
 python predict.py -i input.csv -o predictions.csv
 
-# 仅生成嵌入
+# Generate embeddings only
 python predict.py -i input.csv --embeddings-only -o embeddings.csv
 
-# 自定义阈值
+# Custom threshold
 python predict.py -i input.csv -o predictions.csv --threshold 0.7
 
-# 禁用启发式 fallback（模型不可用时报错而非降级）
+# Disable the heuristic fallback (raise an error instead of degrading when the model is unavailable)
 python predict.py -i input.csv -o predictions.csv --no-heuristic
 ```
 
 ---
 
-## 输入输出
+## Inputs and Outputs
 
-### 输入格式（CSV）
+### Input Format (CSV)
 ```csv
 ID,Sequence
 TAT,RKKRRQRRR
@@ -123,24 +125,24 @@ Penetratin,RQIKIWFQNRRMKWKK
 PolyArg,RRRRRRRR
 ```
 
-### 输出格式（CSV）
+### Output Format (CSV)
 ```csv
 ID,Sequence,CPP_Probability,CPP_Prediction,Prediction_Label
 TAT,RKKRRQRRR,1.0,1,CPP
 Penetratin,RQIKIWFQNRRMKWKK,0.0,0,non-CPP
 ```
 
-### 输出字段说明
-| 字段 | 类型 | 说明 |
+### Output Field Descriptions
+| Field | Type | Description |
 |------|------|------|
-| ID | string | 序列标识符 |
-| Sequence | string | 输入的肽序列 |
-| CPP_Probability | float | CPP概率分数（0-1） |
-| CPP_Prediction | int | 二分类预测（0=non-CPP, 1=CPP） |
-| Prediction_Label | string | 预测标签（CPP/non-CPP） |
+| ID | string | Sequence identifier |
+| Sequence | string | Input peptide sequence |
+| CPP_Probability | float | CPP probability score (0-1) |
+| CPP_Prediction | int | Binary prediction (0=non-CPP, 1=CPP) |
+| Prediction_Label | string | Prediction label (CPP/non-CPP) |
 
-### 嵌入向量输出
-可导出ESM2嵌入向量（320维）：
+### Embedding Output
+ESM2 embeddings (320 dimensions) can be exported:
 ```csv
 ,0,1,2,...,319
 TAT,0.123,-0.456,0.789,...
@@ -149,81 +151,81 @@ Penetratin,0.234,-0.567,0.890,...
 
 ---
 
-## ESM2 模型选择
+## ESM2 Model Selection
 
-| 模型 | 嵌入维度 | 参数量 | 速度 | 精度 |
+| Model | Embedding dimensions | Parameters | Speed | Accuracy |
 |------|----------|--------|------|------|
-| esm2_t6_8M_UR50D | 320 | 8M | 最快 | 良好 |
-| esm2_t12_35M_UR50D | 480 | 35M | 中等 | 更好 |
-| esm2_t30_150M_UR50D | 640 | 150M | 较慢 | 最佳 |
-| esm2_t33_650M_UR50D | 1280 | 650M | 最慢 | 最高 |
+| esm2_t6_8M_UR50D | 320 | 8M | Fastest | Good |
+| esm2_t12_35M_UR50D | 480 | 35M | Medium | Better |
+| esm2_t30_150M_UR50D | 640 | 150M | Slower | Best |
+| esm2_t33_650M_UR50D | 1280 | 650M | Slowest | Highest |
 
-默认使用 `esm2_t6_8M_UR50D`。
+The default is `esm2_t6_8M_UR50D`.
 
-### ESM2模型缓存位置
+### ESM2 Model Cache Location
 - macOS: `~/.cache/torch/hub/checkpoints/`
 - Linux: `~/.cache/torch/hub/checkpoints/`
 - Windows: `C:\Users\<username>\.cache\torch\hub\checkpoints\`
 
 ---
 
-## 批量能力
+## Batch Capability
 
-### 验证结果（实测）
-| 序列数量 | 处理时间 | 平均每条 | 内存占用 |
+### Validation Results (Measured)
+| Number of sequences | Processing time | Average per sequence | Memory usage |
 |----------|----------|----------|----------|
-| 4条 | ~10秒 | ~2.5秒 | ~500MB |
-| 100条 | ~30秒 | ~0.3秒 | ~800MB |
+| 4 sequences | ~10 seconds | ~2.5 seconds | ~500MB |
+| 100 sequences | ~30 seconds | ~0.3 seconds | ~800MB |
 
-注：首次运行会下载 ESM2 模型权重（约30MB）。
-
----
-
-## 局限性
-
-### 短肽限制
-- **最小长度**：建议至少5个氨基酸
-- **极短肽（<5 aa）**：嵌入向量可能不稳定
-
-### 融合肽限制
-- **融合位点影响**：模型基于单一肽序列训练，对融合肽连接区域可能敏感
-- **建议策略**：对融合肽各功能域分别预测，取最高分作为整体递送潜力评估
-
-### Linker场景限制
-- **柔性Linker**（如GGGGS）：可能降低整体CPP概率
-- **刚性Linker**：可能产生不同影响
-- **建议**：设计时将linker长度和组成纳入优化考量
-
-### 其他局限性
-1. **训练数据偏差**：对新型CPP结构预测能力可能有限
-2. **实验条件差异**：实际穿膜效率受细胞类型、浓度等条件影响
-3. **非标准氨基酸**：不支持化学修饰的肽序列
+Note: the first run downloads the ESM2 model weights (about 30MB).
 
 ---
 
-## 融合引擎集成示例
+## Limitations
+
+### Short Peptide Limitations
+- **Minimum length**: at least 5 amino acids recommended
+- **Very short peptides (<5 aa)**: embeddings may be unstable
+
+### Fusion Peptide Limitations
+- **Fusion site effects**: the model is trained on single peptide sequences and may be sensitive to the junction region of a fusion peptide
+- **Recommended strategy**: predict each functional domain of the fusion peptide separately and take the highest score as the overall delivery potential assessment
+
+### Linker Scenario Limitations
+- **Flexible linkers** (e.g., GGGGS): may reduce the overall CPP probability
+- **Rigid linkers**: may have different effects
+- **Recommendation**: take linker length and composition into account during design optimization
+
+### Other Limitations
+1. **Training data bias**: prediction capability for novel CPP structures may be limited
+2. **Differences in experimental conditions**: actual membrane penetration efficiency is affected by cell type, concentration, and other conditions
+3. **Non-standard amino acids**: chemically modified peptide sequences are not supported
+
+---
+
+## Fusion Engine Integration Example
 
 ```python
-# 融合引擎调用示例
+# Example call from the fusion engine
 from predict import cpp_prediction_pipeline
 
 def evaluate_fusion_peptide(peptide_a, linker, peptide_b):
-    """评估融合肽的递送潜力"""
-    # 组成完整序列
+    """Evaluate the delivery potential of a fusion peptide"""
+    # Assemble the full sequence
     full_seq = peptide_a + linker + peptide_b
 
-    # 预测CPP概率
+    # Predict the CPP probability
     results = cpp_prediction_pipeline([("fusion", full_seq)])
     cpp_prob = results["CPP_Probability"].iloc[0]
 
-    # 返回递送潜力分数
+    # Return the delivery potential score
     return {
         "full_sequence": full_seq,
         "cpp_probability": cpp_prob,
         "delivery_score": cpp_prob if cpp_prob > 0.5 else cpp_prob * 0.5
     }
 
-# 使用
+# Usage
 result = evaluate_fusion_peptide("RKKRRQRRR", "GGGGS", "AAGGGAGG")
 print(f"CPP Probability: {result['cpp_probability']:.4f}")
 print(f"Delivery Score: {result['delivery_score']:.4f}")
@@ -231,46 +233,46 @@ print(f"Delivery Score: {result['delivery_score']:.4f}")
 
 ---
 
-## Web服务
-官方提供Web服务器：https://ry2acnp6ep.us-east-1.awsapprunner.com
+## Web Service
+The official web server is provided at: https://ry2acnp6ep.us-east-1.awsapprunner.com
 
 ---
 
-## 验证状态
+## Validation Status
 
-| 功能 | 状态 | 备注 |
+| Feature | Status | Notes |
 |------|------|------|
-| 依赖安装 | ✅ 已验证 | uv + pip安装成功 |
-| ESM2嵌入生成 | ✅ 已验证 | 320维向量正确生成 |
-| CPP模型预测 | ✅ 已验证 | ESM2-320 + CNN 正常工作 |
-| Python API | ✅ 已验证 | predict.py 可导入 |
-| CLI接口 | ✅ 已验证 | predict.py -i -o 正常工作 |
-| 启发式fallback | ✅ 已验证 | 模型不可用时正常降级 |
-| 批量处理 | ✅ 已验证 | 4序列/10秒 |
+| Dependency installation | ✅ Verified | uv + pip installation succeeded |
+| ESM2 embedding generation | ✅ Verified | 320-dimensional vectors generated correctly |
+| CPP model prediction | ✅ Verified | ESM2-320 + CNN works normally |
+| Python API | ✅ Verified | predict.py can be imported |
+| CLI interface | ✅ Verified | predict.py -i -o works normally |
+| Heuristic fallback | ✅ Verified | Degrades normally when the model is unavailable |
+| Batch processing | ✅ Verified | 4 sequences/10 seconds |
 
 ---
 
-## 文件结构
+## File Structure
 
 ```
 pLM4CPPs/
-├── SKILL.md              # 本文件
-├── predict.py            # 核心预测脚本（新增）
-├── pyproject.toml        # 项目配置
-├── .venv/                # Python虚拟环境
-└── pLM4CPPs-main/        # 官方GitHub仓库
-    ├── models/           # 预训练模型
+├── SKILL.md              # This file
+├── predict.py            # Core prediction script (newly added)
+├── pyproject.toml        # Project configuration
+├── .venv/                # Python virtual environment
+└── pLM4CPPs-main/        # Official GitHub repository
+    ├── models/           # Pretrained models
     │   └── ESM2-320/
     │       └── best_model_320.h5
     ├── notebooks/        # Jupyter notebooks
     │   ├── ESM2_320_embeddings.ipynb
     │   └── Prediction.ipynb
-    └── dataset/          # 训练数据
+    └── dataset/          # Training data
 ```
 
 ---
 
-## 参考文献
+## References
 
 1. Kumar, N., et al. (2025). pLM4CPPs: Protein Language Model-Based Predictor for Cell Penetrating Peptides. J. Chem. Inf. Model. DOI: 10.1021/acs.jcim.4c01338
 2. Lin, Z., et al. (2023). Evolutionary-scale prediction of atomic-level protein structure with a language model. Science.

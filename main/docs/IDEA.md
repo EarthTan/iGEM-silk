@@ -1,89 +1,90 @@
+> **English** | [中文](IDEA.zh.md)
+
 # Pipeline
 
-### Pipeline 设计原则
+### Pipeline design principles
 
 1. 
 
 
 
-### 整体思路
+### Overall approach
 
-是这样的：首先，我们要设计的肽融合肽具有特定的结构，包含刚性部分（Beta 折叠）和柔性部分，结尾还有一个由 6 个组氨酸构成的钩子（His-tag），它对于蛋白质的聚集等特性至关重要。
+It goes like this: first, the fusion peptide we want to design has a specific structure, containing a rigid part (Beta sheet) and a flexible part, and at the end there is also a hook made of 6 histidines (His-tag), which is crucial for properties such as protein aggregation.
 
-我们构建融合肽的原材料主要有三种：
-1. 丝素蛋白（作为基础骨架，选自论文中挖掘出的最优序列）
-2. Linker（连接子）
-3. 功能肽
+We have three main raw materials for building the fusion peptide:
+1. Silk fibroin (as the base scaffold, selected from the best sequence mined from the literature)
+2. Linker
+3. Functional peptide
 
-组合的逻辑是以丝素蛋白为基础，将功能肽调换位置放入，并用 Linker 在接触位置相连。例如，可以采用“功能肽 + Linker + 丝素蛋白”的结构，或者“丝素蛋白 + Linker + 功能肽 + Linker + 6 组氨酸钩子”的结构。需要注意的是，这 6 个组氨酸构成的钩子无论如何都必须放在序列的最右端。
+The logic of combination is to take silk fibroin as the base, insert the functional peptide at different positions, and connect them at the contact points with a Linker. For example, a "functional peptide + Linker + silk fibroin" structure can be used, or a "silk fibroin + Linker + functional peptide + Linker + 6-histidine hook" structure. Note that the hook made of these 6 histidines must in any case be placed at the far right end of the sequence.
 
-整个筛选与构建流程分为三步走：
+The whole screening and construction workflow is divided into three steps:
 
-1. 基于 FASTA 的功能肽评估
-   我们要从 2 万多条肽数据中找出合适的功能肽，包含三个筛选层级：
-   (a) 阈值过滤：利用微服务检测肽的毒性、溶血性和致敏性分数，高于设定阈值的（即危险的）直接剔除。
-   (b) 排序：针对特定功能（如抗氧化性）进行评估，将分数在 0 到 1 之间从高到低排序，取前 50% 或前 1000 条。
-   (c) 加权平均：根据各项工具或微服务评分的重要性分配权重，计算综合评分，最终筛选出前 50 条功能肽进入下一步。
+1. FASTA-based functional peptide evaluation
+   We need to find suitable functional peptides from more than 20,000 peptide records, across three screening levels:
+   (a) Threshold filtering: use microservices to detect the toxicity, hemolysis, and allergenicity scores of the peptides; those above the set thresholds (i.e., dangerous) are removed directly.
+   (b) Ranking: evaluate against a specific function (such as antioxidant activity), rank the scores from 0 to 1 from high to low, and take the top 50% or the top 1000.
+   (c) Weighted average: assign weights according to the importance of each tool's or microservice's score, compute a composite score, and finally select the top 50 functional peptides to enter the next step.
 
-2. 融合肽构建与 3D 结构生成
-   将筛选出的 50 条功能肽、6 种 Linker 和 1 种丝素蛋白进行组合。考虑到位置选择（功能肽放在开头、结尾或两边），共有三种位置方案。
-   通过穷举得到所有可能的 FASTA 序列（50 × 6 × 1 × 3），然后提交给 AlphaFold 或 RoseTTAFold 等工具预测其 3D 结构，生成 PDB 文件。
+2. Fusion peptide construction and 3D structure generation
+   Combine the 50 selected functional peptides, 6 Linkers, and 1 silk fibroin. Considering the position choices (functional peptide placed at the beginning, the end, or on both sides), there are three position schemes in total.
+   Obtain all possible FASTA sequences by exhaustive enumeration (50 × 6 × 1 × 3), then submit them to tools such as AlphaFold or RoseTTAFold to predict their 3D structures and generate PDB files.
 
-3. 基于 PDB 文件的评测
-   对融合后的蛋白进行评测。通过 SASA（溶剂可及表面积）计算功能肽在结构中是被包埋还是暴露，并结合其他微服务工具完成最终的性能评估。
+3. PDB-based evaluation
+   Evaluate the fused protein. Use SASA (solvent-accessible surface area) to compute whether the functional peptide is buried or exposed in the structure, and combine with other microservice tools to complete the final performance evaluation.
 
-但是我们不一定非要死板地按照这个步骤执行。从观点、哲学理念和方法论上来说，虽然是这么一个流程，但步骤是可以灵活调整排序的。
+But we do not necessarily have to follow these steps rigidly. In terms of viewpoint, philosophy, and methodology, although this is the workflow, the steps can be flexibly reordered.
 
-关于阈值过滤，我们可以先排序再过滤，也可以先过滤再排序，甚至进行多次交叉操作。我们的最终目标，是将融合态构建后提交给 3D 结构生成的数量控制在 50 个以内。因为 3D 结构生成非常消耗算力和时间，我们耽搁不起，时间非常紧迫。
+Regarding threshold filtering, we can rank first and then filter, or filter first and then rank, or even perform multiple interleaved operations. Our final goal is to keep the number of fusion constructs submitted for 3D structure generation to within 50. Because 3D structure generation is extremely compute- and time-intensive, we cannot afford the delay — time is very tight.
 
-因此，我们这里的设计遵循一个核心原则：尽量将那些“轻快”、可以大量处理的服务放在前面。整个设计呈现出一个倒金字塔或漏斗形，每经过一层，参与运算的候选功能态就会随之减少。那些运算慢、耗时长、模型权重比较大的重型任务，我们则放在后面处理。
+Therefore, our design here follows one core principle: put the "light and fast" services that can process large volumes first, as much as possible. The whole design presents an inverted pyramid or funnel shape, and with each layer the number of candidate functional states participating in the computation decreases accordingly. Those heavy tasks that run slowly, take a long time, and have relatively large model weights are handled later.
 
-具体步骤如下：
-1. 基于 FASTA 对功能态进行评分、筛选、过滤和优选。经过这一步，最终产出的候选数量会非常有限。
-2. 穷举加 3D 结构生成。通过前一步的筛选，保证我们在这一步花费的算力和时间不至于过大。
-3. 最终评估。
+The specific steps are as follows:
+1. Score, screen, filter, and select the functional states based on FASTA. After this step, the number of candidates finally produced will be very limited.
+2. Exhaustive enumeration plus 3D structure generation. The screening in the previous step ensures that the compute and time we spend in this step are not too large.
+3. Final evaluation.
 
-这就是我们的整体设计原则。
-
-
+This is our overall design principle.
 
 
 
 
 
-# 具体细节
 
-我现在来叮嘱你一些具体需要考虑的设计细节：
+# Specific details
 
-1. 数据加载与 .env 文件控制 (不过话说，统一放在 config.py 是不是也行？)
-   (a) 测试阶段不需要直接跑 2 万条数据，那太离谱了，目前我们的 load_data 环节只进行部分加载。
-   (b) 目前加载什么数据（例如现在只加载抗氧化肽的数据）是完全写死在代码里的，在几百行代码里找起来非常麻烦，哪怕加了索引也不方便。
-   (c) 解决方案：写一个 .env 文件，明确指明我们需要加载的数据类型。  
+Now let me point out some specific design details that need to be considered:
 
-1. 缓存机制
-   (a) 缓存的重要性：我们需要反复调试测试，甚至中间会面临失败打断，这种情况下必须有足够的缓存。
-   (b) 缓存范围：无论是大文件还是小文件，一旦数据量达到成千上万，都需要缓存。
-   (c) 具体实例：比如 AlphaFold 3 推理出来的 PDB 结构，我们需要缓存对应的文件。如果 FASTA 序列一模一样，重新测试时直接调用缓存，不要再跑一遍。
-   (d) 存储路径：
-       - 方案一：放在每个工具/微服务自己的文件夹下面。
-       - 方案二（建议）：设置共享缓存池。在生产环境中通过 Docker 部署时，大家挂载在同一个位置，微服务去搜索自己需要的缓存。
-   (e) 缓存分类：
-       - 微服务缓存：每个微服务内部的具体缓存。
-       - Pipeline 缓存：针对整个流程（如 enumeration 环节）产生的多种可能性进行缓存，存放在项目根目录下的配置文件夹中。
+1. Data loading and .env file control (though by the way, would it also work to put everything uniformly in config.py?)
+   (a) During the testing stage there is no need to run all 20,000 records directly — that is absurd; at present our load_data step only performs partial loading.
+   (b) What data is currently loaded (for example, right now only antioxidant peptide data is loaded) is completely hardcoded in the code, and finding it among hundreds of lines of code is very troublesome, even with indexing added.
+   (c) Solution: write a .env file that explicitly specifies the data types we need to load.  
 
-1. 那么第三个技术细节就是关于生命周期，具体来说是 AlphaFold。因为它太吃显存了，我们不可能把 AlphaFold 和其他玩意放在一起跑，所以必须做好显存管理。
+1. Caching mechanism
+   (a) The importance of caching: we need to debug and test repeatedly, and failures may even interrupt us midway; in such cases sufficient caching is essential.
+   (b) Scope of caching: whether files are large or small, once the data volume reaches thousands or tens of thousands, caching is needed.
+   (c) Concrete example: for example, the PDB structures inferred by AlphaFold3 — we need to cache the corresponding files. If the FASTA sequence is exactly the same, call the cache directly on a re-test instead of running it again.
+   (d) Storage path:
+       - Option 1: place it under each tool's/microservice's own folder.
+       - Option 2 (recommended): set up a shared cache pool. When deploying via Docker in production, everyone mounts the same location, and microservices search the cache they need.
+   (e) Cache classification:
+       - Microservice cache: the specific cache internal to each microservice.
+       - Pipeline cache: cache the various possibilities produced by the whole workflow (such as the enumeration step), stored in a configuration folder under the project root directory.
 
-   关于微服务的启动，我的 Pipeline 里面肯定要包含对微服务的调度逻辑。我们不能一开始就把所有模型全部打开并加载好，否则还没开始干活，显存就直接爆炸了。
+1. So the third technical detail is about lifecycle, specifically AlphaFold. Because it consumes so much GPU memory, it is impossible for us to run AlphaFold together with other things, so GPU memory management must be done well.
 
-   我设想的方案是：
-   1. 建立一套按顺序启动、用完就关的低占用计算模式。
-   2. 区分计算资源：如果是 CPU 计算，一直开着无所谓，反而更方便，能避免生命周期管理增加的代码复杂度。
-   3. 针对 AlphaFold 的特殊处理：
-      (a) 在开始 AlphaFold 运算前，必须把其他微服务全部停止并关闭。
-      (b) 只有在 AlphaFold 运算结束之后，才进行其他微服务的后续操作。
+    Regarding microservice startup, my Pipeline will certainly contain scheduling logic for microservices. We cannot open and load all models at the very beginning; otherwise GPU memory will explode before any work even starts.
 
-   如果不这样谨慎处理，显存真的会爆。
+    The scheme I envision is:
+   1. Establish a low-footprint computing mode that starts services in sequence and shuts them down once they are done.
+   2. Distinguish computing resources: if it is CPU computing, leaving it on all the time does not matter — it is actually more convenient and avoids the code complexity added by lifecycle management.
+   3. Special handling for AlphaFold:
+      (a) Before starting AlphaFold computation, all other microservices must be stopped and shut down.
+      (b) Only after AlphaFold computation ends are subsequent operations with other microservices performed.
 
-   不过我们也在考虑后面要不要换这个 AlphaFold 或者其他什么的。
+    If we do not handle this carefully, GPU memory really will explode.
 
-   目前就先按这个来出方案，先这么来出方案行吧？
+    However, we are also considering whether to switch away from this AlphaFold or something else later on.
+
+    For now, let's build the plan on this basis — let's go with this for now, okay?

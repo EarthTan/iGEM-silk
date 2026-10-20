@@ -1,51 +1,53 @@
-# output2 Pipeline 状态
+> **English** | [中文](STATUS.zh.md)
 
-> 最后更新: 2026-05-17 20:35
+# output2 Pipeline Status
 
-## 当前进度
+> Last updated: 2026-05-17 20:35
 
-| 阶段 | 状态 | 备注 |
+## Current Progress
+
+| Stage | Status | Notes |
 |------|------|------|
-| Step 0: 数据整合 | ✅ 完成 | 1,055,116 条清洗完成 |
-| Round 1: 轻量评分 | ✅ 完成 | AnOxPePred + AlgPred2, 886s |
-| Round 2: 分选+安全评分 | ✅ 完成 | top25K+bottom25K, 5 服务完整, 3755s |
-| Round 3: 重服务评分 | ✅ 完成 | TemStaPro 50K + BepiPred3 15K, 7 服务, 3891s |
-| Round 4: 枚举+Construct | ✅ 完成 | 150 constructs (90 Top + 60 Bottom), 5 服务完整 |
-| Round 5: 3D 结构 | ✅ 完成 | OmegaFold 150/150, pLDDT avg=0.4105, 210min |
-| Round 6: PDB 评估 | ✅ 完成 | SASA+A3D 150/150, SASA(0.40)+Agg(0.40)+pLDDT(0.20) |
-| Round 7: 最终输出 | ✅ 完成 | 90 Top + 60 Bottom, 双通道排名, per-construct 文件夹 |
+| Step 0: data integration | ✅ complete | 1,055,116 entries cleaned |
+| Round 1: lightweight scoring | ✅ complete | AnOxPePred + AlgPred2, 886s |
+| Round 2: split + safety scoring | ✅ complete | top25K+bottom25K, all 5 services, 3755s |
+| Round 3: heavy-service scoring | ✅ complete | TemStaPro 50K + BepiPred3 15K, 7 services, 3891s |
+| Round 4: enumeration + constructs | ✅ complete | 150 constructs (90 Top + 60 Bottom), all 5 services |
+| Round 5: 3D structure | ✅ complete | OmegaFold 150/150, pLDDT avg=0.4105, 210min |
+| Round 6: PDB evaluation | ✅ complete | SASA+A3D 150/150, SASA(0.40)+Agg(0.40)+pLDDT(0.20) |
+| Round 7: final output | ✅ complete | 90 Top + 60 Bottom, dual-channel ranking, per-construct folders |
 
-## Pipeline 变更记录
+## Pipeline Change Log
 
-v2 关键变更（vs 原 stages2）：
-- Round 1 不跑 ToxinPred3（105 万条太慢 ~22h），改为 Round 2 对 50K 补跑
-- Round 2 按纯 anoxpepred 分选 top25K + bottom25K，非加权综合分
-- Round 3 在 50K 上跑，保留 channel 标签
-- 全流程双通道（top/bottom）各自输出最终排名
+Key v2 changes (vs the original stages2):
+- Round 1 does not run ToxinPred3 (1.05 million entries would be too slow, ~22h); it is deferred to Round 2 on the 50K set
+- Round 2 splits by pure anoxpepred into top25K + bottom25K, not a weighted composite score
+- Round 3 runs on the 50K set and preserves the channel labels
+- The whole pipeline is dual-channel (top/bottom), each producing its own final ranking
 
-详见 `main/stages2/PLAN2.md`。
+See `main/stages2/PLAN2.md` for details.
 
-## 输出目录结构
+## Output Directory Structure
 
 ```
 output2/
 ├── STATUS.md
-├── step00_integrate/       ← 数据整合
+├── step00_integrate/       ← data integration
 │   └── final/cleaned.csv
 ├── round01_lightweight/    ← AnOxPePred + AlgPred2
 │   └── final/
-│       ├── all_scored.csv  ← 105 万条全量评分
-│       └── top50k.csv      ← 加权分排序（仅参考）
-├── round02_scoring/        ← 分选 + 安全评分
+│       ├── all_scored.csv  ← full scoring of 1.05 million entries
+│       └── top50k.csv      ← weighted-score ranking (for reference only)
+├── round02_scoring/        ← split + safety scoring
 │   └── final/
-│       ├── all_50k.csv     ← 50K 条（5 服务分 + 综合分 + channel）
+│       ├── all_50k.csv     ← 50K entries (5 service scores + composite score + channel)
 │       ├── top25k.csv
 │       └── bottom25k.csv
-└── round03_heavy/          ← TemStaPro 预筛 + BepiPred3
+└── round03_heavy/          ← TemStaPro pre-screen + BepiPred3
     └── final/
-        ├── all_scored.csv  ← 50K 条（7 服务分 + channel）
-        ├── top80.csv       ← Top 通道前 80
-        ├── bottom10.csv    ← Bottom 通道阴性对照
-        ├── danger_list.csv ← 201 条高危
-        └── trajectory.csv  ← 跨轮排名轨迹
+        ├── all_scored.csv  ← 50K entries (7 service scores + channel)
+        ├── top80.csv       ← top 80 of the Top channel
+        ├── bottom10.csv    ← negative controls of the Bottom channel
+        ├── danger_list.csv ← 201 high-risk peptides
+        └── trajectory.csv  ← cross-round ranking trajectory
 ```

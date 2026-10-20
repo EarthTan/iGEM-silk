@@ -1,37 +1,39 @@
-# Round 7: Final Round — 最终排名报告
+> **English** | [中文](round07_report.zh.md)
 
-**生成日期**: 2026-05-21 10:20:59
-**Construct 总数**: 250（Top: 150, Bottom: 100）
-**耗时**: 0s (0.0 min)
+# Round 7: Final Round — Final Ranking Report
 
-## 全流程回顾
+**Generated**: 2026-05-21 10:20:59
+**Total constructs**: 250 (Top: 150, Bottom: 100)
+**Time**: 0s (0.0 min)
 
-| Round | 说明 | 关键服务 | 耗时 |
+## Full pipeline retrospective
+
+| Round | Description | Key services | Time |
 |------|------|---------|------|
-| Round 1 | 肽级别初筛 + 分通道 | AnOxPePred, AlgPred2, ToxinPred3, HemoPI2, MHCflurry | — |
-| Round 2 | 安全过滤 | ToxinPred3, AlgPred2, HemoPI2 | — |
-| Round 3 | 重服务评分 + GraphCPP + 排名 | BepiPred3, TemStaPro, SoDoPE, pLM4CPPs, GraphCPP | ~82 min |
-| Round 4 Phase 1 | 枚举 4,324 肽 → 25,944 constructs + SoDoPE/TemStaPro | SoDoPE, TemStaPro | 16 min |
-| Round 4 Phase 2 | BepiPred3 补充评分（Top 10%） | BepiPred3 | 105 min |
-| Round 5 | OmegaFold 3D 结构预测（Top 150 + Bottom 100） | OmegaFold | 6.13h |
-| Round 6 | SASA + Aggrescan3D 评估 | SASA, Aggrescan3D | 5.4 min |
-| **Round 7** | **最终排名** | — | **0s** |
+| Round 1 | peptide-level primary screening + channel split | AnOxPePred, AlgPred2, ToxinPred3, HemoPI2, MHCflurry | — |
+| Round 2 | safety filtering | ToxinPred3, AlgPred2, HemoPI2 | — |
+| Round 3 | heavy-service scoring + GraphCPP + ranking | BepiPred3, TemStaPro, SoDoPE, pLM4CPPs, GraphCPP | ~82 min |
+| Round 4 Phase 1 | enumerate 4,324 peptides → 25,944 constructs + SoDoPE/TemStaPro | SoDoPE, TemStaPro | 16 min |
+| Round 4 Phase 2 | BepiPred3 supplementary scoring (top 10%) | BepiPred3 | 105 min |
+| Round 5 | OmegaFold 3D structure prediction (Top 150 + Bottom 100) | OmegaFold | 6.13h |
+| Round 6 | SASA + Aggrescan3D evaluation | SASA, Aggrescan3D | 5.4 min |
+| **Round 7** | **final ranking** | — | **0s** |
 
-## 排名公式
+## Ranking formula
 
 ```
 round7_score = 0.4 × SASA + 0.4 × (1 − Aggrescan3D) + 0.2 × pLDDT_norm
 ```
 
-| 维度 | 权重 | 方向 | 含义 |
+| Dimension | Weight | Direction | Meaning |
 |------|------|------|------|
-| SASA | 0.4 | ↑ 越高越好 | 功能肽区域溶剂可及性（暴露在外便于免疫识别） |
-| 1 − Aggrescan3D | 0.4 | ↑ 越高越好 | 聚集风险倒数（不易聚集则表达量高） |
-| pLDDT_norm | 0.2 | ↑ 越高越好 | 结构置信度经 min−max 归一化（结构可靠） |
+| SASA | 0.4 | ↑ higher is better | solvent accessibility of the functional peptide region (exposed on the outside for immune recognition) |
+| 1 − Aggrescan3D | 0.4 | ↑ higher is better | inverse aggregation risk (less prone to aggregation means higher expression) |
+| pLDDT_norm | 0.2 | ↑ higher is better | structural confidence after min−max normalization (reliable structure) |
 
 ## Top 10
 
-| 排名 | 通道 | ID | 位置 | Linker | 肽序列 | SASA | A3D | pLDDT | 总分 |
+| Rank | Channel | ID | Position | Linker | Peptide sequence | SASA | A3D | pLDDT | Total score |
 |------|------|----|------|--------|--------|------|-----|-------|------|
 | 9 | top | 418 | C    | Flex_GGGGSx2 | MNRPWITGHHHHHHHRRRRR | 0.8104 | 0.3219 | 0.4420 | 0.7076 |
 | 13 | top | 417 | C    | Flex_GGGGSx1 | MNRPWITGHHHHHHHRRRRR | 0.7844 | 0.3557 | 0.4514 | 0.6993 |
@@ -46,7 +48,7 @@ round7_score = 0.4 × SASA + 0.4 × (1 − Aggrescan3D) + 0.2 × pLDDT_norm
 
 ## Bottom 10
 
-| 排名 | 通道 | ID | 位置 | Linker | 肽序列 | SASA | A3D | pLDDT | 总分 |
+| Rank | Channel | ID | Position | Linker | Peptide sequence | SASA | A3D | pLDDT | Total score |
 |------|------|----|------|--------|--------|------|-----|-------|------|
 | 1 | bottom | 5489 | Both | Flex_GGGGSx1 | KKKEKKKEEKKKRQKNRKKK | 0.6873 | 0.2925 | 0.4950 | 0.7579 |
 | 2 | bottom | 3275 | Both | Flex_GGGGSx1 | KRKKKKIREKKKRKKNKKKK | 0.6861 | 0.2927 | 0.4857 | 0.7420 |
@@ -59,25 +61,25 @@ round7_score = 0.4 × SASA + 0.4 × (1 − Aggrescan3D) + 0.2 × pLDDT_norm
 | 10 | bottom | 2015 | Both | Flex_GGGGSx1 | KERKKGEKKKKKKKRKKKKN | 0.6938 | 0.2822 | 0.4602 | 0.7070 |
 | 11 | bottom | 1541 | Both | Flex_GGGGSx1 | KKKEKKKVRKKKKKKKRKYK | 0.6831 | 0.3056 | 0.4659 | 0.7027 |
 
-## 分数分布
+## Score distribution
 
-| 维度 | 均值 | 范围 | 样本数 |
+| Dimension | Mean | Range | Sample count |
 |------|------|------|--------|
-| Round 7 综合分 | 0.6327 | 0.4800 ~ 0.7579 | 250 |
-| SASA 暴露度 | 0.7161 | 0.4601 ~ 0.8322 | 250 |
-| Aggrescan3D 聚集风险 | 0.3261 | 0.2696 ~ 0.3857 | 250 |
+| Round 7 composite score | 0.6327 | 0.4800 ~ 0.7579 | 250 |
+| SASA exposure | 0.7161 | 0.4601 ~ 0.8322 | 250 |
+| Aggrescan3D aggregation risk | 0.3261 | 0.2696 ~ 0.3857 | 250 |
 | OmegaFold pLDDT | 0.4205 | 0.3742 ~ 0.4950 | 250 |
-| SoDoPE 溶解度 | 0.7789 | 0.6726 ~ 0.8959 | 250 |
-| TemStaPro 热稳定性 | 0.5051 | 0.3901 ~ 0.6517 | 250 |
+| SoDoPE solubility | 0.7789 | 0.6726 ~ 0.8959 | 250 |
+| TemStaPro thermal stability | 0.5051 | 0.3901 ~ 0.6517 | 250 |
 
-## 输出文件
+## Output files
 
-| 文件 | 说明 |
+| File | Description |
 |------|------|
-| `reports/top_ranking.csv` | Top 通道 150 个 constructs 完整排名 |
-| `reports/bottom_ranking.csv` | Bottom 通道 100 个 constructs 完整排名 |
-| `reports/round07_report.md` | 本报告 |
+| `reports/top_ranking.csv` | complete ranking of the 150 Top-channel constructs |
+| `reports/bottom_ranking.csv` | complete ranking of the 100 Bottom-channel constructs |
+| `reports/round07_report.md` | this report |
 
-## 建议
+## Recommendation
 
-推荐选取 Top 5–10 进行 wet-lab 验证。
+It is recommended to select the Top 5–10 for wet-lab validation.

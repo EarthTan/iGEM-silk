@@ -1,55 +1,57 @@
-# 步骤零：数据整合 — 报告
+> **English** | [中文](README.zh.md)
 
-**时间**: 2026-05-17 15:02:47
-**耗时**: 18.1 秒
-**输出目录**: output2/
+# Step Zero: Data Integration — Report
 
-## 数据源
+**Time**: 2026-05-17 15:02:47
+**Duration**: 18.1 seconds
+**Output directory**: output2/
 
-| 文件 | 总行数 | 抗氧化子集 |
+## Data Sources
+
+| File | Total rows | Antioxidant subset |
 |------|--------|-----------|
 | function_1.csv | 24,694 | 1,627 |
 | function_2.csv | 1,055,961 | 1,055,961 |
 | function_3.csv | 1,117 | 1,117 |
 
-## 清洗流程
+## Cleaning Pipeline
 
 ```
-原始抗氧化合计: 1,058,705
-  ├─ 非标准氨基酸:    42 条
-  ├─ 过短 (<3aa):   113 条
-  ├─ 过长 (>30aa):   1530 条
-  ├─ 合法序列:        1,057,020 条
-  └─ 去重后:          1,055,116 条
+raw antioxidant total: 1,058,705
+  ├─ non-standard amino acids:    42
+  ├─ too short (<3aa):   113
+  ├─ too long (>30aa):   1530
+  ├─ valid sequences:        1,057,020
+  └─ after deduplication:          1,055,116
 ```
 
-## 长度分布
+## Length Distribution
 
 ```
-肽长度 分布 (n=1055116):
-  均值:   10.7909
-  中位数: 10.0000
-  标准差: 2.9935
-  最小值: 3.0000
-  最大值: 30.0000
+peptide length distribution (n=1055116):
+  mean:   10.7909
+  median: 10.0000
+  std dev: 2.9935
+  min: 3.0000
+  max: 30.0000
   P5: 7.0000  |  P25: 9.0000  |  P75: 12.0000  |  P95: 16.0000
 
-  分布直方图:
-  3.0000-6.3750: ░░░░░░░░░░░░░░  (2,484 条, 0.2%) 
-  6.3750-9.7500: █████░░░░░░░░░  (403,221 条, 38.2%) 
-  9.7500-13.1250: ██████░░░░░░░░  (486,162 条, 46.1%) ← 均值
-  13.1250-16.5000: ██░░░░░░░░░░░░  (114,732 条, 10.9%) 
-  16.5000-19.8750: ░░░░░░░░░░░░░░  (33,016 条, 3.1%) 
-  19.8750-23.2500: ░░░░░░░░░░░░░░  (11,239 条, 1.1%) 
-  23.2500-26.6250: ░░░░░░░░░░░░░░  (2,616 条, 0.2%) 
-  26.6250-30.0000: ░░░░░░░░░░░░░░  (1,303 条, 0.1%) 
+  distribution histogram:
+  3.0000-6.3750: ░░░░░░░░░░░░░░  (2,484 seqs, 0.2%) 
+  6.3750-9.7500: █████░░░░░░░░░  (403,221 seqs, 38.2%) 
+  9.7500-13.1250: ██████░░░░░░░░  (486,162 seqs, 46.1%) ← mean
+  13.1250-16.5000: ██░░░░░░░░░░░░  (114,732 seqs, 10.9%) 
+  16.5000-19.8750: ░░░░░░░░░░░░░░  (33,016 seqs, 3.1%) 
+  19.8750-23.2500: ░░░░░░░░░░░░░░  (11,239 seqs, 1.1%) 
+  23.2500-26.6250: ░░░░░░░░░░░░░░  (2,616 seqs, 0.2%) 
+  26.6250-30.0000: ░░░░░░░░░░░░░░  (1,303 seqs, 0.1%) 
 
 ```
 
-## 输出
+## Output
 
-- `final/cleaned.csv` — 1,055,116 条抗氧化肽（含 peptide_id、sequence、length、source）
+- `final/cleaned.csv` — 1,055,116 antioxidant peptides (with peptide_id, sequence, length, source)
 
-## 下一步
+## Next Step
 
-Round 1（轻量评分），输入: `/home/lenovo/Projects/iGEM-silk/output2/step00_integrate/final/cleaned.csv`
+Round 1 (lightweight scoring), input: `/home/lenovo/Projects/iGEM-silk/output2/step00_integrate/final/cleaned.csv`

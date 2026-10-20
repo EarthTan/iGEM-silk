@@ -1,127 +1,129 @@
 ---
 name: GEP-creator
-description: 当用户想要将有效经验固化成"基因胶囊"（Gene Capsule）、创建可共享可继承的能力单元时触发此技能。用于构建 AI Agent 的经验传承体系，让"一个学会，百万继承"成为可能。
+description: Trigger this skill when the user wants to solidify proven experience into a "Gene Capsule" and create a shareable, inheritable capability unit. It builds an experience-inheritance system for AI agents, making "one learns, a million inherit" possible.
 created: 2026-04-20
 version: 0.1.0
 ---
 
+> **English** | [中文](SKILL.zh.md)
+
 # GEP-creator
 
-将有效经验封装为符合 GEP（Genome Evolution Protocol，基因组进化协议）的**基因胶囊**，使经验可在 Agent 之间安全共享、跨环境验证并传递给其他 Agent。
+Package proven experience into a **gene capsule** that conforms to GEP (Genome Evolution Protocol), so that the experience can be shared safely between agents, validated across environments, and passed on to other agents.
 
-# 创建 GEP Capsules
+# Creating GEP Capsules
 
-## 什么时候用
+## When to use
 
-- 当 Agent 发现了一条有效的策略、工作流或 prompt 模式，想让它可复用
-- 当你想把某次成功的经验封装成像"基因"一样可以遗传的能力单元
-- 当你需要为 Agent 构建经验传承体系，而非每次从零开始
-- 对应 EvoMap/GEP 协议中的"基因胶囊打包"阶段
+- When an agent discovers an effective strategy, workflow, or prompt pattern and wants to make it reusable
+- When you want to package a successful experience into a capability unit that can be inherited like a "gene"
+- When you need to build an experience-inheritance system for agents instead of starting from scratch every time
+- This corresponds to the "gene capsule packaging" stage of the EvoMap/GEP protocol
 
 ---
 
-## 核心概念（三要素）
+## Core concepts (three elements)
 
-Gene Capsule（基因胶囊）由三部分构成：
+A Gene Capsule consists of three parts:
 
-| 要素                                    | 含义                                     | 作用                     |
+| Element | Meaning | Role |
 | --------------------------------------- | ---------------------------------------- | ------------------------ |
-| **Experience（经验本体）**              | 具体有效的行为策略、prompt、工具调用序列 | 回答"怎么做"             |
-| **Environment Fingerprint（环境指纹）** | 经验适用的场景、任务类型、约束条件       | 回答"在什么情况下做有效" |
-| **Audit Record（审计记录）**            | 经验的验证过程、通过的测试、成功率       | 回答"为什么可靠"         |
+| **Experience (the experience itself)** | The concrete, effective behavioral strategy, prompt, or tool-call sequence | Answers "how to do it" |
+| **Environment Fingerprint** | The scenarios, task types, and constraints the experience applies to | Answers "under what circumstances it works" |
+| **Audit Record** | How the experience was validated, the tests it passed, its success rate | Answers "why it is reliable" |
 
 ---
 
-## 方法论（Abstract 层）
+## Methodology (Abstract layer)
 
-GEP 封装遵循以下原则：
+GEP packaging follows these principles:
 
-1. **有效性优先** — 只有在真实任务中被验证有效的经验才值得封装
-2. **场景边界清晰** — 明确经验适用的范围和不适用的边界
-3. **可审计可追溯** — 记录验证过程，使消费者 Agent 能自主判断是否采用
-4. **最小可用单元** — 一个胶囊解决一个核心问题，不过度打包
+1. **Effectiveness first** — Only experience validated as effective on real tasks is worth packaging
+2. **Clear scenario boundaries** — State explicitly the scope in which the experience applies and the boundaries where it does not
+3. **Auditable and traceable** — Record the validation process so that consuming agents can decide independently whether to adopt it
+4. **Minimal usable unit** — One capsule solves one core problem; do not over-package
 
 ---
 
-## 操作步骤（Concrete 层）
+## Procedure (Concrete layer)
 
-### Step 1：识别有效经验
+### Step 1: Identify effective experience
 
-识别 Agent 在任务执行中产生的、带来显著正向结果的策略或输出。
+Identify the strategies or outputs that the agent produced during task execution and that led to significantly positive results.
 
-检查清单：
+Checklist:
 
-- ✅ 结果显著优于基线（更快、更准、效果更好）
-- ✅ 不是偶然成功（可重复）
-- ✅ 不依赖特定敏感上下文（token 数量、具体人名等尽量抽象）
+- ✅ The result is significantly better than the baseline (faster, more accurate, better outcome)
+- ✅ It is not accidental success (it is repeatable)
+- ✅ It does not depend on specific sensitive context (abstract away token counts, specific names, etc., as far as possible)
 
-工具：回顾对话、session 历史或执行日志，提取关键转折点。
+Tools: review the conversation, session history, or execution logs to extract the key turning points.
 
-### Step 2：提取 Experience（经验本体）
+### Step 2: Extract the Experience
 
-将有效行为凝练为**结构化描述**，包含：
+Condense the effective behavior into a **structured description** containing:
 
-- **问题类型**：什么类型的任务
-- **核心策略**：具体做了什么（工具调用顺序、prompt 策略、决策点）
-- **关键参数**：重要配置项（如 temperature、max_tokens、选择的模型等）
+- **Problem type**: what kind of task
+- **Core strategy**: what was actually done (tool-call order, prompt strategy, decision points)
+- **Key parameters**: important configuration items (such as temperature, max_tokens, the chosen model, etc.)
 
-格式示例：
+Format example:
 
 ```markdown
 ## Experience
-- 问题类型: 长文档结构化信息提取
-- 核心策略: 两阶段提取——第一阶段用召回模型生成候选段落，第二阶段用精排模型评分筛选
-- 关键参数: 召回模型=xxx, 精排阈值=0.7, max_candidates=20
+- Problem type: structured information extraction from long documents
+- Core strategy: two-stage extraction — stage one uses a recall model to generate candidate passages, stage two uses a reranking model to score and filter them
+- Key parameters: recall_model=xxx, rerank_threshold=0.7, max_candidates=20
 ```
 
-### Step 3：生成 Environment Fingerprint（环境指纹）
+### Step 3: Generate the Environment Fingerprint
 
-描述经验适用的上下文环境，包括：
+Describe the context in which the experience applies, including:
 
-- **任务域**：通用/编程/写作/数据分析/客服等
-- **输入特征**：长文本/多轮对话/结构化数据/图片等
-- **约束条件**：时间敏感？需实时性？资源受限？
-- **不适用场景**：明确边界
+- **Task domain**: general / programming / writing / data analysis / customer service, etc.
+- **Input characteristics**: long text / multi-turn dialogue / structured data / images, etc.
+- **Constraints**: time-sensitive? real-time required? resource-limited?
+- **Inapplicable scenarios**: state the boundaries explicitly
 
-格式示例：
+Format example:
 
 ```markdown
 ## Environment Fingerprint
-- 任务域: 长文档（>5000字）结构化提取
-- 输入特征: 纯文本、无图表、以段落为主
-- 约束条件: 单次 API 调用完成，无需多轮
-- 不适用: 短文本（<500字）、含图表混排、多轮推理型任务
+- Task domain: structured extraction from long documents (>5000 characters)
+- Input characteristics: plain text, no figures or tables, mostly paragraphs
+- Constraints: completed in a single API call, no multi-turn interaction needed
+- Not applicable: short text (<500 characters), mixed figures/tables, multi-turn reasoning tasks
 ```
 
-### Step 4：创建 Audit Record（审计记录）
+### Step 4: Create the Audit Record
 
-记录经验是如何被验证的，提供可信度证明：
+Record how the experience was validated and provide evidence of credibility:
 
-- **验证方式**：人工评估/自动化测试/生产环境验证
-- **测试用例**：至少 2-3 个代表性例子（含输入→输出）
-- **成功率**：通过率或效果提升幅度
-- **局限性**：已知弱点或注意事项
+- **Validation method**: human evaluation / automated tests / production validation
+- **Test cases**: at least 2-3 representative examples (with input → output)
+- **Success rate**: pass rate or magnitude of improvement
+- **Limitations**: known weaknesses or caveats
 
-格式示例：
+Format example:
 
 ```markdown
 ## Audit Record
-- 验证方式: 生产环境连续使用 2 周 + 人工抽检
-- 测试用例:
-  1. 输入: [5000字合同文本] → 输出: [14个关键条款，无遗漏]
-  2. 输入: [3000字新闻报道] → 输出: [8个核心事件，时间线准确]
-  3. 输入: [800字社交媒体帖子] → 输出: [3个主题，离题内容正确过滤]
-- 成功率: ~94%（N=200）
-- 局限性: 对表格内容提取效果较差，需后处理
+- Validation method: 2 consecutive weeks of production use + manual spot checks
+- Test cases:
+  1. Input: [5000-character contract text] → Output: [14 key clauses, none missing]
+  2. Input: [3000-character news report] → Output: [8 core events, accurate timeline]
+  3. Input: [800-character social media post] → Output: [3 themes, off-topic content correctly filtered out]
+- Success rate: ~94% (N=200)
+- Limitations: weak at extracting table content; post-processing required
 ```
 
-### Step 5：组装 Gene Capsule（基因胶囊）
+### Step 5: Assemble the Gene Capsule
 
-将以上三部分合并为标准化的胶囊文档，添加元数据头部：
+Merge the three parts above into a standardized capsule document and add a metadata header:
 
 ```markdown
 ---
-name: 长文档结构化提取 v1.0
+name: Structured Long-Document Extraction v1.0
 author: [creator name]
 created: 2026-04-20
 version: 1.0.0
@@ -129,30 +131,30 @@ tags: [extraction, document, RAG, nlp]
 validated: true
 ---
 
-# Gene Capsule: 长文档结构化提取
+# Gene Capsule: Structured Long-Document Extraction
 
 ## Experience
-[见 Step 2]
+[see Step 2]
 
 ## Environment Fingerprint
-[见 Step 3]
+[see Step 3]
 
 ## Audit Record
-[见 Step 4]
+[see Step 4]
 
 ## Usage
-- 触发条件: ...
-- 调用方式: ...
-- 注意事项: ...
+- Trigger conditions: ...
+- How to invoke: ...
+- Caveats: ...
 ```
 
-### Step 6：存储与注册
+### Step 6: Store and register
 
-将胶囊存入指定位置。
+Store the capsule in the designated location.
 
 ---
 
-## 输入与输出
+## Input and output
 
-- **输入**：Agent 识别到的有效经验（可来自对话、session 日志或用户描述）
-- **输出**：符合 GEP 格式的 `.md` 基因胶囊文件，可被其他支持 GEP 的 Agent 消费。
+- **Input**: the effective experience identified by the agent (it may come from a conversation, a session log, or the user's description)
+- **Output**: a `.md` gene capsule file in GEP format, consumable by other GEP-compatible agents.

@@ -1,5 +1,5 @@
 ---
-name: freesasa 2.2.1 selectArea API 不兼容 v1.0
+name: freesasa 2.2.1 selectArea API Incompatible v1.0
 author: Claude Code
 created: 2026-05-14
 version: 1.0.0
@@ -7,48 +7,50 @@ tags: [freesasa, sasa, api, python, open-source]
 validated: true
 ---
 
-# Gene Capsule: freesasa 2.2.1 selectArea API 不兼容
+> **English** | [中文](gep-freesasa-selectarea-api.zh.md)
+
+# Gene Capsule: freesasa 2.2.1 selectArea API Incompatible
 
 ## Experience
 
-**问题类型**: freesasa Python 库 2.2.1 版本 `selectArea()` API 签名变更导致现有代码崩溃。
+**Problem type**: The `selectArea()` API signature changed in version 2.2.1 of the freesasa Python library, causing existing code to crash.
 
-**核心策略**:
-1. 看到 `expected bytes, tuple found` 或 `TypeError` 错误时，立即定位到 `freesasa.selectArea()` 调用
-2. 检查安装版本：`python -c "import freesasa; print(freesasa.__version__)"`
-3. 版本 < 2.2.0 使用 `[(name, expression)]` 元组列表格式，版本 ≥ 2.2.1 使用 `["name, expression"]` 单字符串格式
-4. 直接在虚环境中试验两种格式确认兼容性
+**Core strategy**:
+1. When you see `expected bytes, tuple found` or a `TypeError`, immediately locate the `freesasa.selectArea()` call
+2. Check the installed version: `python -c "import freesasa; print(freesasa.__version__)"`
+3. Versions < 2.2.0 use the `[(name, expression)]` list-of-tuples format; versions ≥ 2.2.1 use the `["name, expression"]` single-string format
+4. Try both formats directly in the virtual environment to confirm compatibility
 
-**关键参数**:
+**Key parameters**:
 
-| 版本 | selectArea 格式 | 示例 |
+| Version | selectArea format | Example |
 |------|----------------|------|
-| ≤ 2.2.0 | `[(name, expr)]` 元组列表 | `freesasa.selectArea([("residue", "resi 1 and chain A")], ...)` |
-| ≥ 2.2.1 | `["name, expr"]` 单字符串列表 | `freesasa.selectArea(["residue, resi 1 and chain A"], ...)` |
+| ≤ 2.2.0 | `[(name, expr)]` list of tuples | `freesasa.selectArea([("residue", "resi 1 and chain A")], ...)` |
+| ≥ 2.2.1 | `["name, expr"]` list of single strings | `freesasa.selectArea(["residue, resi 1 and chain A"], ...)` |
 
-**典型错误信息**:
-- `TypeError: expected bytes, tuple found` — 2.2.1 不再接受元组
-- 隐式静默返回空 `{}` 也可能发生（用旧格式传 2.2.1，内部解析失败）
+**Typical error messages**:
+- `TypeError: expected bytes, tuple found` — 2.2.1 no longer accepts tuples
+- An implicit, silent return of an empty `{}` can also occur (passing the old format to 2.2.1 makes the internal parsing fail)
 
 ## Environment Fingerprint
 
-- **任务域**: Python 开源生物信息学库调用，FreeSASA 溶剂可及表面积计算
-- **输入特征**: `pip install freesasa` 自动安装最新版，项目可能未锁定版本
-- **约束条件**: pip 默认安装最新版，无版本锁定则自动升级到 2.2.1+
-- **不适用**: 已锁定 `freesasa<2.2.1` 的项目；使用 conda 安装且 conda 尚未推送 2.2.1 的环境
+- **Task domain**: Calling an open-source Python bioinformatics library, FreeSASA solvent-accessible surface area computation
+- **Input characteristics**: `pip install freesasa` automatically installs the latest version; the project may not pin the version
+- **Constraints**: pip installs the latest version by default; without a version pin it upgrades to 2.2.1+ automatically
+- **Not applicable**: Projects that already pin `freesasa<2.2.1`; environments installed via conda where conda has not yet pushed 2.2.1
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk SASA 微服务 Docker 容器内运行时崩溃 + 修复后验证
-- **测试用例**:
-  1. 旧格式 `[("residue", "resi 1 and chain A")]` → `TypeError: expected bytes, tuple found`
-  2. 新格式 `["residue, resi 1 and chain A"]` → 正常返回 `{'residue': 85.3}`
-  3. 修复后批量 90 PDB 评分 → 全部成功，SASA mean=0.742
-- **成功率**: 100%
-- **局限性**: 如果将来 freesasa 再次变更 API 格式，此修复仍会失效
+- **Validation method**: Runtime crash inside the iGEM-silk SASA microservice Docker container, plus post-fix validation
+- **Test cases**:
+  1. Old format `[("residue", "resi 1 and chain A")]` → `TypeError: expected bytes, tuple found`
+  2. New format `["residue, resi 1 and chain A"]` → returns normally `{'residue': 85.3}`
+  3. After the fix, batch scoring of 90 PDBs → all succeeded, SASA mean=0.742
+- **Success rate**: 100%
+- **Limitations**: If freesasa changes the API format again in the future, this fix will break again
 
 ## Usage
 
-- **触发条件**: SASA 服务 `POST /predict` 返回 500，`selectArea` 调用处报 `TypeError: expected bytes`
-- **调用方式**: 找到 `freesasa.selectArea()` 调用，将所有 tuple 参数改为 `"name, expression"` 单字符串格式
-- **注意事项**: Docker 构建时会拉取最新 freesasa 版本，下次构建可能再次变更。推荐在 `pyproject.toml` 中锁定 `freesasa>=2.2.1` 并在代码中兼容两种格式，或固定版本号
+- **Trigger conditions**: The SASA service's `POST /predict` returns 500 and the `selectArea` call reports `TypeError: expected bytes`
+- **How to invoke**: Find the `freesasa.selectArea()` calls and change all tuple arguments to the single-string `"name, expression"` format
+- **Caveats**: Docker builds pull the latest freesasa version, so the next build may change again. It is recommended to pin `freesasa>=2.2.1` in `pyproject.toml` and support both formats in the code, or fix the exact version number

@@ -1,94 +1,96 @@
 ---
 name: anoxpepred
-description: 当用户需要预测肽序列的抗氧化活性时触发此技能。它基于机器学习模型预测肽的抗氧化潜力，支持多种抗氧化机制和批量处理。
+description: Trigger this skill when the user needs to predict the antioxidant activity of peptide sequences. It predicts the antioxidant potential of peptides with a machine learning model and supports multiple antioxidant mechanisms and batch processing.
 created: 2026-04-18
 version: 1.1.0
 last_updated: 2026-04-25
 ---
 
+> **English** | [中文](SKILL.zh.md)
+
 # AnOxPePred
 
 ## What It Is
-AnOxPePred (Antioxidant Peptide Predictor) 是一个基于深度学习的抗氧化肽预测工具。它使用预训练的卷积神经网络模型来评估肽序列的抗氧化潜力，支持多种抗氧化机制，包括：
-- **FRS (Free Radical Scavenging)**：自由基清除能力
-- **Chel (Metal Chelation)**：金属离子螯合能力
+AnOxPePred (Antioxidant Peptide Predictor) is a deep-learning-based antioxidant peptide prediction tool. It uses a pretrained convolutional neural network model to assess the antioxidant potential of peptide sequences, supporting several antioxidant mechanisms, including:
+- **FRS (Free Radical Scavenging)**: free radical scavenging capacity
+- **Chel (Metal Chelation)**: metal ion chelation capacity
 
-模型来源：[TobiasHeOl/AnOxPePred](https://github.com/TobiasHeOl/AnOxPePred)
+Model source: [TobiasHeOl/AnOxPePred](https://github.com/TobiasHeOl/AnOxPePred)
 
 ## When to Use
-- **抗氧化肽筛选**：从肽库中识别潜在的抗氧化候选物
-- **功能食品开发**：评估食品源性肽的抗氧化活性
-- **药物发现**：寻找具有治疗潜力的抗氧化肽
-- **肽工程**：设计具有增强抗氧化活性的肽变体
-- **生物信息学分析**：批量分析蛋白质水解产物的抗氧化潜力
+- **Antioxidant peptide screening**: identify potential antioxidant candidates from peptide libraries
+- **Functional food development**: evaluate the antioxidant activity of food-derived peptides
+- **Drug discovery**: find antioxidant peptides with therapeutic potential
+- **Peptide engineering**: design peptide variants with enhanced antioxidant activity
+- **Bioinformatics analysis**: batch-analyze the antioxidant potential of protein hydrolysates
 
 ## Methodology
-AnOxPePred 使用深度卷积神经网络进行预测：
-1. **序列编码**：使用 30x20 的 one-hot 编码矩阵表示肽序列
-2. **卷积层**：128 个滤波器，核大小 3，激活函数 elu
-3. **池化层**：平均池化，池大小 3
-4. **全连接层**：256 个神经元，激活函数 elu，dropout 0.15
-5. **输出层**：2 个神经元（对应 FRS 和 Chel），sigmoid 激活
-6. **损失函数**：Focal Loss（处理类别不平衡）
+AnOxPePred uses a deep convolutional neural network for prediction:
+1. **Sequence encoding**: represent the peptide sequence with a 30x20 one-hot encoding matrix
+2. **Convolutional layer**: 128 filters, kernel size 3, elu activation
+3. **Pooling layer**: average pooling, pool size 3
+4. **Fully connected layer**: 256 neurons, elu activation, dropout 0.15
+5. **Output layer**: 2 neurons (corresponding to FRS and Chel), sigmoid activation
+6. **Loss function**: Focal Loss (to handle class imbalance)
 
 ## Operations
 
-### 安装
+### Installation
 
-**方式一：使用 uv（推荐）**
+**Option 1: use uv (recommended)**
 ```bash
-# 创建虚拟环境
+# Create a virtual environment
 cd /path/to/AnOxPePred
 uv sync
 
-# 可选：安装完整功能（深度学习模型）
+# Optional: install full functionality (deep learning model)
 uv sync --extra ml
 
-# 可选：安装可视化依赖
+# Optional: install visualization dependencies
 uv sync --extra viz
 ```
 
-**方式二：使用 pip（不推荐）**
+**Option 2: use pip (not recommended)**
 ```bash
 pip install pandas numpy
-pip install tensorflow biopython matplotlib seaborn  # 完整功能
+pip install tensorflow biopython matplotlib seaborn  # full functionality
 ```
 
-### 模型文件说明
+### Model Files
 
-深度学习模型需要以下文件（已包含在 `anoxpepred_data/` 目录中）：
-- `AnOxPePred_v1.data-00000-of-00001`：模型权重文件
-- `AnOxPePred_v1.index`：模型索引文件
-- `One-hot_encoding.txt`：氨基酸编码矩阵
+The deep learning model requires the following files (already included in the `anoxpepred_data/` directory):
+- `AnOxPePred_v1.data-00000-of-00001`: model weight file
+- `AnOxPePred_v1.index`: model index file
+- `One-hot_encoding.txt`: amino acid encoding matrix
 
-如果模型文件缺失，会自动降级到基于氨基酸组成的规则预测模式。
+If the model files are missing, the tool automatically falls back to a rule-based prediction mode based on amino acid composition.
 
-### 快速开始
+### Quick Start
 
 ```python
 import sys
-sys.path.insert(0, '/path/to/AnOxPePred')  # 添加项目路径
+sys.path.insert(0, '/path/to/AnOxPePred')  # add the project path
 
 from tools.anoxpepred_integration import AnOxPePredIntegration
 
-# 初始化预测器
+# Initialize the predictor
 predictor = AnOxPePredIntegration()
 
-# 预测单个肽的抗氧化活性
+# Predict the antioxidant activity of a single peptide
 peptide = "YVPLPNVPQG"
 result = predictor.predict_single(peptide, peptide_id="test_peptide")
 
-print(f"抗氧化概率: {result.overall_score:.3f}")
-print(f"预测类别: {result.overall_class}")
-print(f"自由基清除分数(FRS): {result.frs_score:.3f}")
-print(f"金属螯合分数(Chel): {result.chel_score:.3f}")
-print(f"置信度: {result.confidence}")
+print(f"Antioxidant probability: {result.overall_score:.3f}")
+print(f"Predicted class: {result.overall_class}")
+print(f"Free radical scavenging score (FRS): {result.frs_score:.3f}")
+print(f"Metal chelation score (Chel): {result.chel_score:.3f}")
+print(f"Confidence: {result.confidence}")
 ```
 
-### 批量预测
+### Batch Prediction
 
 ```python
-# 批量预测多个肽
+# Batch-predict multiple peptides
 peptides = {
     "pep1": "YVPLPNVPQG",
     "pep2": "FFVAPFPEVFGK",
@@ -97,82 +99,82 @@ peptides = {
 
 batch_results = predictor.predict_batch(peptides)
 
-# 打印结果
+# Print the results
 for peptide_id, result in batch_results.items():
     print(f"{peptide_id}: {result.sequence} -> {result.overall_class} (score: {result.overall_score:.4f})")
 
-# 导出结果
+# Export the results
 predictor.export_results(batch_results, "anoxpepred_results.csv", format="csv")
 ```
 
-### 从文件预测
+### Predicting from Files
 
 ```python
-# 从 FASTA 文件预测
+# Predict from a FASTA file
 results = predictor.predict_from_fasta("peptides.fasta", threshold=0.5)
 
-# 从 CSV 文件预测
+# Predict from a CSV file
 results = predictor.predict_from_csv("peptides.csv", seq_col="sequence", id_col="id")
 ```
 
 ## Inputs and Outputs
-- **输入**：
-  - 肽序列（字符串格式，通常为 2-50 个氨基酸）
-  - 肽ID（可选）
-  - 文件路径（FASTA、CSV 格式）
-- **输出**：
-  - `overall_score`：综合抗氧化分数（0-1）
-  - `overall_class`：预测类别（Antioxidant / Non-antioxidant）
-  - `frs_score`：自由基清除分数（0-1）
-  - `chel_score`：金属螯合分数（0-1）
-  - `confidence`：置信度（high / medium / low / very_low）
-  - `mechanism_scores`：各机制分数字典
+- **Input**:
+  - Peptide sequence (as a string, usually 2-50 amino acids)
+  - Peptide ID (optional)
+  - File path (FASTA or CSV format)
+- **Output**:
+  - `overall_score`: composite antioxidant score (0-1)
+  - `overall_class`: predicted class (Antioxidant / Non-antioxidant)
+  - `frs_score`: free radical scavenging score (0-1)
+  - `chel_score`: metal chelation score (0-1)
+  - `confidence`: confidence level (high / medium / low / very_low)
+  - `mechanism_scores`: dictionary of scores per mechanism
 
 ## Examples
 
-1. **单个肽评估**：
+1. **Single peptide evaluation**:
 ```python
 result = predictor.predict_single("CCHHPLLLLLLA", peptide_id="cysteine_rich")
-print(f"抗氧化: {result.is_antioxidant}, 分数: {result.overall_score:.3f}")
+print(f"Antioxidant: {result.is_antioxidant}, score: {result.overall_score:.3f}")
 ```
 
-2. **高通量筛选**：
+2. **High-throughput screening**:
 ```python
-# 读取测试数据
+# Read the test data
 import pandas as pd
 df = pd.read_csv("peptides.csv")
 sequences = {str(i): seq for i, seq in enumerate(df['sequence'])}
 
-# 批量预测
+# Batch prediction
 results = predictor.predict_batch(sequences)
 
-# 筛选高活性肽
+# Filter for highly active peptides
 antioxidant_peptides = {
     pid: r for pid, r in results.items() if r.is_antioxidant
 }
-print(f"找到 {len(antioxidant_peptides)} 条抗氧化肽")
+print(f"Found {len(antioxidant_peptides)} antioxidant peptides")
 ```
 
-3. **机制分析**：
+3. **Mechanism analysis**:
 ```python
 result = predictor.predict_single("YVPLPNVPQG")
-print(f"自由基清除: {result.mechanism_scores['radical']:.3f}")
-print(f"金属螯合: {result.mechanism_scores['metal']:.3f}")
+print(f"Free radical scavenging: {result.mechanism_scores['radical']:.3f}")
+print(f"Metal chelation: {result.mechanism_scores['metal']:.3f}")
 ```
 
 ## References Index
 | File | Contents |
 |------|----------|
-| `references/anoxpepred_guide.md` | 详细的技术文档、算法说明和特征工程 |
-| `scripts/antioxidant_screening.py` | 抗氧化肽筛选管道脚本 |
-| `tools/anoxpepred_integration.py` | 核心集成模块 |
-| `anoxpepred_data/` | 模型权重和编码矩阵 |
+| `references/anoxpepred_guide.md` | Detailed technical documentation, algorithm description and feature engineering |
+| `scripts/antioxidant_screening.py` | Antioxidant peptide screening pipeline script |
+| `tools/anoxpepred_integration.py` | Core integration module |
+| `anoxpepred_data/` | Model weights and encoding matrix |
 
 ## Limitations
 
-1. **序列长度**：模型针对 2-50 个氨基酸的肽设计，超长序列可能不准确
-2. **非标准氨基酸**：包含非标准氨基酸（B、J、Z、U、O、X）的序列可能无法正确编码
-3. **模型可用性**：深度学习模型需要 TensorFlow，如果未安装会自动降级到规则预测
-4. **预测模式**：
-   - 深度学习模式：使用预训练模型，准确性更高
-   - 规则预测模式：基于氨基酸组成，准确性较低但无需额外依赖
+1. **Sequence length**: the model is designed for peptides of 2-50 amino acids; overly long sequences may be inaccurate
+2. **Non-standard amino acids**: sequences containing non-standard amino acids (B, J, Z, U, O, X) may not be encoded correctly
+3. **Model availability**: the deep learning model requires TensorFlow; if it is not installed, the tool automatically falls back to rule-based prediction
+4. **Prediction modes**:
+   - Deep learning mode: uses the pretrained model, higher accuracy
+   - Rule-based prediction mode: based on amino acid composition, lower accuracy but no extra dependencies

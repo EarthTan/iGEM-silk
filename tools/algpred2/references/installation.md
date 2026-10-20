@@ -1,21 +1,23 @@
-# AlgPred2 安装与环境配置
+> **English** | [中文](installation.zh.md)
 
-## 环境要求
+# AlgPred2 Installation and Environment Configuration
 
-- **平台**: macOS / Linux / Windows (via WSL)
+## Environment Requirements
+
+- **Platform**: macOS / Linux / Windows (via WSL)
 - **Python**: >= 3.11
-- **包管理器**: uv (必须使用，非 pip)
+- **Package manager**: uv (mandatory, not pip)
 
-## 安装步骤
+## Installation Steps
 
-### 1. 初始化项目
+### 1. Initialize the Project
 
 ```bash
 cd algpred2-risk-prediction
 uv init --no-readme
 ```
 
-### 2. 安装 AlgPred2 及依赖
+### 2. Install AlgPred2 and Its Dependencies
 
 ```bash
 uv add algpred2
@@ -23,48 +25,48 @@ uv add joblib
 uv add "scikit-learn==1.2.2" "numpy==1.26.4"
 ```
 
-> ⚠️ **重要**: 必须固定 `scikit-learn==1.2.2` 和 `numpy==1.26.4` 版本，否则可能出现模型 pickle 兼容性或二进制兼容性问题。
+> ⚠️ **Important**: you must pin `scikit-learn==1.2.2` and `numpy==1.26.4`; otherwise model pickle compatibility or binary compatibility issues may occur.
 
-### 3. 验证安装
+### 3. Verify the Installation
 
 ```bash
-# 验证 Python 导入
+# Verify the Python import
 uv run python -c "import algpred2; print(dir(algpred2))"
 
-# 验证 CLI 入口
+# Verify the CLI entry point
 uv run python -c "from algpred2.python_scripts.algpred2 import main; print('CLI OK')"
 ```
 
-## 依赖版本信息
+## Dependency Version Information
 
-| 包 | 版本 | 说明 |
+| Package | Version | Description |
 | --- | --- | --- |
-| algpred2 | >=1.4 | 核心预测工具 |
-| joblib | >=1.5.3 | 模型加载必需 |
-| scikit-learn | ==1.2.2 | **必须固定版本** |
-| numpy | ==1.26.4 | **必须固定版本** |
+| algpred2 | >=1.4 | Core prediction tool |
+| joblib | >=1.5.3 | Required for model loading |
+| scikit-learn | ==1.2.2 | **Version must be pinned** |
+| numpy | ==1.26.4 | **Version must be pinned** |
 
-## 已知问题
+## Known Issues
 
-### Shebang 路径错误
+### Shebang Path Error
 
-`.venv/bin/algpred2` 脚本的 shebang 可能包含错误路径。
+The shebang of the `.venv/bin/algpred2` script may contain an incorrect path.
 
-**临时解决方案**: 使用 Python import 方式调用 CLI
+**Workaround**: invoke the CLI through Python import
 
 ```bash
-# 直接运行（可能失败）
+# Run directly (may fail)
 algpred2 -h
 
-# Python import 方式（推荐）
+# Python import approach (recommended)
 uv run python -c "from algpred2.python_scripts.algpred2 import main; import sys; sys.argv = ['algpred2', '-h']; main()"
 ```
 
-### 依赖不完整
+### Incomplete Dependencies
 
-AlgPred2 安装后**不是开箱即用**，必须手动安装额外依赖。
+After installation AlgPred2 is **not out of the box**; additional dependencies must be installed manually.
 
-## pyproject.toml 示例
+## pyproject.toml Example
 
 ```toml
 [project]

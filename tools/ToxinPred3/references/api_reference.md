@@ -1,26 +1,28 @@
-# ToxinPred 3.0 API 参考
+> **English** | [中文](api_reference.zh.md)
 
-## 主要函数
+# ToxinPred 3.0 API Reference
+
+## Main Functions
 
 ### extract_features(sequences)
 
-提取完整的 AAC + DPC 特征集。
+Extract the complete AAC + DPC feature set.
 
-**参数：**
-- `sequences`: `List[str]` 或 `str`
-  - 肽序列列表，或 FASTA 文件路径
+**Parameters:**
+- `sequences`: `List[str]` or `str`
+  - A list of peptide sequences, or a FASTA file path
 
-**返回：**
-- `pd.DataFrame`: 420 列特征矩阵
+**Returns:**
+- `pd.DataFrame`: a 420-column feature matrix
 
-**示例：**
+**Example:**
 ```python
 from toxinpred_features import extract_features
 
-# 从序列列表
+# From a sequence list
 features = extract_features(["KWKLFKKIGAVLKVL", "MKPPLNAKLVLKPMWIG"])
 
-# 从文件
+# From a file
 features = extract_features("peptides.fa")
 ```
 
@@ -28,81 +30,81 @@ features = extract_features("peptides.fa")
 
 ### aac_composition(sequences)
 
-计算氨基酸组成 (AAC)。
+Compute amino acid composition (AAC).
 
-**参数：**
-- `sequences`: `List[str]` - 肽序列列表
+**Parameters:**
+- `sequences`: `List[str]` - list of peptide sequences
 
-**返回：**
-- `pd.DataFrame`: 20 列 (AAC_A, AAC_C, ... AAC_Y)
+**Returns:**
+- `pd.DataFrame`: 20 columns (AAC_A, AAC_C, ... AAC_Y)
 
 ---
 
 ### dpc_composition(sequences, step=1)
 
-计算二肽组成 (DPC)。
+Compute dipeptide composition (DPC).
 
-**参数：**
-- `sequences`: `List[str]` - 肽序列列表
-- `step`: `int` (默认 1) - 步长，连续二肽为 1
+**Parameters:**
+- `sequences`: `List[str]` - list of peptide sequences
+- `step`: `int` (default 1) - step size; 1 means consecutive dipeptides
 
-**返回：**
-- `pd.DataFrame`: 400 列 (DPC_AA, DPC_AC, ... DPC_WY)
+**Returns:**
+- `pd.DataFrame`: 400 columns (DPC_AA, DPC_AC, ... DPC_WY)
 
 ---
 
 ### predict_toxicity(sequences, threshold=0.38)
 
-预测肽序列的毒性。
+Predict the toxicity of peptide sequences.
 
-**参数：**
-- `sequences`: `List[str]` 或 `str` - 肽序列或文件路径
-- `threshold`: `float` (默认 0.38) - 毒性阈值
+**Parameters:**
+- `sequences`: `List[str]` or `str` - peptide sequences or a file path
+- `threshold`: `float` (default 0.38) - toxicity threshold
 
-**返回：**
-- `pd.DataFrame` 包含：
-  - `Name`: 序列名称
-  - `Sequence`: 肽序列
-  - `Length`: 序列长度
-  - `Toxicity_Score`: 毒性评分 (0-1)
-  - `Prediction`: "Toxin" 或 "Non-Toxin"
+**Returns:**
+- `pd.DataFrame` containing:
+  - `Name`: sequence name
+  - `Sequence`: peptide sequence
+  - `Length`: sequence length
+  - `Toxicity_Score`: toxicity score (0-1)
+  - `Prediction`: "Toxin" or "Non-Toxin"
 
 ---
 
 ### batch_predict_from_file(input_file, output_file='toxinpred_results.csv', threshold=0.38)
 
-从文件批量预测并保存结果。
+Batch prediction from a file, saving the results.
 
-**参数：**
-- `input_file`: `str` - 输入文件路径 (FASTA 或单序列每行)
-- `output_file`: `str` (默认 "toxinpred_results.csv") - 输出 CSV 路径
-- `threshold`: `float` (默认 0.38) - 毒性阈值
+**Parameters:**
+- `input_file`: `str` - input file path (FASTA or one sequence per line)
+- `output_file`: `str` (default "toxinpred_results.csv") - output CSV path
+- `threshold`: `float` (default 0.38) - toxicity threshold
 
-**返回：**
-- `pd.DataFrame` - 预测结果
+**Returns:**
+- `pd.DataFrame` - prediction results
 
 ---
 
 ### read_fasta(file_path)
 
-读取 FASTA 格式文件。
+Read a FASTA-format file.
 
-**参数：**
-- `file_path`: `str` - FASTA 文件路径
+**Parameters:**
+- `file_path`: `str` - FASTA file path
 
-**返回：**
-- `Tuple[List[str], List[str]]`: (序列名称列表, 序列列表)
+**Returns:**
+- `Tuple[List[str], List[str]]`: (list of sequence names, list of sequences)
 
 ---
 
 ### calculate_toxicity_score(sequence)
 
-基于序列组成计算简化毒性评分。
+Compute a simplified toxicity score based on sequence composition.
 
-**参数：**
-- `sequence`: `str` - 肽序列
+**Parameters:**
+- `sequence`: `str` - peptide sequence
 
-**返回：**
-- `float`: 毒性评分 (0-1)
+**Returns:**
+- `float`: toxicity score (0-1)
 
-**注意：** 这是简化的基于规则的评分，不是 ML 模型。
+**Note:** This is a simplified rule-based score, not an ML model.

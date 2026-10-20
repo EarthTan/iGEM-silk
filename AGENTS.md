@@ -1,50 +1,52 @@
-# 项目约定
+> **English** | [中文](AGENTS.zh.md)
 
-1. 项目的根目录名称是 `iGEM-silk/`,以后统一用 `./` 表示
+# Project Conventions
 
-2. 项目的python环境使用 uv 管理，总的虚拟环境安装在 `./venv`。项目的python环境使用 `pyproject.toml` 来管理。`tools/`下的微服务每个有各自的环境，通过 FastAPI 的方式提供微服务，暴露端口提供给核心功能使用。
+1. The project root directory is named `iGEM-silk/`; from now on, `./` refers to it uniformly.
 
-3. 本项目使用聪慧的 `uv` 和 `pyproject.toml` 来管理python环境，而不使用愚蠢的 `pip` 或者 `requirements.md`。
+2. The project's Python environment is managed with uv, and the shared virtual environment is installed at `./venv`. The project's Python environment is managed with `pyproject.toml`. Each microservice under `tools/` has its own environment, provides its microservice through FastAPI, and exposes a port for use by the core functionality.
+
+3. This project uses the smart `uv` and `pyproject.toml` to manage the Python environment, instead of the stupid `pip` or `requirements.md`.
 
    
 
 
-# Agent 须知
+# Notes for Agents
 
 1. Never use subagent, do it yourself, step by step.
-2. `.agents/learnings` 存储了学到的经验和教训，值得参考
-3. `.agents/skills` 是本项目常用的skill，其中就包括了 "GEP-creator"
-4. 本项目在实际使用中 <u>**一律使用docker运行所有微服务，绝对禁止直接用python直接运行微服务**</u>
+2. `.agents/learnings` stores the experience and lessons learned, and is worth consulting.
+3. `.agents/skills` contains the skills commonly used in this project, including "GEP-creator".
+4. In actual use, this project <u>**always runs all microservices with Docker; running microservices directly with Python is absolutely forbidden**</u>.
 
-# 安全规则（生产部署机器）
+# Safety Rules (Production Deployment Machine)
 
-## 这台机器的身份
+## Identity of This Machine
 
-- **角色**: iGEM-silk 生产部署机器
-- **网络**: 学校网络，下载大文件极慢（2.5GB 需数小时到一整天）
-- **风险等级**: 高 — 任何数据丢失都需要极长时间恢复
+- **Role**: iGEM-silk production deployment machine
+- **Network**: University network; downloading large files is extremely slow (2.5 GB takes hours to a whole day)
+- **Risk level**: High — any data loss requires an extremely long time to recover
 
-## 绝对禁令
+## Absolute Prohibitions
 
-> ⚠️ 以下禁令源于真实教训（2026-05-17）：Claude Code 在执行 `git clean -fdx` 后，删除了 esmfold 模型（6GB）、ESM-2 t33 模型（2.5GB）、数百个 BepiPred embedding 缓存，以及 stages3 输出目录 `output3/`（含不可恢复的数据）。
+> ⚠️ The following prohibitions come from a real lesson (2026-05-17): after running `git clean -fdx`, Claude Code deleted the esmfold model (6 GB), the ESM-2 t33 model (2.5 GB), hundreds of BepiPred embedding caches, and the stages3 output directory `output3/` (which contained unrecoverable data).
 
-1. **绝对禁止在生产机器上运行 `git clean` 的任何变体（包括 `git clean -fd` 和 `git clean -fdx`）。**
-   - untracked 文件不是垃圾文件，是正在使用的模型和数据。
-   - `.gitignore` 中的文件更是如此，删除后恢复极难。
+1. **Absolutely forbidden to run any variant of `git clean` on the production machine (including `git clean -fd` and `git clean -fdx`).**
+   - Untracked files are not garbage; they are models and data currently in use.
+   - This is even more true for files listed in `.gitignore`; once deleted, they are extremely hard to restore.
 
-2. **绝对禁止在生产机器上运行 `git checkout -- .` 或 `git restore .`。**
+2. **Absolutely forbidden to run `git checkout -- .` or `git restore .` on the production machine.**
 
-3. **绝对禁止在生产机器上运行 `git reset --hard`。**
+3. **Absolutely forbidden to run `git reset --hard` on the production machine.**
 
-4. **在执行任何危险操作前，必须先确认当前机器的角色，并理解每个 untracked 文件的作用。**
+4. **Before performing any dangerous operation, you must first confirm the role of the current machine and understand the purpose of every untracked file.**
 
-## 安全操作流程
+## Safe Operating Procedure
 
-1. **识别机器角色**: 有大量 `.pt` 模型文件、有 `output/` `output3/` 目录的就是生产机器。不确定就问用户。
-2. **区分文件类型**:
-   - `.pt` / `.bin` / `.pth` / `.ckpt` 模型文件 → **绝对不能删**
-   - `output/` / `output3/` 输出数据 → **绝对不能删**
-   - `esm_cache/` 缓存 → 可重建但成本高，需用户确认
-   - `__pycache__/` → 安全
-3. **优先使用隔离机制**: 对生产机器的任何修改工作，使用 `EnterWorktree`（git worktree）创建隔离工作区，不要直接在当前目录操作。
-4. **不确定就问用户**: 不清楚后果的操作，先问用户再执行。
+1. **Identify the machine role**: a machine with many `.pt` model files and `output/` `output3/` directories is the production machine. If unsure, ask the user.
+2. **Distinguish file types**:
+   - `.pt` / `.bin` / `.pth` / `.ckpt` model files → **must never be deleted**
+   - `output/` / `output3/` output data → **must never be deleted**
+   - `esm_cache/` cache → rebuildable but expensive; requires user confirmation
+   - `__pycache__/` → safe
+3. **Prefer isolation mechanisms**: for any modification work on the production machine, use `EnterWorktree` (git worktree) to create an isolated workspace; do not operate directly in the current directory.
+4. **When unsure, ask the user**: for operations whose consequences are unclear, ask the user before executing.

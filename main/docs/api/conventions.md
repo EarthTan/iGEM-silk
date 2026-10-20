@@ -1,36 +1,38 @@
-# API 规范手册
+> **English** | [中文](conventions.zh.md)
 
-本系统微服务 API 设计沿————模板化、契约化。所有微服务遵循三种模板之一：
-- **FASTA 服务**（序列→评分/分类）
-- **PDB 服务**（PDB 结构→评分）
-- **Structure 服务**（序列→3D 结构）
+# API Conventions Manual
 
-每个模板定义了一致的端点路径、请求/响应模型、错误处理和健康检查格式。
+The microservice APIs in this system are designed to be templated and contract-based throughout. All microservices follow one of three templates:
+- **FASTA service** (sequence → score/classification)
+- **PDB service** (PDB structure → score)
+- **Structure service** (sequence → 3D structure)
+
+Each template defines consistent endpoint paths, request/response models, error handling, and health check formats.
 
 ---
 
-## 1. 通用约定
+## 1. General Conventions
 
-### 1.1 传输协议
+### 1.1 Transport Protocol
 
-| 项目 | 约定 |
-|------|------|
-| 协议 | HTTP/1.1 |
+| Item | Convention |
+|------|------------|
+| Protocol | HTTP/1.1 |
 | Content-Type | `application/json` |
-| 编码 | UTF-8 |
-| 端口范围 | 评分 8001-8012, 安全过滤 8003-8008, 结构预测 8201-8205, PDB 评分 8101-8102 |
-| 认证 | 无（内部网络，不对外暴露） |
+| Encoding | UTF-8 |
+| Port ranges | Scoring 8001-8012, safety filtering 8003-8008, structure prediction 8201-8205, PDB scoring 8101-8102 |
+| Authentication | None (internal network, not externally exposed) |
 
-### 1.2 状态码
+### 1.2 Status Codes
 
-| 状态码 | 含义 |
-|--------|------|
-| 200 | 成功（含业务错误如 `success: false`） |
-| 202 | 异步任务已接受（仅 async 模式） |
-| 422 | 请求体验证失败（字段缺失/类型错误） |
-| 500 | 服务内部错误 |
+| Status code | Meaning |
+|-------------|---------|
+| 200 | Success (including business errors such as `success: false`) |
+| 202 | Async job accepted (async mode only) |
+| 422 | Request body validation failed (missing field / wrong type) |
+| 500 | Internal service error |
 
-### 1.3 公共端点
+### 1.3 Common Endpoints
 
 ```http
 GET /health   → HealthResponse
@@ -59,7 +61,7 @@ GET /info     → InfoResponse
 }
 ```
 
-`status` 取值：`"healthy"`（可用）、`"loading"`（模型加载中，短暂状态）。
+`status` values: `"healthy"` (available), `"loading"` (model loading, a transient state).
 
 #### InfoResponse
 
@@ -75,24 +77,24 @@ GET /info     → InfoResponse
 }
 ```
 
-`recommended_batch_size` 是服务端的推荐上限，客户端不应超过此值。
+`recommended_batch_size` is the server-side recommended upper bound; clients should not exceed it.
 
 ---
 
-## 2. FASTA 服务模板
+## 2. FASTA Service Template
 
-适用于：AnOxPePred、BepiPred3、ToxinPred3、HemoPI2、MHCflurry、AlgPred2、pLM4CPPs、TIPred、GraphCPP、TemStaPro、SoDoPE。
+Applies to: AnOxPePred, BepiPred3, ToxinPred3, HemoPI2, MHCflurry, AlgPred2, pLM4CPPs, TIPred, GraphCPP, TemStaPro, SoDoPE.
 
-### 2.1 端点
+### 2.1 Endpoints
 
 ```http
-POST /predict          # 单条预测
-POST /predict/batch    # 批量预测
+POST /predict          # single prediction
+POST /predict/batch    # batch prediction
 ```
 
-### 2.2 请求格式
+### 2.2 Request Format
 
-#### 单条：`POST /predict`
+#### Single: `POST /predict`
 
 ```json
 {
@@ -101,12 +103,12 @@ POST /predict/batch    # 批量预测
 }
 ```
 
-| 字段 | 类型 | 必选 | 说明 |
-|------|------|------|------|
-| `sequence` | string | 是 | 氨基酸单字母序列，1-5000 aa |
-| `peptide_id` | string | 否 | 标识符，默认 `"unknown"` |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sequence` | string | Yes | Single-letter amino acid sequence, 1-5000 aa |
+| `peptide_id` | string | No | Identifier, defaults to `"unknown"` |
 
-#### 批量：`POST /predict/batch`
+#### Batch: `POST /predict/batch`
 
 ```json
 {
@@ -117,13 +119,13 @@ POST /predict/batch    # 批量预测
 }
 ```
 
-| 字段 | 类型 | 必选 | 说明 |
-|------|------|------|------|
-| `sequences` | array | 是 | 1-1000 条序列 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sequences` | array | Yes | 1-1000 sequences |
 
-**⚠️ 批量请求 payload 键名是 `sequences`（不是 `requests`）**。这是 FASTA 模板与 PDB 模板的关键区别。
+**⚠️ The batch request payload key is `sequences` (not `requests`)**. This is the key difference between the FASTA template and the PDB template.
 
-### 2.3 单条响应
+### 2.3 Single Response
 
 ```json
 {
@@ -146,25 +148,25 @@ POST /predict/batch    # 批量预测
 }
 ```
 
-| 顶层字段 | 类型 | 说明 |
-|----------|------|------|
-| `success` | bool | 是否成功。**注意**：即使 `success: true`，`result` 仍可能为 null（服务无错误但无法评分） |
-| `peptide_id` | string | 请求传入的标识符 |
-| `sequence` | string | 原始请求序列 |
-| `result` | object|null | 评分结果。失败时为 null |
-| `error` | string|null | 错误信息 |
+| Top-level field | Type | Description |
+|-----------------|------|-------------|
+| `success` | bool | Whether the call succeeded. **Note**: even when `success: true`, `result` may still be null (the service has no error but cannot score) |
+| `peptide_id` | string | Identifier passed in the request |
+| `sequence` | string | Original request sequence |
+| `result` | object|null | Scoring result. null on failure |
+| `error` | string|null | Error message |
 
-#### result 对象
+#### result object
 
-| 字段 | 类型 | 必选 | 说明 |
-|------|------|------|------|
-| `peptide_id` | string | 否 | 默认 `"unknown"` |
-| `sequence` | string | 否 | 回显原始序列 |
-| `score` | float | **是** | 0-1 主评分 |
-| `label` | string | **是** | 分类标签，取值因服务而异 |
-| `details` | dict | 是（可为空） | 服务特定的附加信息 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `peptide_id` | string | No | Defaults to `"unknown"` |
+| `sequence` | string | No | Echoes the original sequence |
+| `score` | float | **Yes** | Primary score, 0-1 |
+| `label` | string | **Yes** | Classification label; values vary by service |
+| `details` | dict | Yes (may be empty) | Service-specific additional information |
 
-### 2.4 批量响应
+### 2.4 Batch Response
 
 ```json
 {
@@ -190,19 +192,19 @@ POST /predict/batch    # 批量预测
 }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `results` | array | result 对象数组。**注意**：与单条不同，批量结果没有 `result` 嵌套层，`score`/`label` 直接在顶层 |
-| `total` | int | 成功评分的数量。若 `< 输入长度`，则有部分失败 |
-| `error` | string|null | 全局错误信息 |
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | bool | Whether the call succeeded |
+| `results` | array | Array of result objects. **Note**: unlike the single endpoint, batch results have no `result` nesting layer; `score`/`label` are at the top level |
+| `total` | int | Number of successful scores. If `< input length`, some items failed |
+| `error` | string|null | Global error message |
 
-**⚠️ 批量响应中没有 `result` 嵌套**。直接读 `results[0].score`，不是 `results[0].result.score`。
+**⚠️ There is no `result` nesting in batch responses**. Read `results[0].score` directly, not `results[0].result.score`.
 
-### 2.5 `label` 取值对照
+### 2.5 `label` Value Reference
 
-| 服务 | label 可能值 |
-|------|-------------|
+| Service | Possible label values |
+|---------|----------------------|
 | AnOxPePred | `"antioxidant"`, `"non-antioxidant"` |
 | ToxinPred3 | `"Toxin"`, `"Non-Toxin"` |
 | HemoPI2 | `"hemolytic"`, `"non-hemolytic"` |
@@ -215,29 +217,29 @@ POST /predict/batch    # 批量预测
 | GraphCPP | `"CPP"`, `"non-CPP"` |
 | TIPred | `"inhibitor"`, `"non-inhibitor"` |
 
-### 2.6 服务端默认配置
+### 2.6 Server-Side Default Configuration
 
 ```python
-recommended_batch_size = 50  # 服务端建议的批量大小上限
-semaphore = asyncio.Semaphore(10)  # 服务端并发限制（可被子类覆盖）
+recommended_batch_size = 50  # recommended upper bound on batch size (server side)
+semaphore = asyncio.Semaphore(10)  # server-side concurrency limit (overridable in subclasses)
 ```
 
 ---
 
-## 3. PDB 服务模板
+## 3. PDB Service Template
 
-适用于：SASA、Aggrescan3D。
+Applies to: SASA, Aggrescan3D.
 
-### 3.1 端点
+### 3.1 Endpoints
 
 ```http
-POST /predict          # 单条 PDB 评分
-POST /predict/batch    # 批量 PDB 评分
+POST /predict          # single PDB scoring
+POST /predict/batch    # batch PDB scoring
 ```
 
-### 3.2 请求格式
+### 3.2 Request Format
 
-#### 单条：`POST /predict`
+#### Single: `POST /predict`
 
 ```json
 {
@@ -248,16 +250,16 @@ POST /predict/batch    # 批量 PDB 评分
 }
 ```
 
-| 字段 | 类型 | 必选 | 说明 |
-|------|------|------|------|
-| `pdb_content` | string | **是** | PDB 格式全文 |
-| `sequence` | string | 否（但 SASA 需要） | 功能肽序列，用于在 PDB 中定位 |
-| `chain_id` | string | 否 | 目标链，默认 `"A"` |
-| `peptide_id` | string | 否 | 标识符，默认 `"unknown"` |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pdb_content` | string | **Yes** | Full PDB-format content |
+| `sequence` | string | No (but required by SASA) | Functional peptide sequence, used to locate the peptide in the PDB |
+| `chain_id` | string | No | Target chain, defaults to `"A"` |
+| `peptide_id` | string | No | Identifier, defaults to `"unknown"` |
 
-**⚠️ SASA 不传 `sequence` 会返回 score=0**。见 quirks.md 第 2 条。
+**⚠️ SASA returns score=0 if `sequence` is not passed**. See item 2 in quirks.md.
 
-#### 批量：`POST /predict/batch`
+#### Batch: `POST /predict/batch`
 
 ```json
 {
@@ -276,11 +278,11 @@ POST /predict/batch    # 批量 PDB 评分
 }
 ```
 
-**⚠️ 批量请求 payload 键名是 `requests`（不是 `sequences`）**。这是 PDB 模板与 FASTA 模板的关键区别。
+**⚠️ The batch request payload key is `requests` (not `sequences`)**. This is the key difference between the PDB template and the FASTA template.
 
-### 3.3 批量响应格式（与单条不同！）
+### 3.3 Batch Response Format (different from single!)
 
-#### 单条：`POST /predict`
+#### Single: `POST /predict`
 
 ```json
 {
@@ -303,7 +305,7 @@ POST /predict/batch    # 批量 PDB 评分
 }
 ```
 
-#### 批量：`POST /predict/batch`
+#### Batch: `POST /predict/batch`
 
 ```json
 {
@@ -321,14 +323,14 @@ POST /predict/batch    # 批量 PDB 评分
 }
 ```
 
-| 对比点 | 单条 | 批量 |
-|--------|------|------|
-| score 位置 | `result.score` | `results[].score`（无 result 嵌套） |
-| 字段结构 | success/peptide_id/result/error | success/results/total/error |
+| Comparison point | Single | Batch |
+|------------------|--------|-------|
+| Location of score | `result.score` | `results[].score` (no result nesting) |
+| Field structure | success/peptide_id/result/error | success/results/total/error |
 
-解析时统一用 `r.get("score")` 处理批量结果。
+When parsing batch results, always use `r.get("score")`.
 
-### 3.4 PDB 服务的 details 结构
+### 3.4 `details` Structure of PDB Services
 
 #### SASA
 
@@ -384,31 +386,31 @@ POST /predict/batch    # 批量 PDB 评分
 
 ---
 
-## 4. Structure 服务模板
+## 4. Structure Service Template
 
-适用于：ESMFold、OmegaFold、AlphaFold3、PEP-FOLD4、Waveflow。
+Applies to: ESMFold, OmegaFold, AlphaFold3, PEP-FOLD4, Waveflow.
 
-### 4.1 端点
+### 4.1 Endpoints
 
-#### 同步模式（ESMFold、OmegaFold、PEP-FOLD4）
-
-```http
-POST /predict          # 单条结构预测
-POST /predict/batch    # 批量结构预测
-```
-
-#### 异步 Job 模式（AlphaFold3，其他可选）
+#### Synchronous mode (ESMFold, OmegaFold, PEP-FOLD4)
 
 ```http
-POST /predict/async          # 提交任务 → 返回 job_id (202)
-GET  /status/{job_id}        # 查询任务状态
-GET  /result/{job_id}        # 获取任务结果
-GET  /status                 # 所有运行中任务
-GET  /jobs                   # 所有历史任务
-DELETE /jobs/{job_id}        # 删除任务
+POST /predict          # single structure prediction
+POST /predict/batch    # batch structure prediction
 ```
 
-#### Waveflow 独有
+#### Async job mode (AlphaFold3; optional for others)
+
+```http
+POST /predict/async          # submit job → returns job_id (202)
+GET  /status/{job_id}        # query job status
+GET  /result/{job_id}        # fetch job result
+GET  /status                 # all running jobs
+GET  /jobs                   # all historical jobs
+DELETE /jobs/{job_id}        # delete job
+```
+
+#### Waveflow-specific
 
 ```http
 POST /predict/{tool}         # tool = esmfold | omegafold | alphafold
@@ -416,9 +418,9 @@ POST /predict/batch/{tool}
 POST /predict/async/{tool}
 ```
 
-### 4.2 请求格式
+### 4.2 Request Format
 
-#### 单条：`POST /predict`
+#### Single: `POST /predict`
 
 ```json
 {
@@ -427,9 +429,9 @@ POST /predict/async/{tool}
 }
 ```
 
-与 FASTA 模板相同的 PredictRequest。
+Same PredictRequest as the FASTA template.
 
-#### 批量：`POST /predict/batch`
+#### Batch: `POST /predict/batch`
 
 ```json
 {
@@ -439,9 +441,9 @@ POST /predict/async/{tool}
 }
 ```
 
-与 FASTA 模板相同的 BatchPredictRequest。
+Same BatchPredictRequest as the FASTA template.
 
-#### 异步提交：`POST /predict/async`
+#### Async submission: `POST /predict/async`
 
 ```json
 {
@@ -450,7 +452,7 @@ POST /predict/async/{tool}
 }
 ```
 
-响应 202：
+Response 202:
 
 ```json
 {
@@ -460,9 +462,9 @@ POST /predict/async/{tool}
 }
 ```
 
-### 4.3 响应格式
+### 4.3 Response Format
 
-#### 单条同步响应
+#### Single synchronous response
 
 ```json
 {
@@ -485,7 +487,7 @@ POST /predict/async/{tool}
 }
 ```
 
-#### 批量同步响应
+#### Batch synchronous response
 
 ```json
 {
@@ -504,7 +506,7 @@ POST /predict/async/{tool}
 }
 ```
 
-#### 异步状态查询：`GET /status/{job_id}`
+#### Async status query: `GET /status/{job_id}`
 
 ```json
 {
@@ -516,9 +518,9 @@ POST /predict/async/{tool}
 }
 ```
 
-`status` 取值：`"pending"` → `"running"` → `"success"` | `"failed"`
+`status` values: `"pending"` → `"running"` → `"success"` | `"failed"`
 
-#### 异步结果获取：`GET /result/{job_id}`
+#### Async result fetch: `GET /result/{job_id}`
 
 ```json
 {
@@ -532,30 +534,30 @@ POST /predict/async/{tool}
 }
 ```
 
-### 4.4 PDB 文件保存建议
+### 4.4 PDB File Saving Recommendations
 
-- 每条序列一个 PDB 文件，以 `{peptide_id}.pdb` 命名
-- 每组预测存放在 `output4/pdb/{peptide_id}/` 目录
-- 保留原始 B-factor 列（OmegaFold 用 confidence×100 填充）
+- One PDB file per sequence, named `{peptide_id}.pdb`
+- Store each prediction set in the `output4/pdb/{peptide_id}/` directory
+- Keep the original B-factor column (OmegaFold fills it with confidence×100)
 
-### 4.5 各 Structure 服务的 `details` 字段
+### 4.5 `details` Fields of Each Structure Service
 
-| 服务 | details 字段 | 说明 |
-|------|-------------|------|
-| OmegaFold | `mean_plddt`, `sequence_length`, `model_version`, `num_cycle`, `device` | pLDDT=confidence |
-| ESMFold | `mean_plddt`, `ptm_score`, `sequence_length` | pTM 是全局折叠置信度 |
-| AlphaFold3 | `mean_plddt`, `ptm_score`, `iptm_score`, `full_pae`(矩阵), `model_version` | PAE 矩阵可能非常大 |
-| PEP-FOLD4 | `sequence_length` | 限 5-40 aa |
-| Waveflow | `tool_type`, `job_name`, `elapsed_seconds`, `sequence_length` | 远程 API 耗时 |
+| Service | details fields | Notes |
+|---------|----------------|-------|
+| OmegaFold | `mean_plddt`, `sequence_length`, `model_version`, `num_cycle`, `device` | pLDDT = confidence |
+| ESMFold | `mean_plddt`, `ptm_score`, `sequence_length` | pTM is the global folding confidence |
+| AlphaFold3 | `mean_plddt`, `ptm_score`, `iptm_score`, `full_pae` (matrix), `model_version` | The PAE matrix can be very large |
+| PEP-FOLD4 | `sequence_length` | Limited to 5-40 aa |
+| Waveflow | `tool_type`, `job_name`, `elapsed_seconds`, `sequence_length` | Remote API elapsed time |
 
 ---
 
-## 5. 批量调用指导
+## 5. Batch Call Guidance
 
-### 5.1 每服务推荐配置速查
+### 5.1 Per-Service Recommended Configuration Quick Reference
 
-| 服务 | 类型 | 每批条数 | 并发数 | 超时(s) | GPU/CPU |
-|------|------|----------|--------|---------|---------|
+| Service | Type | Batch size | Concurrency | Timeout (s) | GPU/CPU |
+|---------|------|------------|-------------|-------------|---------|
 | AnOxPePred | fasta | 1000 | 10 | 120 | GPU |
 | AlgPred2 | fasta | 1000 | 10 | 120 | CPU |
 | ToxinPred3 | fasta | **1** | **2** | 180 | CPU |
@@ -572,63 +574,63 @@ POST /predict/async/{tool}
 | ESMFold | structure | 5 | 3 | 600 | GPU |
 | AlphaFold3 | structure | 1 | 1 | 14400 | GPU |
 | PEP-FOLD4 | structure | 1 | 3 | 1800 | CPU |
-| Waveflow | structure | 5 | 3 | 3600 | CPU(远程) |
+| Waveflow | structure | 5 | 3 | 3600 | CPU(remote) |
 
-### 5.2 并发控制要点
+### 5.2 Key Points of Concurrency Control
 
 ```
-toxinpred3: Semaphore(2), batch_size=1   ← sklearn 线程不安全
-omegafold:  Semaphore(1), batch_size=1   ← 阻塞事件循环
-aggrescan3d: Semaphore(2)                ← Docker 子进程开销大
-temstapro:  Semaphore(5)                 ← GPU OOM 风险
+toxinpred3: Semaphore(2), batch_size=1   ← sklearn is not thread-safe
+omegafold:  Semaphore(1), batch_size=1   ← blocks the event loop
+aggrescan3d: Semaphore(2)                ← high Docker subprocess overhead
+temstapro:  Semaphore(5)                 ← GPU OOM risk
 ```
 
-其他 FASTA 服务可用 `Semaphore(10)` + `batch_size=1000`。
+Other FASTA services can use `Semaphore(10)` + `batch_size=1000`.
 
-### 5.3 客户端代码模式
+### 5.3 Client Code Pattern
 
 ```python
 from main.client import ServiceClient
 
 client = ServiceClient(timeout=120.0)
 
-# FASTA 评分
+# FASTA scoring
 result = await client.predict_batch("anoxpepred", items)
 # items = [{"peptide_id": "1", "sequence": "YVPL..."}, ...]
 # result["results"][0]["score"]
 
-# PDB 评分
+# PDB scoring
 result = await client.predict_pdb_batch("sasa", items)
 # items = [{"peptide_id": "1", "pdb_content": "ATOM...", "sequence": "YVPL..."}]
-# result["results"][0]["score"]  ← 注意：score 在顶层
+# result["results"][0]["score"]  ← note: score is at the top level
 
-# 结构预测（同步）
+# structure prediction (synchronous)
 result = await client.predict_structure_sync("omegafold", items)
 # items = [{"peptide_id": "1", "sequence": "YVPL..."}]
 # result["results"][0]["pdb_content"]
 
-# 结构预测（异步）
+# structure prediction (asynchronous)
 result = await client.predict_structure_async("alphafold3", sequence)
 ```
 
 ---
 
-## 6. 错误处理契约
+## 6. Error Handling Contract
 
-### 6.1 业务错误 vs HTTP 错误
+### 6.1 Business Errors vs HTTP Errors
 
-- **HTTP 4xx/5xx**：网络层或框架层错误（请求体格式错误、服务内部错误）
-- **HTTP 200 + `success: false`**：业务层错误（模型未加载、序列太长、PDB 解析失败）
+- **HTTP 4xx/5xx**: network-layer or framework-layer errors (malformed request body, internal service error)
+- **HTTP 200 + `success: false`**: business-layer errors (model not loaded, sequence too long, PDB parsing failure)
 
-所有业务逻辑错误都在 JSON body 内通过 `success` 和 `error` 字段表达。
+All business-logic errors are expressed inside the JSON body through the `success` and `error` fields.
 
-### 6.2 部分失败
+### 6.2 Partial Failure
 
-批量请求中个别序列可能失败。此时：
-- `success: true`（整体请求成功）
-- `total < 输入长度`（部分失败的数量）
-- 失败项的 `details` 可能包含 `error` 字段
-- 失败项的 `score` 为 `null`
+Individual sequences in a batch request may fail. In that case:
+- `success: true` (the overall request succeeded)
+- `total < input length` (the number of partial failures)
+- A failed item's `details` may contain an `error` field
+- A failed item's `score` is `null`
 
 ```json
 {
@@ -642,40 +644,40 @@ result = await client.predict_structure_async("alphafold3", sequence)
 }
 ```
 
-### 6.3 健康检查降级
+### 6.3 Health Check Degradation
 
-`GET /health` 可能返回以下 `status`：
+`GET /health` may return the following `status` values:
 
-| status | 含义 | 处理方式 |
-|--------|------|----------|
-| `"healthy"` | 服务可用，模型已加载 | 正常调用 |
-| `"loading"` | 模型正在加载（首次启动或重启后） | 等待后重试 |
-| `"degraded"` | 服务部分可用（如模型文件缺失，使用规则回退） | AnOxPePred 特有，调用正常但精度降低 |
-
----
-
-## 7. 各服务 `label` + `score` 含义矩阵
-
-| 服务 | score 含义 | 范围 | label 语义 |
-|------|-----------|------|-----------|
-| AnOxPePred | 抗氧化概率 | 0-1 | antioxidant / non-antioxidant |
-| ToxinPred3 | 毒性概率 | 0-1 | Toxin / Non-Toxin |
-| HemoPI2 | 溶血概率 | 0-1 | hemolytic / non-hemolytic |
-| MHCflurry | 结合概率 | 0-1 | binder / non-binder |
-| AlgPred2 | 致敏概率 | 0-1 | Allergen / Non-Allergen |
-| BepiPred3 | 表位概率 | 0-1 | epitope / non-epitope |
-| TemStaPro | 稳定性分数 | 0-1 | stable / unstable |
-| SoDoPE | 溶解度概率 | 0-1 | soluble / insoluble |
-| pLM4CPPs | CPP 概率 | 0-1 | CPP / non-CPP |
-| GraphCPP | CPP 概率 | 0-1 | CPP / non-CPP |
-| TIPred | 抑制概率 | 0-1 | inhibitor / non-inhibitor |
-| SASA | 平均相对 SASA | 0-1 | exposed / partial / buried / no_target |
-| Aggrescan3D | 聚集风险 | 0-1 | high/moderate/low_aggregation_risk |
-| OmegaFold | 无 | 无（`confidence` 是 pLDDT） | 无（结构质量用 pLDDT 表示） |
-| ESMFold | 无 | 无（`confidence` 是 pLDDT） | 无 |
+| status | Meaning | Handling |
+|--------|---------|----------|
+| `"healthy"` | Service available, model loaded | Call normally |
+| `"loading"` | Model is loading (first startup or after a restart) | Wait, then retry |
+| `"degraded"` | Service partially available (e.g., model files missing, rule-based fallback in use) | AnOxPePred-specific; calls work but accuracy is reduced |
 
 ---
 
-## 8. 快速检索
+## 7. `label` + `score` Meaning Matrix per Service
 
-参见 `services.json` 获得机器可读格式的完整服务配置（端口、batch、并发、阈值、known details keys）。
+| Service | Meaning of score | Range | Semantics of label |
+|---------|------------------|-------|--------------------|
+| AnOxPePred | Antioxidant probability | 0-1 | antioxidant / non-antioxidant |
+| ToxinPred3 | Toxicity probability | 0-1 | Toxin / Non-Toxin |
+| HemoPI2 | Hemolysis probability | 0-1 | hemolytic / non-hemolytic |
+| MHCflurry | Binding probability | 0-1 | binder / non-binder |
+| AlgPred2 | Allergenicity probability | 0-1 | Allergen / Non-Allergen |
+| BepiPred3 | Epitope probability | 0-1 | epitope / non-epitope |
+| TemStaPro | Stability score | 0-1 | stable / unstable |
+| SoDoPE | Solubility probability | 0-1 | soluble / insoluble |
+| pLM4CPPs | CPP probability | 0-1 | CPP / non-CPP |
+| GraphCPP | CPP probability | 0-1 | CPP / non-CPP |
+| TIPred | Inhibition probability | 0-1 | inhibitor / non-inhibitor |
+| SASA | Mean relative SASA | 0-1 | exposed / partial / buried / no_target |
+| Aggrescan3D | Aggregation risk | 0-1 | high/moderate/low_aggregation_risk |
+| OmegaFold | None | None (`confidence` is pLDDT) | None (structure quality is expressed by pLDDT) |
+| ESMFold | None | None (`confidence` is pLDDT) | None |
+
+---
+
+## 8. Quick Lookup
+
+See `services.json` for the complete service configuration in machine-readable form (ports, batch, concurrency, thresholds, known details keys).

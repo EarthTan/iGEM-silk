@@ -1,126 +1,128 @@
 ---
 name: hemopi2
-description: 当用户需要预测多肽的溶血性（hemolytic activity）、评估毒性风险、设计低溶血突变体时触发此技能。用于抗菌肽安全性筛选、虚拟筛选、毒性预测等场景。
+description: Trigger this skill when the user needs to predict the hemolytic activity of peptides, assess toxicity risk, or design low-hemolysis mutants. Used for antimicrobial peptide safety screening, virtual screening, toxicity prediction, and similar scenarios.
 version: "1.3"
 last_updated: "2026-04-11"
 ---
 
-# HemoPI2 溶血性预测工具
+> **English** | [中文](SKILL.zh.md)
 
-> ⚠️ **时效性声明**：本 Skill 基于 2026-04-11 的实际测试结果编写。工具版本或依赖更新后，请验证以下信息是否仍然有效。
+# HemoPI2 Hemolysis Prediction Tool
+
+> ⚠️ **Timeliness statement**: This Skill was written based on actual test results from 2026-04-11. After tool versions or dependencies change, please verify whether the following information is still valid.
 
 ---
 
-## 版本与时效信息
+## Version and Timeliness Information
 
-| 属性 | 值 |
+| Attribute | Value |
 |------|-----|
-| **Skill 制作日期** | 2026-04-11 |
-| **测试的 hemopi2 版本** | 1.3 (pip install) |
-| **测试的 Python 版本** | 3.12.12 |
-| **测试的 torch 版本** | 2.11.0 |
-| **官方最新版本** | 需访问 https://pypi.org/project/hemopi2/ 确认 |
+| **Skill creation date** | 2026-04-11 |
+| **Tested hemopi2 version** | 1.3 (pip install) |
+| **Tested Python version** | 3.12.12 |
+| **Tested torch version** | 2.11.0 |
+| **Latest official version** | Check https://pypi.org/project/hemopi2/ |
 
-> 📝 **建议**：使用前请检查 pip show hemopi2 确认版本，如有差异请在 `.memory/` 中记录变更。
+> 📝 **Recommendation**: Before use, run pip show hemopi2 to confirm the version; if there is any difference, record the change in `.memory/`.
 
 ---
 
-## Build 日志（.memory/ 记录模板）
+## Build Log (.memory/ record template)
 
-> 每次构建或验证此 Skill 时，请在 `.memory/` 中简要记录：
-> - 测试日期
-> - 安装的具体版本
-> - 哪些功能实际测试过
-> - 发现的 bug 或异常
+> Each time this Skill is built or validated, briefly record in `.memory/`:
+> - test date
+> - specific versions installed
+> - which features were actually tested
+> - bugs or anomalies found
 
-**模板：**
+**Template:**
 ```markdown
 # HemoPI2 Build Log
 
 ## YYYY-MM-DD
-- hemopi2 版本: X.X
-- Python 版本: X.X
-- 测试的功能: job=1, job=2, ...
-- 发现的问题: ...
-- 备注: ...
+- hemopi2 version: X.X
+- Python version: X.X
+- Features tested: job=1, job=2, ...
+- Issues found: ...
+- Notes: ...
 ```
 
 ## What It Is
 
-**HemoPI2** 是由 IIITD Raghava 团队开发的**肽溶血性预测工具**，可对多肽进行：
+**HemoPI2** is a **peptide hemolysis prediction tool** developed by the IIITD Raghava team. It can perform the following on peptides:
 
-1. **分类预测**：判断序列是"溶血（Hemolytic）"还是"非溶血（Non-Hemolytic）"
-2. **HC50 回归预测**：预测 50% 溶血所需浓度（μM），数值越低毒性越强
+1. **Classification prediction**: determine whether a sequence is "Hemolytic" or "Non-Hemolytic"
+2. **HC50 regression prediction**: predict the concentration required for 50% hemolysis (μM); the lower the value, the stronger the toxicity
 
-### 核心价值
-- 在研发抗菌肽时，提前评估其对哺乳动物红细胞的破坏风险
-- 大规模候选肽的虚拟筛选与风险分级
-- 指导低溶血突变体的设计与优化
+### Core value
+- When developing antimicrobial peptides, assess in advance the risk of damage to mammalian red blood cells
+- Virtual screening and risk grading of large-scale candidate peptides
+- Guide the design and optimization of low-hemolysis mutants
 
 ---
 
 ## When to Use
 
-- **场景 1**：拿到一条候选肽，想快速判断溶血风险 → 用 `job=1`
-- **场景 2**：有一条长肽，想知道哪一段最危险 → 用 `job=2`（蛋白扫描）
-- **场景 3**：想验证某个位置换成特定氨基酸的效果 → 用 `job=3`（单点突变）
-- **场景 4**：想知道某个位置换成什么氨基酸最好 → 用 `job=4`（全突变扫描）
-- **场景 5**：想检查序列是否包含已知的溶血/非溶血特征模体 → 用 `job=5`（模体扫描）
-- **场景 6**：不只想知道分类，还想知道毒性强度（HC50 值）→ 用**回归模式**
+- **Scenario 1**: You have a candidate peptide and want to quickly judge hemolysis risk → use `job=1`
+- **Scenario 2**: You have a long peptide and want to know which segment is most dangerous → use `job=2` (protein scan)
+- **Scenario 3**: You want to verify the effect of substituting a specific amino acid at a position → use `job=3` (single-point mutation)
+- **Scenario 4**: You want to know which amino acid is best at a position → use `job=4` (full mutation scan)
+- **Scenario 5**: You want to check whether a sequence contains known hemolytic/non-hemolytic feature motifs → use `job=5` (motif scan)
+- **Scenario 6**: You want not only the classification but also the toxicity strength (HC50 value) → use **regression mode**
 
 ---
 
 ## Methodology (How It Works)
 
-### 工具架构
+### Tool architecture
 
 ```
-输入：FASTA 格式肽序列（或每行一条序列）
+Input: FASTA-format peptide sequence (or one sequence per line)
    ↓
-┌─────────────────────────────────────┐
-│           HemoPI2                    │
-├─────────────────────────────────────┤
-│  分类模式 (hemopi2_classification)   │
-│  ├── Model 1: Random Forest (RF)    │
-│  ├── Model 2: Hybrid1 (RF+MERCI)    │
-│  ├── Model 3: ESM2-t6 (深度学习)     │
-│  └── Model 4: Hybrid2 (ESM+MERCI)   │
-├─────────────────────────────────────┤
-│  回归模式 (hemopi2_regression)       │
-│  └── HC50 浓度预测                   │
-└─────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│                  HemoPI2                   │
+├────────────────────────────────────────────┤
+│  Classification (hemopi2_classification)   │
+│  ├── Model 1: Random Forest (RF)           │
+│  ├── Model 2: Hybrid1 (RF+MERCI)           │
+│  ├── Model 3: ESM2-t6 (deep learning)      │
+│  └── Model 4: Hybrid2 (ESM+MERCI)          │
+├────────────────────────────────────────────┤
+│  Regression (hemopi2_regression)           │
+│  └── HC50 concentration prediction         │
+└────────────────────────────────────────────┘
    ↓
-输出：CSV 文件（分类/回归结果）
+Output: CSV file (classification/regression results)
 ```
 
-### Job 类型 Methodology
+### Job type methodology
 
-| Job | 名称 | 本质 | 类比 |
+| Job | Name | Essence | Analogy |
 |-----|------|------|------|
-| `1` | 常规预测 | 整条序列直接输出结论 | 体检报告：直接告诉你有没有病 |
-| `2` | 蛋白扫描 | 滑动窗口切段分析 | CT扫描：逐层查看哪一节有肿瘤 |
-| `3` | 单点突变设计 | 指定位点换指定氨基酸 | 定点手术：切除并替换某一处 |
-| `4` | 全突变扫描 | 指定位点换全部20种氨基酸 | 批量培育：同一位置种20种种子看效果 |
-| `5` | 模体扫描 | 匹配已知的危险/安全指纹 | 指纹比对：查有没有犯罪前科 |
+| `1` | Routine prediction | The whole sequence directly yields a conclusion | Medical checkup report: tells you directly whether you are sick |
+| `2` | Protein scan | Sliding window segmentation analysis | CT scan: examines layer by layer which section has a tumor |
+| `3` | Single-point mutation design | Substitute a specified amino acid at a specified site | Targeted surgery: excise and replace one spot |
+| `4` | Full mutation scan | Substitute all 20 amino acids at a specified site | Batch cultivation: plant 20 seeds at the same position and see how they do |
+| `5` | Motif scan | Match known dangerous/safe fingerprints | Fingerprint comparison: check for a criminal record |
 
 ---
 
 ## Operations
 
-### 环境准备
+### Environment preparation
 
 ```bash
-# 1. 进入项目目录
+# 1. Enter the project directory
 cd /path/to/HemoPI2
 
-# 2. 激活虚拟环境
+# 2. Activate the virtual environment
 source .venv/bin/activate
 
-# 3. 检查 Python 版本是否为 3.12
-python --version  # 应显示 Python 3.12.x
+# 3. Check that the Python version is 3.12
+python --version  # should show Python 3.12.x
 
-# 4. 重要：如果 hemopi2 包尚未修复兼容性，执行以下修复
-#    （修复将 os.system('python3') 改为 os.system(f'{sys.executable}')）
+# 4. Important: if the hemopi2 package compatibility has not been fixed yet, apply the following fix
+#    (the fix changes os.system('python3') to os.system(f'{sys.executable}'))
 .venv/bin/python -c "
 import sys
 for script in ['hemopi2_classification.py', 'hemopi2_regression.py']:
@@ -132,68 +134,68 @@ for script in ['hemopi2_classification.py', 'hemopi2_regression.py']:
     content = content.replace(\"os.system(f'python3 \", \"os.system(f'{sys.executable} \")
     with open(path, 'w') as f:
         f.write(content)
-    print(f'{script} 已修复')
+    print(f'{script} fixed')
 "
 
-# 5. 检查安装是否成功
+# 5. Check that the installation succeeded
 hemopi2_classification -h
 hemopi2_regression -h
 ```
 
-### 命令速查表
+### Command quick reference
 
-#### 分类模式（hemopi2_classification）
+#### Classification mode (hemopi2_classification)
 
 ```bash
-# 基础用法
+# Basic usage
 hemopi2_classification -i input.fasta -o result.csv -j 1 -m 1 -wd workdir
 
-# 参数说明
-# -i, --input     : 输入 FASTA 文件
-# -o, --output    : 输出 CSV 文件（默认 outfile.csv）
-# -j, --job       : 任务类型 1-5（见上方 Methodology）
-# -m, --model     : 模型选择 1-4
-#                   1 = Random Forest（默认，快）
-#                   2 = Hybrid1（RF+MERCI，较准）
-#                   3 = ESM2-t6（深度学习，准）
-#                   4 = Hybrid2（ESM+MERCI，推荐但有bug）
-# -t, --threshold : 阈值 0-1（默认 RF/Hybrid1=0.46, ESM/Hybrid2=0.55）
-# -wd, --working  : 工作目录（必须提供，脚本在此读写临时文件）
+# Parameter description
+# -i, --input     : input FASTA file
+# -o, --output    : output CSV file (default outfile.csv)
+# -j, --job       : job type 1-5 (see Methodology above)
+# -m, --model     : model selection 1-4
+#                   1 = Random Forest (default, fast)
+#                   2 = Hybrid1 (RF+MERCI, more accurate)
+#                   3 = ESM2-t6 (deep learning, accurate)
+#                   4 = Hybrid2 (ESM+MERCI, recommended but buggy)
+# -t, --threshold : threshold 0-1 (defaults: RF/Hybrid1=0.46, ESM/Hybrid2=0.55)
+# -wd, --working  : working directory (required; the script reads and writes temporary files here)
 ```
 
-#### 回归模式（hemopi2_regression）
+#### Regression mode (hemopi2_regression)
 
 ```bash
-# 基础用法
+# Basic usage
 hemopi2_regression -i input.fasta -o hc50_result.csv -j 1 -wd workdir
 
-# 参数说明
-# -j, --job: 1=常规预测, 2=蛋白扫描
+# Parameter description
+# -j, --job: 1=routine prediction, 2=protein scan
 ```
 
-#### 各 Job 专项参数
+#### Job-specific parameters
 
 ```bash
-# job=3（单点突变）需要额外参数
+# job=3 (single-point mutation) requires extra parameters
 hemopi2_classification -i input.fasta -o result.csv -j 3 -m 1 -p 5 -r A -wd workdir
-# -p, --Position : 突变位置（1-indexed，从1开始数）
-# -r, --Residues : 突变后的氨基酸（如 A, G, K 等单字母）
+# -p, --Position : mutation position (1-indexed, counting from 1)
+# -r, --Residues : amino acid after mutation (single letter, e.g. A, G, K)
 
-# job=4（全突变扫描）只需指定位置，会自动尝试全部20种
+# job=4 (full mutation scan) only needs the position; all 20 amino acids are tried automatically
 hemopi2_classification -i input.fasta -o result.csv -j 4 -m 1 -p 5 -wd workdir
 
-# job=2（蛋白扫描）可调整窗口长度
+# job=2 (protein scan) allows adjusting the window length
 hemopi2_classification -i input.fasta -o result.csv -j 2 -m 1 -w 10 -wd workdir
-# -w, --winleng : 窗口长度 8-20（默认8）
+# -w, --winleng : window length 8-20 (default 8)
 ```
 
 ---
 
 ## Inputs and Outputs
 
-### 输入格式
+### Input format
 
-**FASTA 格式（推荐）**：
+**FASTA format (recommended)**:
 ```fasta
 >Peptide1
 KFLKKIAKVI
@@ -201,49 +203,49 @@ KFLKKIAKVI
 GLFDIVKKVG
 ```
 
-**简单格式（每行一条）**：
+**Simple format (one sequence per line)**:
 ```
 KFLKKIAKVI
 GLFDIVKKVG
 ```
 
-### 输出格式
+### Output format
 
-#### 分类输出（job=1）
+#### Classification output (job=1)
 ```csv
 SeqID,Sequence,ML Score,Prediction
 Peptide1,KFLKKIAKVI,0.100,Non-Hemolytic
 Peptide2,GLFDIVKKVG,0.235,Non-Hemolytic
 Peptide3,LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES,0.815,Hemolytic
 ```
-- `ML Score`：溶血风险得分（0-1），越高越危险
-- `Prediction`：Hemolytic（溶血）/ Non-Hemolytic（非溶血）
+- `ML Score`: hemolysis risk score (0-1); the higher, the more dangerous
+- `Prediction`: Hemolytic / Non-Hemolytic
 
-#### 回归输出（HC50）
+#### Regression output (HC50)
 ```csv
 SeqID,Sequence,HC50(μM),Prediction
 Peptide1,KFLKKIAKVI,177.647,Non-Hemolytic
 Peptide3,LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES,18.949,Hemolytic
 ```
-- `HC50(μM)`：50% 溶血所需浓度，数值越低毒性越强
+- `HC50(μM)`: concentration required for 50% hemolysis; the lower the value, the stronger the toxicity
 
-#### 蛋白扫描输出（job=2）
+#### Protein scan output (job=2)
 ```csv
 SeqID,Pattern ID,Start,End,Sequence,ML Score,Prediction
 Peptide3,Pattern_1,1,10,LLGDFFRKSK,0.270,Non-Hemolytic
 Peptide3,Pattern_2,2,11,LGDFFRKSKE,0.270,Non-Hemolytic
 ...
 ```
-显示序列各窗口的得分，可定位风险最高区段
+Shows the score of each window along the sequence, making it possible to locate the highest-risk segment
 
-#### 突变设计输出（job=3）
+#### Mutation design output (job=3)
 ```csv
 SeqID,Original Sequence,ML Score,Prediction,Mutant Sequence,Position,ML Score,Prediction
 Peptide1,KFLKKIAKVI,0.1,Non-Hemolytic,AFLKKIAKVI,1,0.12,Non-Hemolytic
 ```
-原始序列与突变后序列的对比
+Comparison of the original sequence with the mutated sequence
 
-#### 全突变扫描输出（job=4）
+#### Full mutation scan output (job=4)
 ```csv
 SeqID,Mutant_ID,Sequences,ML Score,Prediction
 Peptide1,Original_Seq1,KFLKKIAKVI,0.100,Non-Hemolytic
@@ -251,86 +253,86 @@ Peptide1,Mutant_K1A,AFLKKIAKVI,0.120,Non-Hemolytic
 Peptide1,Mutant_K1C,CFLKKIAKVI,0.270,Non-Hemolytic
 ...
 ```
-该位置全部 20 种氨基酸替换后的预测
+Predictions after substituting all 20 amino acids at that position
 
-#### 模体扫描输出（job=5）
+#### Motif scan output (job=5)
 ```csv
 SeqID,Positive Hits,Negative Hits,Prediction
 Peptide1,0,1,Non-Haemolytic
 Peptide2,0,1,Non-Haemolytic
 ```
-- `Positive Hits`：匹配到的溶血相关模体数
-- `Negative Hits`：匹配到的非溶血相关模体数
+- `Positive Hits`: number of matched hemolysis-related motifs
+- `Negative Hits`: number of matched non-hemolysis-related motifs
 
 ---
 
 ## Examples
 
-### 示例 1：快速判断一条肽的溶血风险
+### Example 1: quickly judging the hemolysis risk of a peptide
 
 ```bash
-# 使用 RF 模型预测
+# Predict with the RF model
 hemopi2_classification -i test.fasta -o result.csv -j 1 -m 1 -wd workdir
 
-# 查看结果
+# View the results
 cat workdir/result.csv
 ```
 
-### 示例 2：定位长肽中最危险的区段
+### Example 2: locating the most dangerous segment in a long peptide
 
 ```bash
-# 对 30 氨基酸的肽进行窗口扫描（窗口=10）
+# Window scan of a 30-amino-acid peptide (window=10)
 hemopi2_classification -i long_peptide.fasta -o scan.csv -j 2 -m 1 -w 10 -wd workdir
 
-# 分析结果：找到最高分的窗口
-# 高分窗口（>0.5）就是最危险的区段
+# Analyze the results: find the highest-scoring window
+# High-scoring windows (>0.5) are the most dangerous segments
 ```
 
-### 示例 3：验证第 5 位换成丙氨酸是否能降低溶血性
+### Example 3: verifying whether substituting alanine at position 5 reduces hemolysis
 
 ```bash
-# 单点突变测试
+# Single-point mutation test
 hemopi2_classification -i test.fasta -o mutant.csv -j 3 -m 1 -p 5 -r A -wd workdir
 
-# 比较原始得分和突变后得分
+# Compare the original score with the mutated score
 ```
 
-### 示例 4：系统寻找第 1 位的最佳替换
+### Example 4: systematically finding the best substitution at position 1
 
 ```bash
-# 全突变扫描（自动尝试全部20种）
+# Full mutation scan (all 20 amino acids tried automatically)
 hemopi2_classification -i test.fasta -o all_mutants.csv -j 4 -m 1 -p 1 -wd workdir
 
-# 在结果中找 ML Score 最低的突变体
+# Find the mutant with the lowest ML Score in the results
 ```
 
-### 示例 5：预测 HC50 毒性浓度
+### Example 5: predicting the HC50 toxic concentration
 
 ```bash
-# 回归模式
+# Regression mode
 hemopi2_regression -i test.fasta -o hc50.csv -j 1 -wd workdir
 
-# HC50 < 50 μM 通常表示高毒性
-# HC50 > 100 μM 通常表示低毒性
+# HC50 < 50 μM usually indicates high toxicity
+# HC50 > 100 μM usually indicates low toxicity
 ```
 
-### 示例 6：批量预测多条肽（适合虚拟筛选）
+### Example 6: batch prediction of multiple peptides (suitable for virtual screening)
 
 ```bash
-# 准备 FASTA 文件（多条序列）
+# Prepare a FASTA file (multiple sequences)
 cat > peptides.fasta << 'EOF'
->候选1
+>Candidate1
 KFLKKIAKVI
->候选2
+>Candidate2
 GLFDIVKKVG
->候选3
+>Candidate3
 LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES
 EOF
 
-# 批量预测
+# Batch prediction
 hemopi2_classification -i peptides.fasta -o screening.csv -j 1 -m 1 -t 0.46 -wd workdir
 
-# 用更高阈值做粗筛（只保留低风险）
+# Coarse screening with a higher threshold (keep only low-risk peptides)
 hemopi2_classification -i peptides.fasta -o safe.csv -j 1 -m 1 -t 0.7 -wd workdir
 ```
 
@@ -338,30 +340,30 @@ hemopi2_classification -i peptides.fasta -o safe.csv -j 1 -m 1 -t 0.7 -wd workdi
 
 ## Limits and Boundaries
 
-### 已知限制
+### Known limitations
 
-1. **序列长度限制**：超过 40 个氨基酸的序列会被截断（前 40 位）
-2. **Hybrid2 bug**：Model 4 在某些情况下有 MERCI 文件路径 bug（缺少 `/`）
-3. **Python 版本**：需要 Python 3.11 或 3.12（不支持 3.13+）
-4. **不支持的氨基酸**：序列中包含 B, J, O, U, X, Z 会报错
+1. **Sequence length limit**: sequences longer than 40 amino acids are truncated (first 40 positions)
+2. **Hybrid2 bug**: Model 4 has a MERCI file path bug in some cases (missing `/`)
+3. **Python version**: requires Python 3.11 or 3.12 (3.13+ is not supported)
+4. **Unsupported amino acids**: sequences containing B, J, O, U, X, Z raise an error
 
-### ⚠️ hemopi2 包兼容性修复
+### ⚠️ hemopi2 package compatibility fix
 
-**问题描述：**
-hemopi2 v1.3 包内部使用 `os.system('python3 ...')` 调用系统 Python，而非 venv 的 Python。当系统 Python 版本 ≥ 3.14 时，会因 `csv.writer(delimiter='\n')` 不再被接受而报错。
+**Problem description:**
+hemopi2 v1.3 internally uses `os.system('python3 ...')` to invoke the system Python rather than the venv Python. When the system Python version is ≥ 3.14, it fails because `csv.writer(delimiter='\n')` is no longer accepted.
 
-**症状：**
+**Symptom:**
 ```
 ValueError: bad delimiter value
 ```
 
-**解决方案：**
-需要修复 venv 中的 hemopi2 包，将 `python3` 替换为 `sys.executable`：
+**Solution:**
+The hemopi2 package in the venv must be fixed, replacing `python3` with `sys.executable`:
 
 ```bash
 cd HemoPI2
 
-# 修复 hemopi2_classification.py
+# Fix hemopi2_classification.py
 .venv/bin/python -c "
 import sys
 script_path = '.venv/lib/python3.12/site-packages/hemopi2/python_scripts/hemopi2_classification.py'
@@ -372,10 +374,10 @@ if 'import sys' not in content:
 content = content.replace(\"os.system(f'python3 \", \"os.system(f'{sys.executable} \")
 with open(script_path, 'w') as f:
     f.write(content)
-print('hemopi2_classification.py 已修复')
+print('hemopi2_classification.py fixed')
 "
 
-# 修复 hemopi2_regression.py
+# Fix hemopi2_regression.py
 .venv/bin/python -c "
 import sys
 script_path = '.venv/lib/python3.12/site-packages/hemopi2/python_scripts/hemopi2_regression.py'
@@ -386,87 +388,87 @@ if 'import sys' not in content:
 content = content.replace(\"os.system(f'python3 \", \"os.system(f'{sys.executable} \")
 with open(script_path, 'w') as f:
     f.write(content)
-print('hemopi2_regression.py 已修复')
+print('hemopi2_regression.py fixed')
 "
 ```
 
-**注意：** 此修复需要在使用 venv 激活后执行。如果重新安装 hemopi2 包，需要重新执行此修复。
+**Note:** this fix must be executed after the venv is activated. If the hemopi2 package is reinstalled, the fix must be applied again.
 
-### 版本验证命令
+### Version verification commands
 
 ```bash
-# 查看已安装版本
+# Show the installed version
 pip show hemopi2
 
-# 查看 Python 版本
+# Show the Python version
 python --version
 
-# 检查 torch 是否安装
+# Check whether torch is installed
 python -c "import torch; print(torch.__version__)"
 
-# 验证 hemopi2 包是否已修复（检查 sys.executable 使用）
+# Verify whether the hemopi2 package has been fixed (check the use of sys.executable)
 grep -l "sys.executable" .venv/lib/python3.12/site-packages/hemopi2/python_scripts/*.py
-# 如果输出两个脚本名，说明已修复
+# If two script names are printed, the fix has been applied
 ```
 
-### 不适用场景
+### Not applicable scenarios
 
-- 非肽类分子（只适用于氨基酸序列）
-- 未知修饰的肽（化学修饰肽建议用旧版 HemoPI-MOD）
-- 哺乳动物以外物种的红细胞（模型基于哺乳动物 RBC 训练）
+- Non-peptide molecules (only amino acid sequences are supported)
+- Peptides with unknown modifications (for chemically modified peptides, the older HemoPI-MOD is recommended)
+- Red blood cells from species other than mammals (the model was trained on mammalian RBCs)
 
-### 注意事项
+### Notes
 
-- **阈值选择**：默认阈值并非最优，可根据实际数据集调整
-  - 保守筛选（尽量保留）：用高阈值如 0.7
-  - 宽松筛选（只剔除高风险）：用低阈值如 0.4
-- **首次运行**：ESM2 模型首次使用会下载预训练权重，需网络连接
-- **工作目录**：必须提供 `-wd` 参数，且路径不应包含特殊字符
+- **Threshold selection**: the default threshold is not optimal and can be adjusted for the actual dataset
+  - Conservative screening (retain as much as possible): use a high threshold such as 0.7
+  - Lenient screening (only remove high risk): use a low threshold such as 0.4
+- **First run**: the ESM2 model downloads pre-trained weights on first use and requires a network connection
+- **Working directory**: the `-wd` parameter is required, and the path should not contain special characters
 
 ---
 
-## 快速参考卡
+## Quick Reference Card
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║                    HemoPI2 快速参考                         ║
-╠════════════════════════════════════════════════════════════╣
-║ 分类预测        │ hemopi2_classification -i X -o Y -j 1    ║
-║ HC50回归        │ hemopi2_regression -i X -o Y -j 1        ║
-║ 定位危险区段    │ -j 2 -w 10                               ║
-║ 单点突变设计    │ -j 3 -p 5 -r A                           ║
-║ 全突变扫描      │ -j 4 -p 5                                ║
-║ 模体扫描        │ -j 5                                     ║
-╠════════════════════════════════════════════════════════════╣
-║ 模型选择        │ -m 1(RF) 2(Hybrid1) 3(ESM2) 4(Hybrid2)  ║
-║ 常用阈值        │ RF: 0.46 / ESM: 0.55                     ║
-╚════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════╗
+║                    HemoPI2 Quick Reference                     ║
+╠════════════════════════════════════════════════════════════════╣
+║ Classification     │ hemopi2_classification -i X -o Y -j 1     ║
+║ HC50 regression    │ hemopi2_regression -i X -o Y -j 1         ║
+║ Locate risk zones  │ -j 2 -w 10                                ║
+║ Single mutation    │ -j 3 -p 5 -r A                            ║
+║ Full mutation scan │ -j 4 -p 5                                 ║
+║ Motif scan         │ -j 5                                      ║
+╠════════════════════════════════════════════════════════════════╣
+║ Model choice       │ -m 1(RF) 2(Hybrid1) 3(ESM2) 4(Hybrid2)    ║
+║ Thresholds         │ RF: 0.46 / ESM: 0.55                      ║
+╚════════════════════════════════════════════════════════════════╝
 ```
 
 ---
 
-## 版本更新检查
+## Version Update Check
 
-> 工具发布新版本后，用法或功能可能发生变化。使用前建议检查：
+> After a new version of the tool is released, usage or features may change. Check before use:
 
 ```bash
-# 1. 检查 pip 上的最新版本
+# 1. Check the latest version on pip
 pip index versions hemopi2
 
-# 2. 查看当前安装版本
+# 2. View the currently installed version
 pip show hemopi2
 
-# 3. 查看 GitHub 是否有更新
+# 3. Check whether GitHub has updates
 # https://github.com/raghavagps/HemoPI2/releases
 ```
 
-如版本有更新，请在 `.memory/` 中记录变更内容。
+If a version update exists, record the changes in `.memory/`.
 
 ---
 
-## 引用
+## Citations
 
-- 论文：Rathore et al., Commun Biol 8, 176 (2025)
-- 官网：https://webs.iiitd.edu.in/raghava/hemopi2/
-- GitHub：https://github.com/raghavagps/HemoPI2
-- PyPI：https://pypi.org/project/hemopi2/
+- Paper: Rathore et al., Commun Biol 8, 176 (2025)
+- Website: https://webs.iiitd.edu.in/raghava/hemopi2/
+- GitHub: https://github.com/raghavagps/HemoPI2
+- PyPI: https://pypi.org/project/hemopi2/

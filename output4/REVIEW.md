@@ -1,36 +1,38 @@
-# Stages4 Pipeline Review — iGEM-silk 抗氧化肽融合蛋白设计
+> **English** | [中文](REVIEW.zh.md)
 
-**生成日期**: 2026-05-24
-**状态**: 全流程完成
-**输出目录**: `output4/`
+# Stages4 Pipeline Review — iGEM-silk Antioxidant Peptide Fusion Protein Design
+
+**Generated**: 2026-05-24
+**Status**: Full pipeline complete
+**Output directory**: `output4/`
 
 ---
 
-## 1. 做了什么
+## 1. What Was Done
 
-完成 stages4 全流程 9 轮（Round 0 ~ Round 8）端到端运行，从 1990 万候选肽筛选至 250 个最终 constructs，并对 Top 10 + Bottom 10 做 AlphaFold3 高精度结构预测。
+Completed the full stages4 pipeline end to end, all 9 rounds (Round 0 ~ Round 8), screening from 19.9 million candidate peptides down to 250 final constructs, and performed AlphaFold3 high-accuracy structure prediction on Top 10 + Bottom 10.
 
-### Pipeline 总览
+### Pipeline Overview
 
-| 阶段 | 耗时 | 数据量变化 |
+| Stage | Time | Data volume change |
 |------|------|-----------|
-| Round 0: 数据导入 | ~15min | 19,890,021 → 19,890,021 |
-| Round 1: 抗氧化分选 (AnOxPePred + AlgPred2) | ~30min | 19,890,021 → Top 10% + Bottom 1% |
-| Round 2: 安全筛选 (ToxinPred3/HemoPI2/MHCflurry) | ~24h | 双通道 → 硬阈值过滤 |
-| Round 3 Phase 1: 预评分 (BepiPred3/TemStaPro/SoDoPE/pLM4CPPs) | ~2h | 安全通过肽 → 全量评分 |
-| Round 3 Phase 2: SD 加权评分 | ~2h | → 综合排名 |
-| Round 3 Phase 3: GraphCPP | ~1h | 补充评分 |
-| Round 4 Phase 1: 枚举 + SoDoPE/TemStaPro | ~30min | 肽 → 250 constructs |
-| Round 4 Phase 2: BepiPred3 | ~6h | 250 construct 级评分 |
+| Round 0: Data import | ~15min | 19,890,021 → 19,890,021 |
+| Round 1: Antioxidant split (AnOxPePred + AlgPred2) | ~30min | 19,890,021 → Top 10% + Bottom 1% |
+| Round 2: Safety screening (ToxinPred3/HemoPI2/MHCflurry) | ~24h | dual-channel → hard-threshold filtering |
+| Round 3 Phase 1: Pre-scoring (BepiPred3/TemStaPro/SoDoPE/pLM4CPPs) | ~2h | safety-passing peptides → full scoring |
+| Round 3 Phase 2: SD-weighted scoring | ~2h | → composite ranking |
+| Round 3 Phase 3: GraphCPP | ~1h | supplementary scoring |
+| Round 4 Phase 1: Enumeration + SoDoPE/TemStaPro | ~30min | peptides → 250 constructs |
+| Round 4 Phase 2: BepiPred3 | ~6h | 250 construct-level scores |
 | Round 5: OmegaFold 3D | ~6.13h | 250 → 250 PDB (pLDDT avg=0.4205) |
-| Round 6: SASA + Aggrescan3D | ~5.4min | 250 PDB → 250 评估分 |
-| Round 7: 最终排名 | <1s | 250 → Top 150 + Bottom 100 |
+| Round 6: SASA + Aggrescan3D | ~5.4min | 250 PDB → 250 evaluation scores |
+| Round 7: Final ranking | <1s | 250 → Top 150 + Bottom 100 |
 | Round 8: AlphaFold3 | ~22.5h | Top 10 + Bottom 10 → AF3 mmCIF |
-| **总计** | **~65h** | **19,890,021 → 250 constructs (20 AF3)** |
+| **Total** | **~65h** | **19,890,021 → 250 constructs (20 AF3)** |
 
-### 最终 Top 5（Round 7 排名）
+### Final Top 5 (Round 7 ranking)
 
-| 全局排名 | 通道 | ID | SASA | A3D | pLDDT | 总分 |
+| Global rank | Channel | ID | SASA | A3D | pLDDT | Total score |
 |---------|------|----|------|-----|-------|------|
 | 1 | bottom | con_5489 | 0.6873 | 0.2925 | 0.4950 | 0.7579 |
 | 2 | bottom | con_3275 | 0.6861 | 0.2927 | 0.4857 | 0.7420 |
@@ -38,228 +40,228 @@
 | 4 | bottom | con_15869 | 0.8229 | 0.2753 | 0.4410 | 0.7296 |
 | 5 | bottom | con_1103 | 0.6777 | 0.2946 | 0.4743 | 0.7189 |
 
-### AF3 排名（Top 10 + Bottom 10）
+### AF3 ranking (Top 10 + Bottom 10)
 
 | ranking_score | Top | Bottom |
 |-------------|-----|--------|
-| 最高 | con_0850 **0.56** | con_3774 **0.53** |
-| 最低 | con_0317/0558/0660 **0.50** | con_5489 **0.50** |
-| 平均 | **0.52** | **0.52** |
+| Highest | con_0850 **0.56** | con_3774 **0.53** |
+| Lowest | con_0317/0558/0660 **0.50** | con_5489 **0.50** |
+| Average | **0.52** | **0.52** |
 
 ---
 
-## 2. stages2 → stages4 关键设计变更
+## 2. Key Design Changes from stages2 to stages4
 
-### 为什么重做而不是直接用 stages2？
+### Why redo it rather than use stages2 directly?
 
-stages2 有两个根本设计缺陷：
+stages2 has two fundamental design flaws:
 
-1. **安全属性被稀释**：ToxinPred3、HemoPI2 等安全指标被拼进加权平均分，一个肽就算毒性很高，也可以通过其他维度的"优秀"分数补偿。这在湿实验中是致命风险。
-2. **抗氧化信号污染**：AnOxPePred 分数在所有下游环节反复出现，导致筛选偏向抗氧化而偏离了"在丝绸蛋白背景下表现良好"的真实目标。
+1. **Safety attributes were diluted**: safety metrics such as ToxinPred3 and HemoPI2 were folded into a weighted average score, so a peptide with high toxicity could be compensated by "excellent" scores in other dimensions. In a wet lab this is a fatal risk.
+2. **Antioxidant signal contamination**: the AnOxPePred score appeared repeatedly in every downstream step, so screening was biased toward antioxidant activity and drifted away from the real objective of "performing well in a silk protein context."
 
-### 核心变更
+### Core changes
 
-| 变更 | stages2 | stages4 |
+| Change | stages2 | stages4 |
 |------|---------|---------|
-| **安全策略** | 加权平均，可被补偿 | **硬阈值否决**，一票否决 |
-| **抗氧化使用** | 全流程反复使用 | **仅 Round 1** 用于通道分选 |
-| **权重设计** | 手动预设固定权重 | **SD 驱动权重**（winsorized stddev） |
-| **评分阶段** | 仅 Round 3 一次评分 | Phase 1 全量 + Phase 2 SD 加权 + Phase 3 GraphCPP |
-| **3D 结构** | OmegaFold 150 PDB | OmegaFold 250 PDB + **AF3 20 条** |
-| **双通道** | Top 90 + Bottom 60 | Top 150 + Bottom 100 |
-| **排序依据** | SASA + A3D + pLDDT | 同左（已验证有效） |
+| **Safety policy** | weighted average, can be compensated | **hard-threshold veto**, one-vote veto |
+| **Antioxidant use** | used repeatedly throughout the pipeline | **Round 1 only**, for channel assignment |
+| **Weight design** | manually preset fixed weights | **SD-driven weights** (winsorized stddev) |
+| **Scoring stages** | a single scoring pass in Round 3 | Phase 1 full scoring + Phase 2 SD weighting + Phase 3 GraphCPP |
+| **3D structure** | OmegaFold 150 PDB | OmegaFold 250 PDB + **20 AF3 models** |
+| **Dual-channel** | Top 90 + Bottom 60 | Top 150 + Bottom 100 |
+| **Ranking basis** | SASA + A3D + pLDDT | same as the left column (validated as effective) |
 
-### 安全硬阈值（Round 2）
+### Safety hard thresholds (Round 2)
 
-| 服务 | 阈值 | 含义 |
+| Service | Threshold | Meaning |
 |------|------|------|
-| ToxinPred3 | < 0.38 | 预测无毒 |
-| HemoPI2 | < 0.55 | 预测非溶血 |
-| MHCflurry | < 0.50 | 预测低免疫原性 |
+| ToxinPred3 | < 0.38 | predicted non-toxic |
+| HemoPI2 | < 0.55 | predicted non-hemolytic |
+| MHCflurry | < 0.50 | predicted low immunogenicity |
 
-任一条件不满足 → 直接淘汰，无商量余地。
+If any condition is not met → eliminated outright, no room for negotiation.
 
 ---
 
-## 3. 权重设计——SD 驱动（Round 3）
+## 3. Weight Design — SD-Driven (Round 3)
 
-stages4 只在 Round 3 使用加权评分，且权重不由人工指定而是**由数据驱动**。
+stages4 uses weighted scoring only in Round 3, and the weights are not assigned by hand but **driven by the data**.
 
-### 公式
+### Formula
 
 ```
 w_i = α × (σ_winsorized_i / Σσ_winsorized)
 ```
 
-其中 α 是人工干预系数（default=1），winsorized stddev 排除极值后计算。区分度越高的服务→权重越高，区分度低的自动降权。
+Here α is a manual intervention coefficient (default=1), and the winsorized stddev is computed after excluding extreme values. A service with greater discriminating power → higher weight; low discriminating power is automatically down-weighted.
 
-### 实际权重
+### Actual weights
 
-| 服务 | 权重 | 区分度 |
+| Service | Weight | Discriminating power |
 |------|------|--------|
-| SoDoPE | 最高 | 物理化学性质差异大 |
-| BepiPred3 | 高 | B 细胞表位差异明显 |
-| TemStaPro | 中 | 热稳定性有一定区分 |
-| pLM4CPPs | 低 | CPP 预测区分度有限 |
-| GraphCPP | 低 | 同上 |
+| SoDoPE | highest | large differences in physicochemical properties |
+| BepiPred3 | high | clear differences in B-cell epitopes |
+| TemStaPro | medium | some discrimination in thermal stability |
+| pLM4CPPs | low | limited discrimination in CPP prediction |
+| GraphCPP | low | same as above |
 
-这种设计确保了权重反映数据本身的结构，而非先入为主的"我觉得哪个重要"。
+This design ensures that the weights reflect the structure of the data itself, rather than a preconceived "I think this one matters more."
 
-### Round 7 最终排名公式
+### Round 7 final ranking formula
 
 ```
 round7_score = 0.40 × SASA + 0.40 × (1 - Aggrescan3D) + 0.20 × pLDDT_norm
 ```
 
-沿用 stages2 已验证有效的权重。原理：
-- SASA 越高 → 功能肽越暴露在表面 → 越可能发挥作用
-- Aggrescan3D 越低 → 聚集风险越小 → 蛋白越稳定
-- pLDDT 归一化后作为置信度权重，确保结构可靠性
+Reuses the weights already validated in stages2. Rationale:
+- Higher SASA → the functional peptide is more exposed on the surface → more likely to function
+- Lower Aggrescan3D → lower aggregation risk → more stable protein
+- Normalized pLDDT serves as a confidence weight, ensuring structural reliability
 
 ---
 
-## 4. 关键数据特征
+## 4. Key Data Characteristics
 
-| 维度 | 均值 | 范围 |
+| Dimension | Mean | Range |
 |------|------|------|
-| AnOxPePred（Round 1） | 0.30 | 0.09–0.67 |
+| AnOxPePred (Round 1) | 0.30 | 0.09–0.67 |
 | Round 3 composite | 0.75 | 0.50–0.95 |
 | OmegaFold pLDDT | 0.42 | 0.37–0.50 |
 | SASA | 0.72 | 0.46–0.83 |
 | Aggrescan3D | 0.33 | 0.27–0.39 |
-| Round 7 综合分 | — | 0.54–0.76 |
-| AF3 ranking_score（20 条） | **0.52** | 0.50–0.56 |
+| Round 7 composite score | — | 0.54–0.76 |
+| AF3 ranking_score (20 models) | **0.52** | 0.50–0.56 |
 
-### 筛选漏斗
+### Screening funnel
 
 ```
 19,890,021 ┐
-           │ Round 1 (抗氧化分选)
-      ~86,000 ┘  ┌─ Top 10%（抗氧化最好）
-                  └─ Bottom 1%（抗氧化最差，做对照）
-           │ Round 2 (安全硬阈值)
+           │ Round 1 (antioxidant split)
+      ~86,000 ┘  ┌─ Top 10% (best antioxidant)
+                  └─ Bottom 1% (worst antioxidant, as control)
+           │ Round 2 (safety hard thresholds)
       ~65,000 ┘
-           │ Round 3 (综合评分 + SD 加权)
+           │ Round 3 (composite scoring + SD weighting)
         ~700 ┘
-           │ Round 4 (枚举)
+           │ Round 4 (enumeration)
          250 ┘  ┌─ Top 150
                 └─ Bottom 100
-           │ Round 5-6 (3D + 评估)
+           │ Round 5-6 (3D + evaluation)
          250 ┘
-           │ Round 7 (最终排名)
+           │ Round 7 (final ranking)
          250 ┘  ┌─ Top 150 + Bottom 100
            │ Round 8 (AF3)
           20 ┘  ┌─ Top 10 + Bottom 10
 ```
 
-淘汰率：**19,890,021 → 250** = **99.9987%**
+Elimination rate: **19,890,021 → 250** = **99.9987%**
 
 ---
 
-## 5. Round 8：AlphaFold3 小结
+## 5. Round 8: AlphaFold3 Summary
 
-### 为什么跑 AF3？
+### Why run AF3?
 
-OmegaFold pLDDT 均值 0.42，可作初步排名，但结构精度不足以做 wet-lab 决策。AlphaFold3 是当前最先进的结构预测工具，ranking_score 衡量模型对预测结构的置信度，0.50 以上通常意味着可信的折叠。
+OmegaFold pLDDT averages 0.42, which is adequate for preliminary ranking, but the structure accuracy is insufficient for wet-lab decisions. AlphaFold3 is the current state of the art in structure prediction; ranking_score measures the model's confidence in the predicted structure, and above 0.50 usually means a credible fold.
 
-### 耗时
+### Time
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
-| 总耗时 | 22.5h |
-| 平均单条 | ~67min |
-| 最慢环节 | MSA 搜索（~2h/条） |
-| GPU 推理 | 仅 ~85s/条 |
-| 中断次数 | 3 次（脚本 bug + DB 锁 + ORDER BY bug） |
+| Total time | 22.5h |
+| Average per construct | ~67min |
+| Slowest step | MSA search (~2h per construct) |
+| GPU inference | only ~85s per construct |
+| Number of interruptions | 3 (script bug + DB lock + ORDER BY bug) |
 
-### 结果总览
+### Results overview
 
-| Construct | ranking_score | pTM | 备注 |
+| Construct | ranking_score | pTM | Notes |
 |-----------|--------------|-----|------|
-| con_0850 | **0.56** | 0.23 | ⭐ 最佳 |
+| con_0850 | **0.56** | 0.23 | ⭐ best |
 | con_0561 | 0.53 | 0.24 | |
 | con_0768 | 0.53 | 0.25 | |
 | con_3774 | 0.53 | 0.24 | |
 | con_0418 | 0.52 | 0.21 | |
 | con_0521 | 0.52 | 0.24 | |
-| ...（共 20 条） | avg **0.52** | | |
+| ... (20 in total) | avg **0.52** | | |
 
-AF3 ranking_score 与 OmegaFold pLDDT 趋势一致，均在 0.50 左右。丝绸蛋白的固有无序性（GGX 重复序列）限制了所有结构预测方法的置信度。
+AF3 ranking_score trends consistently with OmegaFold pLDDT, both around 0.50. The intrinsic disorder of the silk protein (GGX repeats) limits the confidence of all structure prediction methods.
 
 ---
 
-## 6. 技术性困难
+## 6. Technical Difficulties
 
-### 并发与超时
+### Concurrency and timeouts
 
-| 问题 | 根因 | 解决 |
+| Problem | Root cause | Resolution |
 |------|------|------|
-| ToxinPred3 处理 200 万条耗时 24h | sklearn ExtraTrees 单线程，C 扩展不可中断 | Round 2 先行，并行度受限 |
-| BepiPred3 超时 | GPU 服务排队超 300s | Semaphore=1，timeout=600s |
-| OmegaFold 阻塞事件循环 | PyTorch CUDA 同步推理 | Semaphore=1 串行化 |
-| SASA/A3D 并发冲突 | batch 提交 + Semaphore 控制 | 各自独立 Semaphore |
+| ToxinPred3 took 24h for 2 million sequences | sklearn ExtraTrees is single-threaded, the C extension cannot be interrupted | Ran Round 2 first; parallelism was limited |
+| BepiPred3 timeouts | GPU service queuing exceeded 300s | Semaphore=1, timeout=600s |
+| OmegaFold blocks the event loop | PyTorch CUDA synchronous inference | Semaphore=1 serialization |
+| SASA/A3D concurrency conflicts | batch submission + Semaphore control | independent Semaphore per service |
 
-### Docker 网络
+### Docker networking
 
-与前代一致，Docker 容器间通过桥接 IP 直连而非 docker-proxy（127.0.0.1），避免长耗时请求的 httpx 挂死。
+As in the previous generation, Docker containers connect directly via bridge IP rather than docker-proxy (127.0.0.1), avoiding httpx hangs on long-running requests.
 
-### AlphaFold3 脚本错误
+### AlphaFold3 script errors
 
-Round 8 运行中暴露 3 个 bug：
-1. **iptm 为 None**：单链蛋白 iptm 没有值，`.4f` 格式化崩溃 → 加 `_fmt()` helper
-2. **条件格式化语法**：Python 不支持 `{v:.4f if v is not None else 'N/A'}` → 改为 `f"{v:.4f}" if v else "N/A"`
-3. **ORDER BY LIMIT 顺序错误**：`ORDER BY channel, rank` + `LIMIT 20` 取了 bottom 前 20 而非 bottom10+top10 → 改用 UNION ALL
+Three bugs surfaced during the Round 8 run:
+1. **iptm is None**: single-chain proteins have no iptm value, so `.4f` formatting crashed → added a `_fmt()` helper
+2. **Conditional formatting syntax**: Python does not support `{v:.4f if v is not None else 'N/A'}` → changed to `f"{v:.4f}" if v else "N/A"`
+3. **ORDER BY LIMIT ordering bug**: `ORDER BY channel, rank` + `LIMIT 20` took the top 20 of bottom rather than bottom10+top10 → switched to UNION ALL
 
-### Docker 构建
+### Docker builds
 
-| 镜像 | 耗时 | 大小 | 说明 |
+| Image | Time | Size | Notes |
 |------|------|------|------|
-| `alphafold3` | 8h | 6.92GB | pip 下载 nvidia CUDA whl 极慢（~100KB/s） |
-| 各微服务镜像 | 不等 | — | 16 个服务 Docker 化 |
+| `alphafold3` | 8h | 6.92GB | pip download of nvidia CUDA whl extremely slow (~100KB/s) |
+| Microservice images | varies | — | 16 services containerized |
 
-AlphaFold3 镜像的主要瓶颈在国内网络环境：nvidia-cublas（393MB）、nvidia-cudnn（571MB）等 CUDA Python 包下载速度仅 ~100KB/s。若在海外网络环境预计 30-60min 可完成。
+The main bottleneck for the AlphaFold3 image is the domestic network environment: CUDA Python packages such as nvidia-cublas (393MB) and nvidia-cudnn (571MB) download at only ~100KB/s. On an overseas network this is expected to complete in 30-60min.
 
 ---
 
-## 7. 与 stages2 的结果对比
+## 7. Comparison with stages2 Results
 
-| 指标 | stages2 (v2) | stages4 |
+| Metric | stages2 (v2) | stages4 |
 |------|-------------|---------|
-| 输入 | 1,081,772 | **19,890,021** |
-| 输出 | 150 constructs | **250 constructs** |
-| 输入覆盖率 | UniProt + MGnify（部分） | **UniProt + MGnify + 冗余集** |
-| 安全策略 | 加权可稀释 | **硬阈值否决** |
-| pLDDT 均值 | 0.41 | **0.42** |
-| SASA 均值 | 0.70 | **0.72** |
-| top 区间 SASA | 0.50-0.83 | **0.67-0.83** |
-| A3D 均值 | 0.35 | **0.33**（更低=更好） |
-| 结构质量 | 150 OmegaFold | **250 OmegaFold + 20 AF3** |
+| Input | 1,081,772 | **19,890,021** |
+| Output | 150 constructs | **250 constructs** |
+| Input coverage | UniProt + MGnify (partial) | **UniProt + MGnify + redundant set** |
+| Safety policy | weighted and dilutable | **hard-threshold veto** |
+| pLDDT mean | 0.41 | **0.42** |
+| SASA mean | 0.70 | **0.72** |
+| SASA in top range | 0.50-0.83 | **0.67-0.83** |
+| A3D mean | 0.35 | **0.33** (lower = better) |
+| Structure quality | 150 OmegaFold | **250 OmegaFold + 20 AF3** |
 
-stages4 保留了与 stages2 相似的 3D 评分分布但覆盖了更多样化的候选肽来源（stages3 的全量 1990 万 vs stages2 的 108 万），并且首次引入了 AF3 高精度结构。
+stages4 retains a 3D score distribution similar to stages2 but covers a more diverse source of candidate peptides (stages3's full 19.9 million vs stages2's 1.08 million), and introduces AF3 high-accuracy structures for the first time.
 
 ---
 
-## 8. 经验与教训
+## 8. Experience and Lessons
 
-### 设计层面
+### Design level
 
-1. **安全否决优于加权**：硬阈值筛除毒性/溶血/高免疫原性肽段是最安全的策略，加权平均无法保证这一点。
-2. **一次任务，一个指标**：stages2 中 AnOxPePred 出现在 Round 1/2/3/4 共四个环节，导致抗氧化信号在最终排名中被过度放大。stages4 只在 Round 1 分选时使用一次。
-3. **SD 驱动权重正确**：数据本身告诉哪些指标有区分度，比人工预设更可靠。低区分度的服务自动降权，避免引入噪声。
+1. **Safety veto beats weighting**: hard thresholds that remove toxic/hemolytic/highly immunogenic peptides are the safest strategy; a weighted average cannot guarantee this.
+2. **One task, one metric**: in stages2, AnOxPePred appeared in Round 1/2/3/4 — four places in total — which over-amplified the antioxidant signal in the final ranking. stages4 uses it once, and only for the Round 1 split.
+3. **SD-driven weights are correct**: the data itself shows which metrics discriminate, which is more reliable than manual presets. Low-discrimination services are automatically down-weighted, avoiding injected noise.
 
-### 工程层面
+### Engineering level
 
-1. **断点续跑是必需品**：24h+ 的管道一定会出错。没有 checkpoint/resume 机制就等于从零重来。
-2. **SQL 查询要仔细**：`ORDER BY channel LIMIT 20` 不等于"取 10 bottom + 10 top"。UNION ALL 才是正解。
-3. **None 处理要覆盖全部路径**：哪怕"不可能"为 None 的值也可能在特定条件下为 None（如单链蛋白的 iptm）。
-4. **网络环境决定构建时间**：AlphaFold3 镜像在海外 30min，在国内 8h。提前缓存 CUDA whl 可大幅优化。
-5. **测试先行**：单条 AF3 测试节省了大量调试时间（发现了 iptm 问题才没浪费 20 条 × 2h）。
+1. **Checkpoint/resume is a necessity**: a 24h+ pipeline will certainly fail at some point. Without a checkpoint/resume mechanism you start over from zero.
+2. **Read SQL queries carefully**: `ORDER BY channel LIMIT 20` is not the same as "take 10 bottom + 10 top". UNION ALL is the right answer.
+3. **None handling must cover all paths**: even a value that "cannot" be None can be None under specific conditions (e.g., iptm of a single-chain protein).
+4. **Network environment determines build time**: the AlphaFold3 image takes 30min overseas and 8h domestically. Pre-caching the CUDA whl can greatly optimize this.
+5. **Test first**: a single-construct AF3 test saved a great deal of debugging time (finding the iptm issue avoided wasting 20 × 2h).
 
-### 湿润实验建议
+### Wet-lab recommendations
 
-- **首选 con_0850**（AF3 ranking_score=0.56，SASA=0.80）和 **con_0418**（AF3 rs=0.52，SASA=0.81）
-- Bottom 通道的 construct（如 con_5489 等）具有更高 OmegaFold pLDDT（0.48-0.50），结构预测更可靠，但抗氧化性较低
-- 建议选取 Top 5-10 进行 wet-lab 验证，同时选择 2-3 个 Bottom 对照
+- **First choice con_0850** (AF3 ranking_score=0.56, SASA=0.80) and **con_0418** (AF3 rs=0.52, SASA=0.81)
+- Bottom-channel constructs (such as con_5489 and others) have higher OmegaFold pLDDT (0.48-0.50), so their structure predictions are more reliable, but their antioxidant activity is lower
+- Recommend selecting Top 5-10 for wet-lab validation, along with 2-3 Bottom controls
 
 ---
 

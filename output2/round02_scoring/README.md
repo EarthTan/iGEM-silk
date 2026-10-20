@@ -1,39 +1,41 @@
-# Round 2：抗氧化分选 + 追加评分 — 报告
+> **English** | [中文](README.zh.md)
 
-**时间**: 2026-05-17 17:15:48
-**耗时**: 3755 秒
-**输入**: Round 1 全部 1,055,116 条评分
-**输出目录**: output2/
+# Round 2: Antioxidant Split + Additional Scoring — Report
 
-## 分选策略
+**Time**: 2026-05-17 17:15:48
+**Duration**: 3755 seconds
+**Input**: all 1,055,116 scored entries from Round 1
+**Output directory**: output2/
 
-按纯抗氧化活性（AnOxPePred 原始分）从高到低排序：
-- **Top 25K**: 抗氧化活性最好的 25,000 条
-- **Bottom 25K**: 抗氧化活性最差的 25,000 条（阴性对照）
+## Split Strategy
 
-> ⚠️ 注意：Round 1 的加权综合分（混合了 AlgPred2）被丢弃，
-> 改用纯 anoxpepred 分进行分选。
+Sorted from high to low by pure antioxidant activity (raw AnOxPePred score):
+- **Top 25K**: the 25,000 entries with the best antioxidant activity
+- **Bottom 25K**: the 25,000 entries with the worst antioxidant activity (negative controls)
 
-## 追加评分
+> ⚠️ Note: the weighted composite score from Round 1 (which mixed in AlgPred2) was discarded,
+> and the split uses the pure anoxpepred score instead.
 
-在 50K 上跑 3 个安全服务：
+## Additional Scoring
 
-| 服务 | 用途 | 并发 | Top 25K 有效 | Bottom 25K 有效 |
+Three safety services were run on the 50K set:
+
+| Service | Purpose | Concurrency | Top 25K valid | Bottom 25K valid |
 |------|------|------|-------------|----------------|
-| ToxinPred3 | 毒性反向 | 2 | 25,000 | 25,000 |
-| HemoPI2 | 溶血反向 | 10 | | |
-| MHCflurry | MHC-I 反向 | 10 | | |
+| ToxinPred3 | toxicity, negative | 2 | 25,000 | 25,000 |
+| HemoPI2 | hemolysis, negative | 10 | | |
+| MHCflurry | MHC-I, negative | 10 | | |
 
-## 抗氧化活性范围
+## Antioxidant Activity Ranges
 
 - **Top 25K**: 0.6046 ~ 0.4291
 - **Bottom 25K**: 0.1576 ~ 0.2485
 
-## 输出
+## Output
 
-| 文件 | 说明 |
+| File | Description |
 |------|------|
-| `final/all_50k.csv` | 全部 50K（top25K + bottom25K，含 channel 标签）→ Round 3 输入 |
-| `final/top25k.csv` | 仅 Top 25K |
-| `final/bottom25k.csv` | 仅 Bottom 25K |
-| `scores/*_results.json` | 各服务原始返回 |
+| `final/all_50k.csv` | all 50K (top25K + bottom25K, with channel labels) → Round 3 input |
+| `final/top25k.csv` | Top 25K only |
+| `final/bottom25k.csv` | Bottom 25K only |
+| `scores/*_results.json` | raw responses from each service |

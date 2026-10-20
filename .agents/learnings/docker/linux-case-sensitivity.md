@@ -1,5 +1,5 @@
 ---
-name: Linux 文件系统大小写敏感 v1.0
+name: Linux Filesystem Case Sensitivity v1.0
 author: Claude Code
 created: 2026-05-13
 version: 1.0.0
@@ -7,39 +7,41 @@ tags: [linux, macos, case-sensitivity, filesystem, docker, iGEM-silk]
 validated: true
 ---
 
-# Gene Capsule: Linux 文件系统大小写敏感
+> **English** | [中文](linux-case-sensitivity.zh.md)
+
+# Gene Capsule: Linux Filesystem Case Sensitivity
 
 ## Experience
 
-**问题类型**: macOS 开发时 APFS 大小写不敏感，Linux（ext4/xfs）严格区分大小写，导致跨平台 Docker 构建中路径不匹配。
+**Problem type**: APFS is case-insensitive during macOS development, while Linux (ext4/xfs) is strictly case-sensitive, causing path mismatches in cross-platform Docker builds.
 
-**核心策略**: 用 `ls` 逐字符确认实际目录名，不要"目测一致"就认为正确。`Tipred` vs `TIPred`、`algpred2` vs `AlgPred2` 是不同的路径。
+**Core strategy**: Use `ls` to confirm the actual directory name character by character; do not assume it is correct just because it "looks the same". `Tipred` vs `TIPred` and `algpred2` vs `AlgPred2` are different paths.
 
-**关键参数**: 目录名的大小写必须与实际文件系统完全匹配
+**Key parameters**: The case of directory names must match the actual filesystem exactly
 
-### 影响三处
+### Three Affected Places
 
-1. Dockerfile 的 `COPY` 语句
-2. docker-compose.yml 的 `dockerfile` 路径
-3. Dockerfile 的 `WORKDIR` 指令
+1. The `COPY` statement in the Dockerfile
+2. The `dockerfile` path in docker-compose.yml
+3. The `WORKDIR` instruction in the Dockerfile
 
-任一处不一致都会导致构建失败，且错误信息不会直接指向"大小写问题"。
+Any inconsistency in any of these causes a build failure, and the error message does not point directly at "a case-sensitivity problem".
 
 ## Environment Fingerprint
 
-- **任务域**: 跨平台 Docker 项目
-- **输入特征**: macOS 开发 + Linux 部署
-- **约束条件**: 涉及文件路径的 Docker 配置
-- **不适用**: 纯 macOS 或纯 Linux 单一环境开发
+- **Task domain**: Cross-platform Docker projects
+- **Input characteristics**: macOS development + Linux deployment
+- **Constraints**: Docker configuration involving file paths
+- **Not applicable**: Development entirely on macOS or entirely on Linux
 
 ## Audit Record
 
-- **验证方式**: iGEM-silk Docker 构建在 Ubuntu 部署环境验证
-- **失败案例**: 多个服务因目录名大小写不匹配导致 `COPY` 失败
-- **修复验证**: `ls tools/` 确认实际目录名后统一修正
+- **Validation method**: iGEM-silk Docker builds validated in the Ubuntu deployment environment
+- **Failure case**: Several services failed `COPY` because of case mismatches in directory names
+- **Fix validation**: Corrected uniformly after confirming the actual directory names with `ls tools/`
 
 ## Usage
 
-- **触发条件**: macOS 上构建通过但 Linux 上 COPY 报 `file not found`
-- **调用方式**: `ls -1 tools/` 列出实际目录名，逐一比对 Dockerfile 和 compose 文件中的引用
-- **注意事项**: 不仅仅是目录名——文件名同理（如 `service.py` vs `Service.py`）
+- **Trigger conditions**: The build passes on macOS but COPY reports `file not found` on Linux
+- **How to invoke**: List the actual directory names with `ls -1 tools/` and compare them one by one against the references in the Dockerfiles and compose files
+- **Caveats**: Not only directory names—file names are the same (e.g. `service.py` vs `Service.py`)
